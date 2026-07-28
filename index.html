@@ -840,14 +840,13 @@
   </main>
 </div>
 
-<!-- promise-based dialogs; no window.alert/confirm/prompt anywhere -->
-<div class="modal-wrap" id="modalWrap" hidden>
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-    <div class="modal-head"><h3 id="modalTitle"></h3><div class="msub" id="modalSub"></div></div>
-    <div class="modal-body" id="modalBody"></div>
-    <div class="modal-foot" id="modalFoot"></div>
-  </div>
-</div>
+<!-- Promise-based dialogs; no window.alert/confirm/prompt anywhere.
+     There is deliberately NO static markup for the modal: `openModal()` builds
+     and appends its own `.modal-wrap` each time. A placeholder used to sit here,
+     which meant two elements carried id="modalTitle" whenever a dialog was open —
+     so the dialog's own `aria-labelledby` resolved to the empty placeholder and
+     screen readers announced an untitled dialog. -->
+<div id="lightbox-anchor" hidden></div>
 
 <div class="lightbox" id="lightbox" hidden onclick="closeLightbox()">
   <button class="lbclose" type="button" aria-label="Close">✕</button>
@@ -866,6 +865,17 @@
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){
   return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function uid(p){return (p||'id')+'-'+Math.random().toString(36).slice(2,8);}
+
+/* esc() alone is NOT safe inside an inline handler. It turns ' into &#39;, and
+   the HTML parser decodes attribute entities before JavaScript ever sees the
+   value — so onclick="f('Bob&#39;s Bag')" reaches the engine as f('Bob's Bag')
+   and throws. Backslash-escape for the JS string layer FIRST, then esc() for
+   the attribute layer; the entity decode then yields a correct \' and the
+   string survives. Use this for any value going into an on* attribute. */
+function jsq(s){
+  return esc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")
+    .replace(/\r?\n/g,'\\n'));
+}
 
 /* ---------- in-site dialogs ----------
    Everything here replaces window.alert/confirm/prompt. Three reasons the native
@@ -949,9 +959,12 @@ function uiConfirm(msg,title,opts){
 // than resolved as '' — every caller here treats '' as "user cancelled" anyway.
 function uiPrompt(msg,def,title,opts){
   opts=opts||{};
-  var multi=!!opts.multiline, allowEmpty=!!opts.allowEmpty;
+  // `rows` implies multiline: a caller asking for 12 rows plainly wants a
+  // textarea, and honouring only `multiline` meant a 14-line checklist was
+  // handed to a single-line <input>, which silently drops every newline.
+  var multi=!!opts.multiline||!!opts.rows, allowEmpty=!!opts.allowEmpty;
   var field=multi
-    ? '<textarea id="mPromptIn" rows="3">'+esc(def||'')+'</textarea>'
+    ? '<textarea id="mPromptIn" rows="'+(opts.rows||3)+'">'+esc(def||'')+'</textarea>'
     : '<input type="text" id="mPromptIn" value="'+esc(def||'')+'">';
   return openModal({title:title||'',message:msg,
     body:'<div class="field">'+field+'</div>',
@@ -980,10 +993,10 @@ function uiForm(title,message,fields,opts){
     return '<div class="field"><label for="'+id+'">'+esc(f.label)+(f.required?'':' <span style="text-transform:none;letter-spacing:0;font-weight:500">(optional)</span>')+'</label>'+
       input+(f.hint?'<p class="hint">'+esc(f.hint)+'</p>':'')+'</div>';
   }).join('');
-  // A <datalist> has to be in the document for `list=` to resolve, and the modal
-  // is built fresh each time, so it ships inside the modal body.
-  if(fields.some(function(f){return f.datalist==='itemsug-modal';}))
-    body=itemDatalist('itemsug-modal')+body;
+  // The bike site injected an item-suggestion <datalist> here via itemDatalist().
+  // That function was not carried over, so the call was a dangling reference —
+  // harmless only because no field on this site sets `datalist`. Removed rather
+  // than left as a trap for the first person who adds one.
   return openModal({title:title,message:message,body:body,
     okText:opts.okText||'Save',cancelText:'Cancel',focus:'#mf-'+fields[0].key,
     onOk:function(w){
@@ -1778,7 +1791,16 @@ function saveDB(){
 }
 function resetDB(){
   try{ localStorage.removeItem(LS_DB); }catch(e){}
-  loadDB(); renderAll();
+  loadDB();
+  // Reload the content AND drop the in-memory form state. Without this, a form
+  // that had been submitted stayed frozen on its "Filed" completion card after a
+  // reset, because renderCheck() renders the done panel whenever formDone is
+  // still true — so the site looked broken in exactly the moment someone was
+  // trying to put it back to a clean state.
+  Object.keys(FORMS).forEach(function(f){
+    formDone[f]=false; formPick[f]=null; usageRows[f]=null; delete lastResult[f];
+  });
+  renderAll();
 }
 
 /* ============================================================================
@@ -1835,18 +1857,23 @@ function setRole(r,quiet){
 function openRolePicker(){
   if(ROLE!=='member'){
     uiConfirm('You are signed in as '+ROLE_LABEL[ROLE]+'. Sign out?','Manager access',
-              {ok:'Sign out',cancel:'Stay signed in'})
+              {okText:'Sign out',cancelText:'Stay signed in'})
       .then(function(y){ if(y) setRole('member'); });
     return;
   }
+  // NOTE: the dialog helpers take `key` (not `id`) on a field, and `okText`
+  // (not `ok`) in options. Getting that wrong is silent — the field renders,
+  // the dialog opens, and the result object comes back keyed `undefined`, so
+  // the caller's `v.role` is undefined and nothing happens. That shipped once
+  // and made manager sign-in a no-op.
   uiForm('Manager access',
     'Pick your role. This unlocks that role\'s tools on this device — it does not '+
     'protect anything, so keep anything sensitive off this site.',
-    [{id:'role',label:'Role',type:'select',options:[
+    [{key:'role',label:'Role',type:'select',required:true,value:'office',options:[
         {v:'office',t:'Office Manager'},
         {v:'equipment',t:'Equipment Manager'},
         {v:'ops',t:'Operations Officer (both)'}]}],
-    {ok:'Unlock'})
+    {okText:'Unlock'})
    .then(function(v){ if(v&&v.role) setRole(v.role); });
 }
 
@@ -2136,7 +2163,8 @@ function renderUsage(fid){
     var unitName=(items.filter(function(c){return c.id===r.item;})[0]||{}).unit||'';
     return '<div class="urow">'+
       '<select aria-label="Item" onchange="setUsage(\''+fid+'\','+i+',\'item\',this.value)">'+itemOpts+'</select>'+
-      '<div class="uqty"><input type="number" min="1" step="1" value="'+esc(String(r.qty||1))+'" '+
+      '<div class="uqty"><input type="number" min="1" max="'+USAGE_MAX+'" step="1" '+
+        'inputmode="numeric" value="'+esc(String(r.qty||1))+'" '+
         'aria-label="How many" onchange="setUsage(\''+fid+'\','+i+',\'qty\',this.value)">'+
         '<span class="uunit">'+esc(unitName)+'</span></div>'+
       '<select aria-label="Where from" onchange="setUsage(\''+fid+'\','+i+',\'from\',this.value)">'+unitOpts+'</select>'+
@@ -2146,10 +2174,14 @@ function renderUsage(fid){
   }).join('');
 }
 
+// 999 is not a real restock quantity, it is a stuck key. Left uncapped, one
+// fat-fingered entry dominates the buy-list and whoever is ordering has to work
+// out which line to disbelieve.
+var USAGE_MAX=999;
 function setUsage(fid,i,k,v){
   var rows=usageState(fid);
   if(!rows[i]) return;
-  rows[i][k] = (k==='qty') ? Math.max(1,parseInt(v,10)||1) : v;
+  rows[i][k] = (k==='qty') ? Math.min(USAGE_MAX,Math.max(1,parseInt(v,10)||1)) : v;
   if(k==='item') renderUsage(fid);       // the unit label depends on the item
   onFormInput(fid);
 }
@@ -2182,7 +2214,7 @@ function checkBody(fid){
     if(room && room.photo){
       h+='<div class="card mt"><h3>What "done" looks like</h3>'+
          '<button type="button" class="photo" style="max-width:340px" '+
-         'onclick="openLightbox(\'assets/rooms/'+esc(room.photo)+'.jpg\',\''+esc(room.name)+'\')">'+
+         'onclick="openLightbox(\'assets/rooms/'+jsq(room.photo)+'.jpg\',\''+jsq(room.name)+'\')">'+
          '<img src="assets/rooms/'+esc(room.photo)+'.jpg" alt="'+esc(room.name)+
          ' reference photo" loading="lazy">'+
          '<div class="pcap">'+esc(room.name)+'<small>Tap to enlarge</small></div></button></div>';
@@ -2339,10 +2371,14 @@ function renderDraftNote(fid){
 function clearDraft(fid){ var d=readDrafts(); delete d[fid]; writeDrafts(d); }
 
 function discardCheck(fid){
-  uiConfirm('Clear everything on this form?','Start over',{ok:'Clear',cancel:'Keep it'})
+  uiConfirm('Clear everything on this form?','Start over',
+            {okText:'Clear',cancelText:'Keep it'})
     .then(function(y){
       if(!y) return;
-      clearDraft(fid); formPick[fid]=null; formDone[fid]=false; renderCheck(fid);
+      // usageRows is in-memory state, not part of the draft — clearing the draft
+      // alone left the typed usage rows sitting on screen after "Clear".
+      clearDraft(fid); formPick[fid]=null; formDone[fid]=false; usageRows[fid]=null;
+      renderCheck(fid);
     });
 }
 
@@ -2437,13 +2473,33 @@ function doSubmit(fid,s){
         where:s.pickName, by:openedBy});
     }
   }else{
-    s.missing.forEach(function(m){
-      addIssue({area:c.tab==='Room Checks'?'Office':'Equipment', urgency:'Soon',
-        what:m, where:s.pickName, by:openedBy});
-    });
-    ['restock','maint','short'].forEach(function(k){
-      if(s.extras[k]) addIssue({area:c.tab==='Room Checks'?'Office':'Equipment',
-        urgency:'Soon', what:s.extras[k], where:s.pickName, by:openedBy});
+    /* An unticked box only becomes a reported problem on the forms where it
+       actually means one.
+
+       On a room check or a bag check, the list describes the WORLD: "sink empty",
+       "2 tourniquets present". Leaving one unticked says something is wrong and a
+       manager should look.
+
+       On post-call and post-shift the list describes YOUR TASKS: "shoes tucked
+       back in their cubby", "radio back in the radio room". Leaving one unticked
+       says you did not do it — that is not an equipment fault, and filing it as
+       one buried the problem log. One post-shift submission with nothing ticked
+       used to create six issues, and one post-call created nine; across eighty
+       members that drowns every real concern within days, including in the
+       Friday email. The counts still reach the spreadsheet either way, which is
+       where "who is not closing out their shift" belongs. */
+    var TASKLIST={'Post-Call':1,'Post-Shift':1};
+    var area=(c.tab==='Room Checks')?'Office':'Equipment';
+    if(!TASKLIST[c.tab]){
+      s.missing.forEach(function(m){
+        addIssue({area:area, urgency:'Soon', what:m, where:s.pickName, by:openedBy});
+      });
+    }
+    // Free text is always a real report, on every form — somebody chose to type it.
+    [['restock','Office'],['maint','Office'],['short','Equipment']].forEach(function(pair){
+      var v=s.extras[pair[0]];
+      if(v) addIssue({area:(c.tab==='Room Checks')?pair[1]:area, urgency:'Soon',
+        what:v, where:s.pickName, by:openedBy});
     });
   }
 
@@ -2511,7 +2567,7 @@ function renderRoleCards(){
   host.innerHTML=DB.roles.map(function(r){
     var ext=!!r.external;
     return '<button type="button" class="rolecard'+(ext?' ext':'')+'" '+
-      (ext?'onclick="openExternal(\''+esc(r.external)+'\',\''+esc(r.title)+'\')"'
+      (ext?'onclick="openExternal(\''+jsq(r.external)+'\',\''+jsq(r.title)+'\')"'
           :'onclick="go(\'roles\')"')+'>'+
       '<span class="rc-ic">'+(ICON[r.id]||'◈')+'</span>'+
       '<b>'+esc(r.title)+'</b>'+
@@ -2522,7 +2578,8 @@ function renderRoleCards(){
 
 function openExternal(url,title){
   uiConfirm('The '+title+' role has its own site, with its own checks and QR codes. '+
-            'Open it in a new tab?','Leaving Operations',{ok:'Open it',cancel:'Stay here'})
+            'Open it in a new tab?','Leaving Operations',
+            {okText:'Open it',cancelText:'Stay here'})
     .then(function(y){ if(y) window.open(url,'_blank','noopener'); });
 }
 
@@ -2536,8 +2593,8 @@ function renderRooms(){
   h+='<div class="photogrid">';
   DB.rooms.forEach(function(r){
     if(!r.photo) return;
-    h+='<button type="button" class="photo" onclick="openLightbox(\'assets/rooms/'+esc(r.photo)+
-       '.jpg\',\''+esc(r.name)+'\')">'+
+    h+='<button type="button" class="photo" onclick="openLightbox(\'assets/rooms/'+jsq(r.photo)+
+       '.jpg\',\''+jsq(r.name)+'\')">'+
        '<img src="assets/rooms/'+esc(r.photo)+'.jpg" alt="'+esc(r.name)+'" loading="lazy">'+
        '<div class="pcap">'+esc(r.name)+'<small>'+r.slots+' slots per duty period</small></div></button>';
   });
@@ -2552,8 +2609,8 @@ function renderRooms(){
        'not claimable as a duty-period task — still the Office Manager\'s to keep an eye on.</p>'+
        '<div class="photogrid">';
     DB.otherSpaces.forEach(function(s){
-      h+='<button type="button" class="photo" onclick="openLightbox(\'assets/rooms/'+esc(s.photo)+
-         '.jpg\',\''+esc(s.name)+'\')">'+
+      h+='<button type="button" class="photo" onclick="openLightbox(\'assets/rooms/'+jsq(s.photo)+
+         '.jpg\',\''+jsq(s.name)+'\')">'+
          '<img src="assets/rooms/'+esc(s.photo)+'.jpg" alt="'+esc(s.name)+'" loading="lazy">'+
          '<div class="pcap">'+esc(s.name)+'<small>'+esc(s.note)+'</small></div></button>';
     });
@@ -2605,8 +2662,8 @@ function renderBags(){
     if(b.photos&&b.photos.length){
       h+='<div class="photogrid">';
       b.photos.forEach(function(p){
-        h+='<button type="button" class="photo" onclick="openLightbox(\'assets/bags/'+esc(p)+
-           '.jpg\',\''+esc(b.name)+'\')">'+
+        h+='<button type="button" class="photo" onclick="openLightbox(\'assets/bags/'+jsq(p)+
+           '.jpg\',\''+jsq(b.name)+'\')">'+
            '<img src="assets/bags/'+esc(p)+'.jpg" alt="'+esc(b.name)+'" loading="lazy">'+
            '<div class="pcap">'+esc(b.name)+'<small>'+esc(p.replace(/-/g,' '))+'</small></div></button>';
       });
@@ -2654,8 +2711,8 @@ function renderRoles(){
        'letter-spacing:.08em">'+esc(r.time||'')+'</p>'+
        '<p style="font-size:14.5px;color:var(--ink-soft);margin:0 0 12px">'+esc(r.summary)+'</p>';
     if(r.external){
-      h+='<button class="btn solid sm" onclick="openExternal(\''+esc(r.external)+'\',\''+
-         esc(r.title)+'\')">Open the Bike Ops site</button>';
+      h+='<button class="btn solid sm" onclick="openExternal(\''+jsq(r.external)+'\',\''+
+         jsq(r.title)+'\')">Open the Bike Ops site</button>';
     }
     (r.duties||[]).forEach(function(d){
       h+='<div class="acc"><button type="button" class="acchead" onclick="toggleAcc(this)">'+
@@ -2766,12 +2823,13 @@ function flagRestock(id){
 
 function addSupply(){
   uiForm('Add a supply','Something the office should not run out of.',
-    [{id:'item',label:'Item',type:'text'},
-     {id:'where',label:'Where it lives',type:'text'},
-     {id:'par',label:'Keep on hand',type:'text'}],{ok:'Add'})
+    [{key:'item',label:'Item',type:'text',required:true},
+     {key:'where',label:'Where it lives',type:'text'},
+     {key:'par',label:'Keep on hand',type:'text'}],{okText:'Add'})
    .then(function(v){
      if(!v||!v.item) return;
-     DB.officeSupplies.push({id:uid('os'),item:v.item,where:v.where||'—',par:v.par||'—'});
+     DB.officeSupplies.push({id:uid('os'),item:v.item.trim(),
+                             where:(v.where||'').trim()||'—',par:(v.par||'').trim()||'—'});
      saveDB(); renderRestock();
    });
 }
@@ -2860,10 +2918,10 @@ function toggleUnit(id){
 }
 function addUnit(){
   uiForm('Add a bag','A physical bag or kit on the rack, not a kit type.',
-    [{id:'name',label:'Name as written on the bag',type:'text'},
-     {id:'type',label:'Type',type:'select',options:[
+    [{key:'name',label:'Name as written on the bag',type:'text',required:true},
+     {key:'type',label:'Type',type:'select',value:'jumpkit',options:[
        {v:'jumpkit',t:'Jumpkit'},{v:'event',t:'Event bag'},{v:'blue',t:'Blue bag'},
-       {v:'ccpod',t:'Crew chief pod'},{v:'other',t:'Something else'}]}],{ok:'Add'})
+       {v:'ccpod',t:'Crew chief pod'},{v:'other',t:'Something else'}]}],{okText:'Add'})
    .then(function(v){
      if(!v||!v.name) return;
      DB.bagUnits.push({id:uid('unit'),name:v.name.trim(),type:v.type||'other',active:true});
@@ -2873,14 +2931,15 @@ function addUnit(){
 
 function addInvItem(){
   uiForm('Add an item','Adds it to the schema. Counts still live in the spreadsheet.',
-    [{id:'item',label:'Item',type:'text'},
-     {id:'loc',label:'Where it lives',type:'text'},
-     {id:'cat',label:'Category',type:'text'},
-     {id:'par',label:'Par',type:'text'}],{ok:'Add'})
+    [{key:'item',label:'Item',type:'text',required:true},
+     {key:'loc',label:'Where it lives',type:'text'},
+     {key:'cat',label:'Category',type:'text'},
+     {key:'par',label:'Par',type:'text'}],{okText:'Add'})
    .then(function(v){
      if(!v||!v.item) return;
-     DB.inventory.push({id:uid('iv'),item:v.item,loc:v.loc||'Equipment Room',
-                        cat:v.cat||'Equipment',par:v.par||'—'});
+     DB.inventory.push({id:uid('iv'),item:v.item.trim(),
+                        loc:(v.loc||'').trim()||'Equipment Room',
+                        cat:(v.cat||'').trim()||'Equipment',par:(v.par||'').trim()||'—'});
      saveDB(); renderInventory();
    });
 }
@@ -3249,7 +3308,7 @@ function exportDB(){
 function confirmReset(){
   uiConfirm('This throws away every edit made in this browser and puts the site back to its '+
             'shipped content. Submitted forms are not affected.','Reset content',
-            {ok:'Reset',cancel:'Keep my edits',danger:true})
+            {okText:'Reset',cancelText:'Keep my edits',danger:true})
     .then(function(y){ if(y) resetDB(); });
 }
 
