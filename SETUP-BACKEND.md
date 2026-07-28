@@ -26,6 +26,33 @@ that account the whole way through.
 While you are there: turn on 2-factor auth, and write the recovery details
 somewhere the org will still have them in two years.
 
+### If you cannot make the account yet
+
+Google rate-limits account creation per phone number, and the limit resets on its
+own after a while. If you are stuck against it, **use `bikecmuems@gmail.com` in
+the meantime.** It is already a shared organisation account rather than a
+personal one, which is the property that matters — the system does not walk out
+of the door with whoever set it up.
+
+Do the rest of this document signed in as the bike account, and make a
+**separate** spreadsheet for ops rather than adding tabs to either bike file.
+Keeping them as distinct files is what makes the handover a one-click ownership
+transfer later.
+
+Two things to know about the interim arrangement:
+
+- **Whoever holds the bike account can read every ops submission.** That account
+  gets handed to the next Bike Manager. This is a role-boundary problem rather
+  than a security one, but it is the kind of thing nobody notices until a
+  handover — so move off it when you can, and mention it to the Ops Officer in
+  the meantime.
+- **Migrating later is cheap, and nothing printed changes.** The QR codes encode
+  the *site* address (`sonnnnnion.github.io/ems-ops/#room-check`), never the
+  Apps Script address, so stickers already on the wall keep working. To move:
+  transfer ownership of the ops spreadsheet in Drive (the bound script goes with
+  it), have the new owner **Deploy ▸ New deployment**, then paste the new `/exec`
+  URL into Site Settings. One field.
+
 ---
 
 ## 1. Make the spreadsheet
