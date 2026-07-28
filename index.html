@@ -1,0 +1,2665 @@
+<!doctype html>
+<html lang="en" data-theme="ems">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CMU EMS · Operations</title>
+<meta name="description" content="Operations hub for CMU EMS: room checks, equipment and bag checks, inventory, and the forms behind them.">
+<link rel="icon" href="assets/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<meta name="theme-color" content="#8c1c2b">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,600&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    /* ---- CMU EMS: burgundy primary on warm paper.
+       The burgundy is ours; the warmth, type scale and soft depth follow the
+       21-254 site. --rule and --shadow-* are deliberately remapped from the old
+       hard 2px/0-offset brutalist values, so every component that references
+       them softens at once rather than needing 200 individual edits. ---- */
+    --bg:#FBF8F4; --bg-2:#F4EFE7; --card:#FFFFFF; --card-2:#FDFBF8;
+    --ink:#241A1D; --ink-soft:#4A3A3F; --ink-mute:#6B5C61; --ink-faint:#8E7F84;
+    --rule:#E7E1D6; --rule-soft:#EFE9DF; --rule-strong:#D8CFC2; --rule-ink:#241A1D;
+    --brand:#8c1c2b; --brand-2:#a81f33; --brand-deep:#6d1522;
+    --brand-wash:#F7E9EB; --brand-tint:#FCF2F3;
+    --accent:#c41230; --accent-ink:#9c0f26;
+    /* gold bridges the purple-and-gold crest to the burgundy without re-theming */
+    --gold:#B89642; --gold-wash:#F7EFDD;
+    --chip:#fff;
+    --shadow-sm:0 1px 2px rgba(36,26,29,.05), 0 1px 3px rgba(36,26,29,.04);
+    --shadow-md:0 2px 6px rgba(36,26,29,.06), 0 8px 20px rgba(36,26,29,.05);
+    --shadow-lg:0 4px 12px rgba(36,26,29,.07), 0 16px 40px rgba(36,26,29,.07);
+    --font-display:'Fraunces','Iowan Old Style',Georgia,serif;
+    --font-body:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    --font-mono:'JetBrains Mono',ui-monospace,'SF Mono',monospace;
+    --display-wt:700;
+    --r-sm:6px; --radius:10px; --r-md:14px; --r-lg:20px; --r-xl:28px;
+    --ok:#2F7A4A; --warn:#B45309; --oos:#C8102E;
+    --ok-wash:#E1F0E5; --warn-wash:#FBF0DC; --oos-wash:#FBE7EA;
+    --ease:cubic-bezier(.2,.7,.2,1); --ease-out:cubic-bezier(.16,1,.3,1);
+    --maxw:1120px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{color:var(--ink);font-family:var(--font-body);line-height:1.55;-webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+    background-color:var(--bg);
+    background-image:
+      radial-gradient(circle at 1px 1px, rgba(36,26,29,.045) 1px, transparent 0),
+      radial-gradient(1200px 600px at 85% -10%, rgba(140,28,43,.05), transparent 60%),
+      radial-gradient(900px 500px at -10% 110%, rgba(184,150,66,.05), transparent 60%);
+    background-size:26px 26px, 100% 100%, 100% 100%;
+    background-attachment:fixed}
+  ::selection{background:var(--brand);color:#fff}
+  h1,h2,h3,.display{font-family:var(--font-display)}
+  a{color:var(--accent-ink)}
+  .mono{font-family:var(--font-mono)}
+
+  /* ---------- form controls ---------- */
+  label{display:block;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-faint);margin:0 0 6px}
+  input[type=text],input[type=password],input[type=url],input[type=date],input[type=number],textarea,select{
+    width:100%;padding:11px 13px;border:1.5px solid var(--rule-strong);border-radius:var(--radius);background:#fff;color:var(--ink);
+    font-family:var(--font-body);font-size:15px;transition:border-color .16s var(--ease),box-shadow .16s var(--ease)}
+  input:focus,textarea:focus,select:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-wash)}
+  .hint{font-size:12px;color:var(--ink-faint);margin-top:10px}
+  .field{margin-bottom:14px}
+  .field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:640px){.field-row{grid-template-columns:1fr}}
+
+  /* ---------- shell ---------- */
+  #app{display:grid;min-height:100vh;grid-template-columns:236px 1fr;grid-template-rows:auto 1fr}
+  /* 1/-1 not 1/3 — on narrow screens #app drops to a single column, and a hard
+     -coded 2-column span would conjure an implicit second column back into it. */
+  .topbar{grid-column:1/-1;display:flex;align-items:center;gap:14px;padding:12px 20px;
+    background:linear-gradient(180deg,var(--brand) 0%,var(--brand-deep) 100%);color:#fff;
+    border-bottom:1px solid rgba(0,0,0,.18);box-shadow:var(--shadow-sm);position:sticky;top:0;z-index:20}
+  .brand{display:flex;flex-direction:column;line-height:1.1}
+  .brand b{font-family:var(--font-display);font-weight:var(--display-wt);font-size:20px;letter-spacing:-.015em;color:#fff}
+  .brand .term{font-size:10.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#e8bfc6}
+  .topbar .spacer{flex:1}
+  .topbar .btn{background:rgba(255,255,255,.14);color:#fff;border-color:rgba(255,255,255,.4);box-shadow:none;border-radius:999px}
+  .topbar .btn:hover{background:rgba(255,255,255,.24);border-color:rgba(255,255,255,.7);transform:translateY(-1px)}
+  .role-pill{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;border-radius:999px;
+    border:1.5px solid rgba(255,255,255,.45);padding:5px 11px;color:#fff}
+  .role-pill.web{background:#fff;color:var(--brand);border-color:#fff;font-weight:700}
+  /* The mark has transparent corners, so a round white backing reads as a badge
+     rather than a sticker on a square tile. The white ring also keeps the crest's
+     purple off the burgundy, where the two would muddy each other. */
+  .logo-mark{width:38px;height:38px;object-fit:contain;flex:0 0 auto;background:#fff;padding:2px;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+  .logo-fallback{width:38px;height:38px;flex:0 0 auto;display:grid;place-items:center;background:#fff;color:var(--brand);
+    font-weight:800;font-size:11px;letter-spacing:.02em;border-radius:var(--r-sm)}
+
+  .sidebar{border-right:1px solid var(--rule);padding:18px 12px;background:transparent;display:flex;flex-direction:column;gap:2px}
+  /* Real <button>s, not styled divs. A div is not reachable by Tab and does not
+     respond to Enter or Space, which left the whole navigation unusable without a
+     mouse. Everything below the first two lines is undoing button defaults; the
+     click handler is delegated on #nav, so it kept working unchanged. */
+  .sb-item{display:flex;align-items:center;gap:10px;padding:10px 13px;border-radius:var(--radius);cursor:pointer;font-weight:500;font-size:14.5px;color:var(--ink-soft);
+    width:100%;text-align:left;background:none;border:0;font-family:inherit;line-height:inherit;-webkit-appearance:none;appearance:none}
+  .sb-item:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+  .sb-item .ic{width:18px;text-align:center;color:var(--brand);opacity:.75}
+  .sb-item:hover{background:var(--bg-2);color:var(--ink)}
+  .sb-item.active{background:var(--brand);color:#fff;font-weight:600;box-shadow:var(--shadow-sm)}
+  .sb-item.active .ic{color:#fff;opacity:1}
+  .sb-label{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--ink-faint);padding:14px 13px 5px}
+
+  /* `min-width:0` is load-bearing. A grid item defaults to `min-width:auto`,
+     which means it refuses to shrink below its widest child — so the inventory
+     table's `min-width:600px` widened the whole grid track and gave the page a
+     horizontal scrollbar at 375px instead of scrolling inside `.invwrap`. */
+  main{padding:32px clamp(18px,4vw,44px);max-width:var(--maxw);min-width:0}
+  .view{display:none}
+  .view.active{display:block;animation:viewIn .42s var(--ease-out)}
+  @keyframes viewIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .btn{transition:transform .14s var(--ease),box-shadow .14s var(--ease)}
+  .sb-item{transition:background .18s var(--ease),border-color .18s var(--ease),color .18s var(--ease)}
+  @media(prefers-reduced-motion:reduce){
+    .view.active{animation:none}
+    .btn,.sb-item{transition:none}
+    .btn:hover{transform:none}
+  }
+  h2.view-title{font-family:var(--font-display);font-weight:var(--display-wt);font-size:34px;letter-spacing:-.025em;margin:0 0 6px;line-height:1.15}
+  h2.view-title em{font-style:italic;color:var(--brand)}
+  .view-sub{color:var(--ink-mute);font-size:15px;margin:0 0 26px;max-width:64ch}
+  /* The hamburger only exists on narrow screens; on desktop the sidebar is always
+     there and a menu button would be a control that does nothing. */
+  .navtoggle{display:none;flex:0 0 auto;width:38px;height:38px;padding:0;margin-right:2px;
+    background:rgba(255,255,255,.14);border:1.5px solid rgba(255,255,255,.35);border-radius:var(--radius);
+    cursor:pointer;align-items:center;justify-content:center;-webkit-appearance:none;appearance:none}
+  .navtoggle:focus-visible{outline:2px solid #fff;outline-offset:2px}
+  .bars{display:block;width:17px}
+  .bars span{display:block;height:2px;background:#fff;border-radius:2px;margin:3.5px 0;
+    transition:transform .22s var(--ease),opacity .18s var(--ease)}
+  body.nav-open .bars span:nth-child(1){transform:translateY(5.5px) rotate(45deg)}
+  body.nav-open .bars span:nth-child(2){opacity:0}
+  body.nav-open .bars span:nth-child(3){transform:translateY(-5.5px) rotate(-45deg)}
+  /* pointer-events is the whole reason this works. The scrim is present but
+     transparent whenever the drawer is shut, and a transparent element still
+     receives taps — so without this it sat over the entire page at z-index 29,
+     above the topbar, and swallowed every tap including the one on the hamburger
+     meant to open it. Opacity alone is invisible, not intangible. */
+  .navscrim{display:none;position:fixed;inset:0;z-index:29;background:rgba(36,26,29,.42);
+    opacity:0;pointer-events:none;transition:opacity .22s var(--ease)}
+  body.nav-open .navscrim{opacity:1;pointer-events:auto}
+
+  /* Narrow screens: the sidebar becomes a slide-in drawer rather than a horizontal
+     strip. The strip technically worked but showed three items at a time and hid
+     the group labels, so most of the site was undiscoverable without knowing to
+     swipe sideways. It must NOT simply be hidden — QR codes are scanned on phones,
+     so a member landing on a form deep link needs a way to reach everything else. */
+  @media(max-width:820px){
+    .cols-2,.cols-3{grid-template-columns:1fr}
+    #app{grid-template-columns:1fr}
+    .navtoggle{display:flex}
+    .navscrim{display:block}
+    .sidebar{position:fixed;top:0;left:0;bottom:0;width:min(84vw,300px);z-index:30;
+      flex-direction:column;gap:2px;padding:16px 12px calc(16px + env(safe-area-inset-bottom));
+      background:var(--bg);border-right:1px solid var(--rule);border-bottom:0;
+      box-shadow:var(--shadow-lg);overflow-y:auto;-webkit-overflow-scrolling:touch;
+      transform:translateX(-102%);transition:transform .26s var(--ease-out);
+      visibility:hidden}
+    /* translateX(0), not `none`. Transitioning between `none` and a transform
+       function is unreliable — the browser has no matching start value to
+       interpolate from and can leave the element parked at its start offset. */
+    body.nav-open .sidebar{transform:translateX(0);visibility:visible}
+    .sb-item{padding:11px 13px;font-size:15px;border-radius:var(--radius);white-space:normal}
+    .sb-item .ic{display:inline-block}
+    .sb-label{display:block}
+    h2.view-title{font-size:27px}
+  }
+  @media(prefers-reduced-motion:reduce){
+    .sidebar,.navscrim,.bars span{transition:none}
+  }
+
+  .card{border:1px solid var(--rule);border-radius:var(--r-md);background:var(--card);box-shadow:var(--shadow-md);padding:22px}
+  .card h3{margin:0 0 10px;font-size:17px;font-weight:600;font-family:var(--font-display);letter-spacing:-.01em}
+  .card.soft{box-shadow:var(--shadow-sm)}
+  .card.brandtop{border-top:3px solid var(--brand)}/* wrap the pill onto its own line rather than letting a long bike name break */
+  .bike-head b{font-family:var(--font-display);font-size:20px;font-weight:600;letter-spacing:-.015em}
+  .kv span:first-child{color:var(--ink-faint)}/* Value + its manager controls. The controls sit after the value and are gated
+     by .row.webonly, so member view sees exactly the old right-aligned value. */
+  .kv .kvacts .btn{padding:2px 7px;font-size:11px}
+  /* On a phone the label, the value and four buttons cannot share one line — the
+     value shreds into four wrapped words. Stack them instead. Scoped to manager
+     mode because member view has no buttons and reads fine as a two-column row. */
+  @media (max-width:620px){
+    body.is-web .kv{flex-direction:column;align-items:stretch;gap:6px;padding:10px 0}
+    body.is-web .kv .kvval{justify-content:space-between;text-align:left;gap:8px}
+    body.is-web .kv .kvval>span:first-child{flex:1}
+  }
+  /* Role summary paragraph on Role & Boundaries. */
+  .rolesum{font-size:13.5px;color:var(--ink-mute);line-height:1.6;margin:0 0 12px}/* Part headings on the Bylaws page. */
+  .mt-lg{margin-top:34px}
+
+  .btn{display:inline-flex;align-items:center;gap:8px;font-family:var(--font-body);font-weight:600;font-size:14.5px;padding:10px 16px;border:1.5px solid var(--rule-strong);background:var(--chip);color:var(--ink);cursor:pointer;border-radius:var(--radius);box-shadow:var(--shadow-sm)}
+  .btn:hover{transform:translateY(-1px);box-shadow:var(--shadow-md);border-color:var(--brand)}
+  .btn:active{transform:translateY(0);box-shadow:var(--shadow-sm)}
+  .btn.solid{background:var(--brand);color:#fff;border-color:var(--brand)}
+  .btn.solid:hover{background:var(--brand-2);border-color:var(--brand-2)}
+  .btn.danger{background:var(--oos);color:#fff;border-color:var(--oos)}
+  .btn.sm{padding:6px 10px;font-size:12.5px}
+  .btn.xs{padding:3px 7px;font-size:11px;box-shadow:none}
+  .btn.block{width:100%;justify-content:center}
+  .btn.ghost{box-shadow:none;background:transparent}
+  .btn:disabled{opacity:.45;cursor:not-allowed;transform:none;box-shadow:var(--shadow-sm)}
+  body.is-web .webonly{display:inline-flex}
+  body.is-web .webonly.blockonly{display:block}
+  /* `.webonly` was only ever designed for inline controls, so revealing it forces
+     inline-flex. On a card that turned the whole panel into a flex row and dealt
+     its heading, text and button out as columns. Block-level things that are gated
+     have to say so, or they come back visible but shaped wrong. */
+  body.is-web .card.webonly,
+  body.is-web .sharenote.webonly{display:block}
+  /* The Site Settings nav item needs `flex`, which neither rule above gives it.
+     It used to get that from an inline style set in setWeb() — a SECOND gating
+     mechanism, which meant anything toggling `is-web` without going through
+     setWeb (devtools, a future caller) left the item visible in member view.
+     Stated here instead, so `.is-web` remains the only switch. */
+  body.is-web .sb-item.webonly{display:flex}
+
+  .tag{font-family:var(--font-mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;border:1.5px solid var(--rule);padding:3px 7px;background:#fff;display:inline-block}
+  .tag.crit{background:var(--oos);color:#fff;border-color:transparent}
+  .tag.warn{background:var(--warn);color:#fff;border-color:transparent}
+  .tag.ok{background:var(--ok);color:#fff;border-color:transparent}
+  .tag.brand{background:var(--brand);color:#fff;border-color:transparent}
+
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--rule-soft)}
+  th{font-family:var(--font-mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-faint);border-bottom:1.5px solid var(--rule)}
+
+  .checkline{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px dashed var(--rule-soft)}
+  .checkline input[type=checkbox]{margin-top:3px;width:16px;height:16px;accent-color:var(--brand);flex:0 0 auto}
+  .checkline .lbl{flex:1;font-size:14px}
+  .checkline .lbl small{display:block;color:var(--ink-faint);font-size:12px}
+  .checkline .qty{font-family:var(--font-mono);font-size:11.5px;color:var(--ink-faint);white-space:nowrap}
+  .checkline.done .lbl{color:var(--ink-faint)}
+
+  .verdict{margin-top:16px;padding:16px;border:2px solid var(--rule);box-shadow:var(--shadow-md);font-weight:700;display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap}
+  .verdict.ok{background:var(--ok-wash)} .verdict.warn{background:var(--warn-wash)} .verdict.oos{background:var(--oos-wash)}
+  .verdict .big{font-family:var(--font-mono);font-size:15px;text-transform:uppercase;letter-spacing:.04em;display:block}
+  .verdict .detail{font-weight:500;font-size:13px;color:var(--ink-soft);margin-top:6px;display:block}/* aspect-ratio is set inline per video — see ASPECTS. The striped fill is the
+     "not linked yet" placeholder; once an embed is in, the box goes black so any
+     letterboxing the player still adds reads as film, not as a broken layout. */
+  .video .thumb iframe{width:100%;height:100%;border:0;display:block}
+  /* Each card sizes to its own content, so one tall embed does not stretch its
+     neighbours into a column of empty space. */
+  #videoGrid{align-items:start}/* Google's preview players draw fixed-size chrome. Under roughly 380px the play
+     and popout buttons are cut off instead of shrinking, which makes the video
+     unwatchable in place — hence the floor, and the single column below it. */
+  @media(max-width:900px){ #videoGrid{grid-template-columns:1fr} }
+  .module .embed{min-height:220px}
+  .video .meta b{display:block;font-size:14px}
+  .video .meta small{color:var(--ink-faint);font-size:12px}/* Advisory, not an alarm — it appears on every view, so it stays quiet:
+     no monospace, no full-width slab, sits inline like a footnote. */
+  .placeholder{border:1px solid var(--rule-strong);border-radius:var(--r-sm);background:var(--card-2);color:var(--ink-mute);font-size:13px;padding:9px 12px;margin-top:10px}
+  .draftnote{border:1px solid #E8D3A8;border-radius:var(--r-sm);background:var(--warn-wash);color:#7a4d00;font-size:12.5px;padding:8px 11px;margin-bottom:14px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .mt{margin-top:14px}/* ---------- expiry badges ---------- */
+  .exprow input[type=date]{max-width:190px}/* ---------- grounded / disabled form ---------- *//* ---------- form builder (manager mode) ---------- */
+  .builder h4{margin:0 0 4px;font-size:14px;font-weight:700;color:var(--brand)}
+  .bsection .bhead input{font-weight:700}
+  .bitem input[type=text]{font-size:13px;padding:6px 8px}
+  .bitem input[type=number]{font-size:13px;padding:6px 8px;text-align:center}
+  @media(max-width:640px){.bitem{grid-template-columns:1fr;gap:5px}}
+
+  /* ---------- collapsible (bylaws) ---------- */
+  .acc{border:1.5px solid var(--rule);background:var(--card);margin-bottom:10px;box-shadow:var(--shadow-sm)}
+  .acc .acchead{display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer;font-weight:700;font-size:15px}
+  /* min-width, not width — the article numeral is roman, so VIII must be able to
+     widen the badge instead of overflowing a 24px box. */
+  .acc .acchead .num{font-family:var(--font-mono);font-size:11.5px;letter-spacing:.04em;color:#fff;
+    background:var(--brand);min-width:30px;height:24px;padding:0 6px;display:grid;place-items:center;
+    flex:0 0 auto;border-radius:var(--r-sm)}
+  .acc .acchead .chev{margin-left:auto;font-family:var(--font-mono);color:var(--ink-faint);transition:transform .2s var(--ease)}
+  .acc.open .acchead .chev{transform:rotate(90deg)}
+  .acc .accbody{display:none;padding:0 14px 14px 48px;font-size:13.5px;color:var(--ink-soft)}
+  .acc.open .accbody{display:block}
+  .acc .accbody ul{margin:0;padding-left:18px}
+  .acc .accbody li{margin-bottom:5px}
+  /* Clauses: hanging section number, so the text of every clause aligns on one
+     left edge the way a printed governing document does. */
+  .acc .accbody ol.clauses{margin:0;padding:0;list-style:none}
+  .acc .accbody ol.clauses li{display:flex;gap:11px;align-items:baseline;margin-bottom:9px;line-height:1.55}
+  .acc .accbody .cnum{font-family:var(--font-mono);font-size:11.5px;color:var(--brand);
+    flex:0 0 auto;min-width:34px;font-weight:600}
+  .acc .accbody .ctext{flex:1}
+  .acc .accbody textarea{min-height:130px;font-size:13px;font-family:var(--font-body)}/* ---------- lectures ---------- */
+  .module.open .mbody{display:block}
+  .module .embed iframe{width:100%;height:100%;border:0;display:block}/* Compact notice, NOT 16/9 — an unlinked module shouldn't open into a
+     screen-tall empty box just because a real slide deck would be that shape. *//* ---------- CMU EMS logo blocks ---------- */
+  .herobar .htxt b{display:block;font-size:20px;font-weight:800;letter-spacing:-.01em}
+  .herobar .htxt span{font-size:13px;color:var(--ink-faint)}/* ---------- bike diagram (out-of-service) ---------- */
+  @media(max-width:640px){.views{grid-template-columns:1fr}}
+  .viewbox{border:1.5px solid var(--rule);background:var(--card-2);padding:10px 12px 12px}
+  .bikeviz .part *{vector-effect:non-scaling-stroke}
+  .bikeviz .part.solid{fill:var(--ink);stroke:none}
+  .bikeviz .part.solid.flag{fill:var(--oos);stroke:none}
+  @keyframes partpulse{0%,100%{opacity:.82}50%{opacity:1}}
+  .flagchips{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;align-items:center;min-height:24px}
+  @media(prefers-reduced-motion:reduce){.bikeviz .part.flag{animation:none}}
+
+  /* ============================================================
+     SOFTENING LAYER
+     Placed last so it wins on equal specificity. The components below were
+     authored against the old brutalist tokens (hard 2px rules, zero radius);
+     rather than rewrite each one, they are re-cornered and lightened here.
+     ============================================================ */
+  .verdict,.qr,.video,.module,.herobar,.grounded,.expblock,.acc,.diagram-wrap{
+    border-radius:var(--r-md);border-width:1px}
+  .video .thumb,.module>:first-child{border-top-left-radius:var(--r-md);border-top-right-radius:var(--r-md)}
+  .expbadge,.tag,.flagchip{border-radius:999px;border-width:1px}
+
+  /* Sentence case for anything a person actually reads. The global label rule
+     is uppercase for form field names; checkbox rows are prose and were
+     inheriting it, which turned every safety criterion into shouting. */
+  .checkline label,.checkline .lbl,.bitem label{
+    text-transform:none;letter-spacing:normal;font-size:15px;font-weight:500;color:var(--ink);margin:0}
+  .checkline .lbl small{font-size:12.5px}
+  .verdict .big{font-family:var(--font-display);font-size:18px;font-weight:600;
+    text-transform:none;letter-spacing:-.01em}
+  .backlink,.placeholder,.draftnote{font-family:var(--font-body)}
+
+  /* `.row{display:flex}` is declared after `.webonly{display:none}` and has equal
+     specificity, so a `class="row webonly"` element stays visible to members.
+     These two rules raise the gate's specificity above `.row` and close that leak. */
+  .row.webonly{display:none}
+  body.is-web .row.webonly{display:flex}/* Numerals read as data — 21-254 uses the display face for these. *//* ---------- fleet readiness bar ---------- *//* The headline operational fact. "0 of 3 rideable" is an emergency and has to
+     read as one, so the left rule and note colour follow the worst case. */
+  .fleetbar.warn{border-left-color:var(--warn)}/* ---------- bike picker ---------- */
+  /* iOS gives <button> its own colour and font — the system accent blue and the
+     system font — unless both are stated. Every bike name was rendering blue on
+     iPhone and correct everywhere else, which is why it survived desktop review.
+     -webkit-text-fill-color is needed as well; on iOS `color` alone is not always
+     enough inside a button. */
+  button{color:inherit;font-family:inherit;-webkit-text-fill-color:currentColor}
+  .pick.on{border-color:var(--brand);border-width:2px;background:var(--brand-tint);box-shadow:var(--shadow-md)}
+  @media(prefers-reduced-motion:reduce){.pick{transition:none}}
+
+  /* ---------- QR codes ---------- */
+  .qrbox{display:flex;justify-content:center;padding:14px;background:#fff;
+    border:1px solid var(--rule);border-radius:var(--r-sm)}
+  .qrsvg{display:block;width:168px;height:168px}
+
+  /* Print = sticker sheet. Everything that isn't a code comes off, and the codes
+     are pinned to a physical size — a QR much under 2cm gets unreliable on a
+     phone camera in a dim bike room. */
+  @media print{
+    body{background:#fff!important;background-image:none!important}
+    .topbar,.sidebar,.banner,.view-sub,.noprint,.sharenote{display:none!important}
+    #app{display:block}
+    main{padding:0;max-width:none}
+    .card{border:1px solid #999;box-shadow:none;break-inside:avoid;page-break-inside:avoid}
+    .card.brandtop{margin:0 0 18px}
+    .qrsvg{width:46mm;height:46mm}
+  }
+
+  /* Deliberately sets NO display property. `.webonly{display:none}` is declared
+     earlier, so any class here that set display:flex/block would out-rank the
+     gate at equal specificity and leak the note into member view — the same bug
+     `.row.webonly` had. Divs are block by default; let the gate do the work. */
+  .sharenote{border:1px solid #E8D3A8;border-radius:var(--radius);background:var(--warn-wash);
+    color:#7a4d00;font-size:13px;line-height:1.55;padding:12px 15px;margin-bottom:18px}
+  .sharenote b{display:block;margin-bottom:3px}/* Same rule as .sharenote above: no `display` here. The gate is .row.webonly. *//* Pre-ride reminder at the foot of the jumpkit check. Deliberately louder than
+     a hint and quieter than the verdict — it is a prompt to go do something
+     physical, not a judgement on what was just filled in. */
+  .rideprompt b{font-family:var(--font-display);font-size:15.5px;color:var(--brand-deep)}
+  .rideprompt ul{margin:9px 0 0;padding-left:20px}
+  .rideprompt li{font-size:14px;color:var(--ink-soft);margin-bottom:4px}
+  .rideprompt p{font-size:13px;color:var(--ink-mute);margin:10px 0 0}
+
+  /* Post-submit panel. Replaces the form entirely so a completed check cannot be
+     mistaken for one still waiting to be sent. */
+  .donecard{background:var(--card);border:1.5px solid var(--rule);border-radius:var(--r-lg);
+    box-shadow:var(--shadow-md);padding:34px 28px;text-align:center;max-width:560px;margin:0 auto}
+  .donecard.ok{border-color:var(--ok)}
+  .donecard.warn{border-color:var(--warn)}
+  .donecard.oos{border-color:var(--oos)}
+  .donetick{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;margin:0 auto 16px;
+    font-size:25px;font-weight:700;color:#fff;background:var(--ok)}
+  .donecard.warn .donetick{background:var(--warn)}
+  .donecard.oos .donetick{background:var(--oos)}
+  .donecard h3{font-family:var(--font-display);font-size:23px;margin:0 0 10px;color:var(--ink)}
+  .doneverdict{font-size:16px;font-weight:600;color:var(--ink-soft);margin:0 0 8px}
+  .donetail{font-size:14px;color:var(--ink-mute);margin:0 0 8px}
+  .donewhere{font-size:13px;color:var(--ink-faint);margin:0}
+  .donemissing{text-align:left;margin:16px auto;max-width:400px;padding:13px 16px;
+    border:1px solid var(--rule-strong);border-radius:var(--radius);background:var(--bg-2)}
+  .donemissing b{font-size:13px;color:var(--warn);display:block;margin-bottom:6px}
+  .donemissing ul{margin:0;padding-left:19px}
+  .donemissing li{font-size:13.5px;color:var(--ink-soft);margin-bottom:3px}/* Shown when a half-finished check is restored on this device. */
+
+  /* ---------- per-bike issue list on the fleet cards ---------- */
+  .isslist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:9px}
+  /* Wraps, because on a phone the urgency tag, the description and the resolve
+     button do not fit on one line and the button was pushed off the screen. */
+  .isslist li{display:flex;align-items:flex-start;gap:9px;font-size:13.5px;
+    color:var(--ink-soft);line-height:1.45;flex-wrap:wrap}
+  .isslist li>b{flex:1 1 60%;min-width:0;overflow-wrap:anywhere}/* The x is not inside a .row, so it carries its own gate rather than relying on
+     .row.webonly. Quiet by default, red on hover — destructive but not shouty. *//* "reported 4x" — the signal that something keeps coming back and is worth
+     chasing, without a row per report. */
+  .issx{border:0;background:none;cursor:pointer;color:var(--ink-faint);font-size:13px;
+    line-height:1;padding:3px 6px;border-radius:var(--r-sm);margin-left:auto;flex:0 0 auto}
+  .issx:hover{background:var(--oos-wash);color:var(--oos)}
+  .issx:focus-visible{outline:2px solid var(--brand);outline-offset:1px}
+  .webonly.issx{display:none}
+  body.is-web .webonly.issx{display:inline-flex;align-items:center}
+  .isslist .tag{flex:0 0 auto;margin-top:1px}
+  .noissues{font-size:13.5px;color:var(--ok);font-weight:600;margin:0}/* ---------- dated-kit heads-up (jumpkit view) ---------- *//* Sits above the form so an expired item is known before the bag is opened,
+     not discovered halfway down a checklist. */
+  .kitalert.warn{border-left-color:var(--warn)}
+  .kalist li{display:flex;align-items:center;justify-content:space-between;gap:12px;
+    font-size:14.5px;padding-bottom:8px;border-bottom:1px solid var(--rule-soft)}
+  .kalist li:last-child{border-bottom:0;padding-bottom:0}/* these read as short sentences, not labels — don't uppercase them */
+
+  /* Phone: the topbar was wrapping "Bike Ops" onto two lines and pushing the
+     buttons down. The role pill goes — the manager button already shows the
+     mode — and the brand is pinned to one line. */
+  @media(max-width:480px){
+    .topbar{padding:10px 12px;gap:9px}
+    .brand{flex:0 0 auto;white-space:nowrap}
+    .brand b{font-size:16.5px}
+    .brand .term{font-size:9px;letter-spacing:.1em}
+    .logo-mark,.logo-fallback{width:30px;height:30px}
+    .topbar .btn{padding:6px 10px;font-size:12px;white-space:nowrap}
+    .role-pill{display:none}
+    h2.view-title{font-size:25px}
+  }
+
+  /* ---------- in-site dialog ----------
+     Replaces window.alert/confirm/prompt. The native ones render as
+     "sonnnnnion.github.io says", which reads like a browser warning rather than
+     part of the site, and they cannot show a checklist — which mark-out-of-service
+     needs. ---- */
+  .modal-wrap{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;
+    padding:20px;background:rgba(36,26,29,.44);backdrop-filter:blur(2px);
+    animation:mfade .16s var(--ease-out)}
+  .modal-wrap[hidden]{display:none}
+  @keyframes mfade{from{opacity:0}to{opacity:1}}
+  @keyframes mrise{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}
+  .modal{background:var(--card);border:1px solid var(--rule);border-radius:var(--r-lg);
+    box-shadow:var(--shadow-lg);width:min(520px,100%);max-height:86vh;display:flex;flex-direction:column;
+    animation:mrise .2s var(--ease-out)}
+  .modal-head{padding:20px 22px 0}
+  .modal-head h3{font-family:var(--font-display);font-size:20px;margin:0 0 4px;color:var(--ink)}
+  .modal-head .msub{font-size:13.5px;color:var(--ink-mute);margin:0;white-space:pre-line}
+  .modal-body{padding:16px 22px 4px;overflow-y:auto}
+  .modal-body:empty{display:none}
+  .modal-foot{padding:16px 22px 20px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+  .modal-foot .btn{min-width:88px;justify-content:center}/* Checklist used by mark-out-of-service; mirrors the OOS tool's vocabulary. */
+  .mcheck input{margin:2px 0 0;flex:none;width:16px;height:16px;accent-color:var(--brand)}/* The global `label` rule is uppercase/tracked/faint for form field captions.
+     A criterion is a sentence, not a caption, so that styling is undone here —
+     without this the checklist reads as SHOUTED SMALL CAPS. */
+  @media (max-width:520px){
+    .modal-foot{justify-content:stretch}
+    .modal-foot .btn{flex:1}
+  }
+
+  /* ==========================================================================
+     Operations-site additions. Everything above this line is the shared CMU EMS
+     design system, carried over from the Bike Ops site so the two read as one
+     organisation.
+     ========================================================================== */
+
+  /* ---------- role gating ----------
+     The bike site gated manager controls with `.webonly{display:none}` plus a
+     `body.is-web .webonly{display:...}` counterpart. That works until some later
+     rule sets `display` at equal specificity, at which point manager controls
+     leak into member view — its own handoff notes record that biting twice.
+     There are four audiences here, not two, so the same trick would need a dozen
+     reveal rules and would break in a dozen ways.
+
+     So gating is done in JS instead: `applyGates()` walks every `[data-need]`
+     element and sets the `hidden` property. CSS carries exactly one rule, and it
+     is `!important`, so nothing can override it. An element that IS permitted has
+     no gating rule applied at all, so its own layout is untouched. */
+  [hidden]{display:none !important}
+
+  /* ---------- home ---------- */
+  .rolegrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px;margin-top:20px}
+  .rolecard{display:block;text-align:left;background:var(--card);border:1px solid var(--rule);border-radius:var(--r-md);
+    padding:20px;box-shadow:var(--shadow-sm);cursor:pointer;font:inherit;color:inherit;width:100%;
+    transition:transform .16s var(--ease),box-shadow .16s var(--ease),border-color .16s var(--ease)}
+  .rolecard:hover{transform:translateY(-2px);box-shadow:var(--shadow-md);border-color:var(--brand)}
+  .rolecard:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+  .rolecard .rc-ic{font-size:22px;color:var(--brand);line-height:1}
+  .rolecard b{display:block;font-family:var(--font-display);font-size:18px;margin:10px 0 4px}
+  .rolecard p{margin:0;font-size:13.5px;color:var(--ink-mute);line-height:1.5}
+  .rolecard .rc-go{display:inline-block;margin-top:12px;font-size:12px;font-weight:700;
+    text-transform:uppercase;letter-spacing:.08em;color:var(--brand)}
+  .rolecard.ext .rc-go::after{content:' ↗'}
+
+  /* ---------- task lists (quick actions) ---------- */
+  .quick{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-top:14px}
+  .quick button{display:flex;align-items:center;gap:9px;padding:13px 15px;border-radius:var(--radius);
+    border:1.5px solid var(--rule-strong);background:var(--card);cursor:pointer;font:inherit;font-size:14.5px;
+    font-weight:600;color:var(--ink);text-align:left;transition:border-color .16s var(--ease),background .16s var(--ease)}
+  .quick button:hover{border-color:var(--brand);background:var(--brand-tint)}
+  .quick button .ic{color:var(--brand);font-size:15px}
+
+  /* ---------- photo galleries ---------- */
+  .photogrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px;margin-top:16px}
+  .photo{border:1px solid var(--rule);border-radius:var(--r-md);overflow:hidden;background:var(--card);
+    box-shadow:var(--shadow-sm);cursor:zoom-in;padding:0;font:inherit;text-align:left;width:100%;display:block}
+  .photo:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+  .photo img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block;background:var(--bg-2)}
+  .photo .pcap{padding:10px 12px;font-size:13px;font-weight:600;color:var(--ink)}
+  .photo .pcap small{display:block;font-weight:500;color:var(--ink-faint);font-size:11.5px;margin-top:2px;
+    text-transform:none;letter-spacing:0}
+  .lightbox{position:fixed;inset:0;background:rgba(20,14,16,.9);z-index:80;display:grid;place-items:center;padding:22px}
+  .lightbox[hidden]{display:none !important}
+  .lightbox img{max-width:100%;max-height:82vh;border-radius:var(--r-sm);box-shadow:var(--shadow-lg)}
+  .lightbox .lbcap{color:#fff;text-align:center;margin-top:14px;font-size:14px}
+  .lightbox .lbclose{position:absolute;top:16px;right:18px;background:rgba(255,255,255,.16);color:#fff;
+    border:1.5px solid rgba(255,255,255,.4);border-radius:999px;width:38px;height:38px;font-size:18px;cursor:pointer}
+
+  /* ---------- the printable duty-period tracker ---------- */
+  .tracker{width:100%;border-collapse:collapse;margin-top:14px;background:var(--card)}
+  .tracker th,.tracker td{border:1px solid var(--rule-strong);padding:9px 11px;text-align:left;font-size:13.5px}
+  .tracker th{background:var(--bg-2);font-weight:700;font-size:11.5px;text-transform:uppercase;letter-spacing:.07em;
+    color:var(--ink-mute)}
+  .tracker td.slot{width:78px;height:38px}
+  .tracker tr.high td.slot{background:var(--card)}
+  .tracker tr.high th{background:var(--brand-tint)}
+  .trackhead{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;
+    border-bottom:2px solid var(--ink);padding-bottom:10px;margin-bottom:4px}
+  .trackhead .th-t{font-family:var(--font-display);font-size:21px;font-weight:700}
+  .trackhead .th-dp{font-size:13px}
+  .trackhead .th-dp b{display:inline-block;min-width:190px;border-bottom:1px solid var(--ink)}
+
+  /* ---------- inventory ---------- */
+  .invwrap{overflow-x:auto;margin-top:14px;border:1px solid var(--rule);border-radius:var(--r-md);background:var(--card)}
+  .invtable{width:100%;border-collapse:collapse;min-width:600px}
+  .invtable th,.invtable td{padding:10px 13px;text-align:left;font-size:13.5px;border-bottom:1px solid var(--rule-soft)}
+  .invtable th{background:var(--bg-2);font-size:11px;text-transform:uppercase;letter-spacing:.07em;
+    color:var(--ink-mute);font-weight:700;position:sticky;top:0}
+  .invtable tr:last-child td{border-bottom:0}
+  .invtable td.num{font-family:var(--font-mono);font-size:12.5px}
+  .invtable .grp td{background:var(--brand-tint);font-weight:700;font-size:12px;text-transform:uppercase;
+    letter-spacing:.07em;color:var(--brand-deep)}
+
+  /* ---------- notice blocks ---------- */
+  .notice{border:1px solid var(--rule-strong);border-left:4px solid var(--gold);background:var(--gold-wash);
+    border-radius:var(--r-sm);padding:14px 16px;margin-top:16px;font-size:13.5px;color:var(--ink-soft)}
+  .notice b{color:var(--ink)}
+  .notice.warn{border-left-color:var(--warn);background:var(--warn-wash)}
+  .notice.stop{border-left-color:var(--oos);background:var(--oos-wash)}
+  .notice p{margin:6px 0 0}
+  .notice ul{margin:8px 0 0;padding-left:20px}
+  .notice li{margin:3px 0}
+
+  /* ---------- the room picker ---------- */
+  .roomgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(152px,1fr));gap:9px;margin-top:6px}
+  .roompick{padding:12px 13px;border-radius:var(--radius);border:1.5px solid var(--rule-strong);background:var(--card);
+    cursor:pointer;font:inherit;font-size:14px;font-weight:600;text-align:left;color:var(--ink-soft);
+    transition:border-color .16s var(--ease),background .16s var(--ease),color .16s var(--ease)}
+  .roompick:hover{border-color:var(--brand);color:var(--ink)}
+  .roompick.on{background:var(--brand);border-color:var(--brand);color:#fff;box-shadow:var(--shadow-sm)}
+  .roompick .rp-sub{display:block;font-size:11px;font-weight:500;letter-spacing:.04em;text-transform:uppercase;
+    opacity:.7;margin-top:2px}/* ---------- counted items (stock entry) ---------- */
+  .countline .cl-lbl small{display:block;color:var(--ink-faint);font-size:11.5px}
+  .countline input{padding:8px 10px;font-size:14px;text-align:center;font-family:var(--font-mono)}
+
+  /* A <label> holding a whole sentence must undo the global uppercase/tracked
+     label rule, or it renders as unreadable small caps. */
+  .checkline .lbl,.countline .cl-lbl,.photo .pcap{text-transform:none;letter-spacing:normal}
+
+  /* ---------- QR sheet ---------- */
+  .qrsheet{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:18px;margin-top:18px}
+  .qrcard{border:1px solid var(--rule);border-radius:var(--r-md);background:var(--card);padding:18px;
+    text-align:center;box-shadow:var(--shadow-sm)}
+  .qrcard h4{margin:0 0 4px;font-family:var(--font-display);font-size:16px}
+  .qrcard .qrwho{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-faint);
+    margin-bottom:12px}
+  .qrcard .qrsvg{max-width:100%;height:auto}
+  .qrcard .qrlink{font-family:var(--font-mono);font-size:10.5px;color:var(--ink-faint);word-break:break-all;
+    margin-top:10px}
+
+  @media print{
+    .sidebar,.topbar,.navtoggle,.noprint,.navscrim{display:none !important}
+    #app{display:block}
+    main{padding:0;max-width:none}
+    body{background:#fff}
+    .card,.qrcard,.invwrap{box-shadow:none;border-color:#999;break-inside:avoid}
+    .tracker th,.tracker td{border-color:#000}
+    .qrsheet{grid-template-columns:repeat(2,1fr)}
+  }
+</style>
+</head>
+
+<body>
+
+<!-- ============================================================================
+     CMU EMS · Operations
+
+     Open to everyone. Signing in as a manager unlocks that manager's own tools;
+     it is a convenience gate, not a security boundary (anything genuinely
+     sensitive is kept off this page entirely — see README).
+
+     Views are addressed by `data-view` and mirrored into location.hash, so every
+     form is deep-linkable and therefore QR-able.
+     ============================================================================ -->
+<div id="app">
+  <div class="topbar">
+    <button class="navtoggle" id="navToggle" type="button" onclick="toggleNav()"
+            aria-label="Menu" aria-expanded="false" aria-controls="nav">
+      <span class="bars"><span></span><span></span><span></span></span>
+    </button>
+    <img class="logo-mark" src="assets/cmuems-mark.png" alt="CMU EMS"
+         onerror="this.outerHTML='<div class=\'logo-fallback\'>EMS</div>'">
+    <div class="brand"><b>Operations</b><span class="term">CMU EMS</span></div>
+    <div class="spacer"></div>
+    <span id="rolePill" class="role-pill">Member view</span>
+    <button class="btn sm" onclick="openRolePicker()" id="roleBtn">🔒 Manager</button>
+  </div>
+
+  <div class="navscrim" id="navScrim" onclick="closeNav()"></div>
+  <nav class="sidebar" id="nav">
+    <!-- Ordered by what a member on duty actually opens. The two things almost
+         everyone comes here to do — a room check and a bag check — sit at the
+         top; management tooling is gated and sits at the bottom. -->
+    <div class="sb-label">On duty</div>
+    <button type="button" class="sb-item active" data-view="home"><span class="ic">◈</span>Start here</button>
+    <button type="button" class="sb-item" data-view="room-check"><span class="ic">✔</span>Room Check</button>
+    <button type="button" class="sb-item" data-view="bag-check"><span class="ic">✚</span>Bag &amp; Equipment Check</button>
+    <button type="button" class="sb-item" data-view="post-call"><span class="ic">↻</span>Post-Call Restock</button>
+    <button type="button" class="sb-item" data-view="post-shift"><span class="ic">⇥</span>End of Shift</button>
+    <button type="button" class="sb-item" data-view="report"><span class="ic">⚑</span>Report a Problem</button>
+
+    <div class="sb-label">Reference</div>
+    <button type="button" class="sb-item" data-view="rooms"><span class="ic">▦</span>Rooms &amp; Standards</button>
+    <button type="button" class="sb-item" data-view="bags"><span class="ic">▩</span>What's in each bag</button>
+    <button type="button" class="sb-item" data-view="roles"><span class="ic">§</span>The Ops Roles</button>
+    <button type="button" class="sb-item" data-view="qr"><span class="ic">▤</span>QR Codes</button>
+
+    <div class="sb-label" data-need="mgr">Manage</div>
+    <button type="button" class="sb-item" data-need="office" data-view="tracker"><span class="ic">▤</span>Duty-Period Tracker</button>
+    <button type="button" class="sb-item" data-need="office" data-view="restock"><span class="ic">▤</span>Office Restock List</button>
+    <button type="button" class="sb-item" data-need="equipment" data-view="inventory"><span class="ic">▦</span>Equipment Inventory</button>
+    <button type="button" class="sb-item" data-need="mgr" data-view="log"><span class="ic">⚑</span>Reported Problems</button>
+    <button type="button" class="sb-item" data-need="mgr" data-view="settings"><span class="ic">⚙</span>Site Settings</button>
+  </nav>
+
+  <main>
+
+    <!-- ===== HOME ============================================================
+         Three roles, one of which (Bike) lives on its own site. Rather than
+         reproduce the bike content here, the card links out — one source of
+         truth per role. -->
+    <section class="view active" data-view="home">
+      <h2 class="view-title">CMU EMS <em>Operations</em></h2>
+      <p class="view-sub">Checks, forms and reference for the Operations team.</p>
+
+      <div class="card brandtop mt">
+        <h3>What do you need to do?</h3>
+        <div class="quick">
+          <button type="button" onclick="go('room-check')"><span class="ic">✔</span>Complete a room check</button>
+          <button type="button" onclick="go('bag-check')"><span class="ic">✚</span>Check a bag or kit</button>
+          <button type="button" onclick="go('post-call')"><span class="ic">↻</span>Restock after a call</button>
+          <button type="button" onclick="go('post-shift')"><span class="ic">⇥</span>Close out my shift</button>
+          <button type="button" onclick="go('report')"><span class="ic">⚑</span>Report something broken</button>
+          <button type="button" onclick="go('bags')"><span class="ic">▩</span>See what's in a bag</button>
+        </div>
+      </div>
+
+      <h3 class="mt-lg" style="font-family:var(--font-display);font-size:19px;margin-bottom:0">The Operations team</h3>
+      <div class="rolegrid" id="roleCards"></div>
+
+      <div class="notice">
+        <b>One duty period, one task.</b>
+        <p>Every technician and probationary member completes one operational task per
+        duty period. Pick any open slot on the printed tracker, do that room's
+        checklist, then file it through the Room Check form here.</p>
+      </div>
+    </section>
+
+    <!-- ===== ROOM CHECK ====================================================== -->
+    <section class="view" data-view="room-check">
+      <h2 class="view-title">Room <em>check</em></h2>
+      <p class="view-sub">Pick the room you took, work the list, submit. Takes a few minutes.</p>
+      <div id="roomCheckHost"></div>
+    </section>
+
+    <!-- ===== BAG CHECK ======================================================= -->
+    <section class="view" data-view="bag-check">
+      <h2 class="view-title">Bag &amp; equipment <em>check</em></h2>
+      <p class="view-sub">Jumpkits, event bags, the blue bag, trauma and squad-car kits.</p>
+      <div id="bagCheckHost"></div>
+    </section>
+
+    <!-- ===== POST-CALL ======================================================= -->
+    <section class="view" data-view="post-call">
+      <h2 class="view-title">Post-call <em>restock</em></h2>
+      <p class="view-sub">After a call, before the kit goes back on the rack.</p>
+      <div id="postCallHost"></div>
+    </section>
+
+    <!-- ===== POST-SHIFT ====================================================== -->
+    <section class="view" data-view="post-shift">
+      <h2 class="view-title">End of <em>shift</em></h2>
+      <p class="view-sub">The handful of things that have to be back where they belong.</p>
+      <div id="postShiftHost"></div>
+    </section>
+
+    <!-- ===== REPORT A PROBLEM ================================================ -->
+    <section class="view" data-view="report">
+      <h2 class="view-title">Report a <em>problem</em></h2>
+      <p class="view-sub">Broken, missing, expired, low, or just not right. Anyone can file this.</p>
+      <div id="reportHost"></div>
+    </section>
+
+    <!-- ===== ROOMS & STANDARDS =============================================== -->
+    <section class="view" data-view="rooms">
+      <h2 class="view-title">Rooms &amp; <em>standards</em></h2>
+      <p class="view-sub">What each room should look like, and what its check covers.</p>
+      <div id="roomsHost"></div>
+    </section>
+
+    <!-- ===== BAG CONTENTS ==================================================== -->
+    <section class="view" data-view="bags">
+      <h2 class="view-title">What's in each <em>bag</em></h2>
+      <p class="view-sub">Reference photos, so a bag gets packed back the way it came.</p>
+      <div id="bagsHost"></div>
+    </section>
+
+    <!-- ===== ROLES =========================================================== -->
+    <section class="view" data-view="roles">
+      <h2 class="view-title">The Ops <em>roles</em></h2>
+      <p class="view-sub">What each manager is responsible for.</p>
+      <div id="rolesHost"></div>
+    </section>
+
+    <!-- ===== QR CODES ======================================================== -->
+    <section class="view" data-view="qr">
+      <h2 class="view-title">QR <em>codes</em></h2>
+      <p class="view-sub">Print these and put them where the task happens.</p>
+      <div id="qrHost"></div>
+    </section>
+
+    <!-- ===== DUTY-PERIOD TRACKER (Office Manager) ============================ -->
+    <section class="view" data-view="tracker">
+      <h2 class="view-title">Duty-period <em>tracker</em></h2>
+      <p class="view-sub">The sheet that goes on the board at the start of each duty period.</p>
+      <div id="trackerHost"></div>
+    </section>
+
+    <!-- ===== OFFICE RESTOCK (Office Manager) ================================= -->
+    <section class="view" data-view="restock">
+      <h2 class="view-title">Office <em>restock</em></h2>
+      <p class="view-sub">Non-medical supplies to reorder before they run out.</p>
+      <div id="restockHost"></div>
+    </section>
+
+    <!-- ===== EQUIPMENT INVENTORY (Equipment Manager) ========================= -->
+    <section class="view" data-view="inventory">
+      <h2 class="view-title">Equipment <em>inventory</em></h2>
+      <p class="view-sub">Par levels and where each item lives. Live counts come from the spreadsheet.</p>
+      <div id="inventoryHost"></div>
+    </section>
+
+    <!-- ===== REPORTED PROBLEMS ============================================== -->
+    <section class="view" data-view="log">
+      <h2 class="view-title">Reported <em>problems</em></h2>
+      <p class="view-sub">Everything filed from a check or a problem report.</p>
+      <div id="logHost"></div>
+    </section>
+
+    <!-- ===== SETTINGS ======================================================== -->
+    <section class="view" data-view="settings">
+      <h2 class="view-title">Site <em>settings</em></h2>
+      <p class="view-sub">Where submissions go, and who can edit this site.</p>
+      <div id="settingsHost"></div>
+    </section>
+
+  </main>
+</div>
+
+<!-- promise-based dialogs; no window.alert/confirm/prompt anywhere -->
+<div class="modal-wrap" id="modalWrap" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-head"><h3 id="modalTitle"></h3><div class="msub" id="modalSub"></div></div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-foot" id="modalFoot"></div>
+  </div>
+</div>
+
+<div class="lightbox" id="lightbox" hidden onclick="closeLightbox()">
+  <button class="lbclose" type="button" aria-label="Close">✕</button>
+  <div><img id="lbImg" src="" alt=""><div class="lbcap" id="lbCap"></div></div>
+</div>
+
+<script>
+/* ============================================================
+   Bike Ops — CMU EMS
+   Single-file static site. All editable content lives in DB and
+   persists to localStorage; the Google Sheet backend (Apps Script)
+   is optional and configured in Site Settings.
+   ============================================================ */
+
+/* ---------- helpers ---------- */
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function uid(p){return (p||'id')+'-'+Math.random().toString(36).slice(2,8);}
+
+/* ---------- in-site dialogs ----------
+   Everything here replaces window.alert/confirm/prompt. Three reasons the native
+   ones had to go: they announce themselves as "sonnnnnion.github.io says", which
+   reads to a member like a browser security warning rather than the site talking;
+   they cannot render a checklist, which mark-out-of-service needs; and they are
+   unstyled, so the one moment the site interrupts you is the one moment it stops
+   looking like itself.
+
+   All four return a Promise, so callers `await`/`.then()` instead of assuming a
+   value is on hand. Only one dialog can be open at a time — that matches the
+   native behaviour these replace and keeps focus handling simple. ---- */
+var _modalHost=null,_modalPrev=null;
+function _closeModal(resolve,value){
+  if(!_modalHost) return;
+  document.removeEventListener('keydown',_modalKey,true);
+  _modalHost.remove(); _modalHost=null;
+  if(_modalPrev&&_modalPrev.focus) _modalPrev.focus();
+  _modalPrev=null;
+  resolve(value);
+}
+var _modalEsc=null,_modalEnter=null;
+function _modalKey(e){
+  if(e.key==='Escape'&&_modalEsc){e.preventDefault();_modalEsc();}
+  // Enter submits, except in a textarea where it has to stay a newline.
+  else if(e.key==='Enter'&&_modalEnter&&e.target.tagName!=='TEXTAREA'){e.preventDefault();_modalEnter();}
+}
+// opts: {title, message, body, okText, cancelText, danger, focus, onOk}
+// onOk reads the body and returns the resolved value; returning undefined keeps
+// the dialog open, which is how validation refuses to close on empty input.
+function openModal(opts){
+  return new Promise(function(resolve){
+    if(_modalHost) _closeModal(function(){},null);
+    _modalPrev=document.activeElement;
+    var w=document.createElement('div'); w.className='modal-wrap';
+    w.innerHTML='<div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">'+
+      '<div class="modal-head"><h3 id="modalTitle">'+esc(opts.title||'')+'</h3>'+
+      (opts.message?'<p class="msub">'+esc(opts.message)+'</p>':'')+'</div>'+
+      '<div class="modal-body">'+(opts.body||'')+'</div>'+
+      '<div class="modal-foot">'+
+        (opts.cancelText?'<button type="button" class="btn ghost" data-mcancel>'+esc(opts.cancelText)+'</button>':'')+
+        // A dialog whose action lives in its body (the Google button) has no OK of
+        // its own; a default one would read as the way to proceed and do nothing.
+        (opts.noOk?'':'<button type="button" class="btn '+(opts.plainOk?'ghost':'solid')+(opts.danger?' danger':'')+'" data-mok>'+esc(opts.okText||'OK')+'</button>')+
+      '</div></div>';
+    document.body.appendChild(w); _modalHost=w;
+
+    var cancel=function(){_modalEsc=null;_modalEnter=null;_closeModal(resolve,opts.cancelValue===undefined?null:opts.cancelValue);};
+    var ok=function(){
+      var v=opts.onOk?opts.onOk(w):true;
+      if(v===undefined) return;            // validation refused — stay open
+      _modalEsc=null;_modalEnter=null;_closeModal(resolve,v);
+    };
+    var okBtn=w.querySelector('[data-mok]'); if(okBtn) okBtn.onclick=ok;
+    var c=w.querySelector('[data-mcancel]'); if(c) c.onclick=cancel;
+    // Clicking the scrim cancels, but only the scrim itself — not a click that
+    // started inside the dialog and drifted out while selecting text.
+    w.addEventListener('mousedown',function(e){if(e.target===w) cancel();});
+    _modalEsc=opts.cancelText?cancel:ok; _modalEnter=ok;
+    document.addEventListener('keydown',_modalKey,true);
+    var f=opts.focus?w.querySelector(opts.focus):(w.querySelector('[data-mok]')||w.querySelector('[data-mcancel]'));
+    if(f&&f.focus) f.focus();
+    if(f&&f.select) f.select();
+    // Anything that has to mount INTO the dialog (a third-party button, a chart)
+    // needs the body to already be in the document. It is, by here.
+    if(opts.onOpen) opts.onOpen(w,function(v){
+      _modalEsc=null;_modalEnter=null;_closeModal(resolve,v);
+    });
+  });
+}
+function uiAlert(msg,title){
+  return openModal({title:title||'Heads up',message:msg,okText:'Got it'});
+}
+function uiConfirm(msg,title,opts){
+  opts=opts||{};
+  return openModal({title:title||'Are you sure?',message:msg,
+    okText:opts.okText||'Yes',cancelText:opts.cancelText||'Cancel',
+    danger:opts.danger,cancelValue:false,onOk:function(){return true;}});
+}
+// Resolves to the string, or null if cancelled. Empty input is refused rather
+// than resolved as '' — every caller here treats '' as "user cancelled" anyway.
+function uiPrompt(msg,def,title,opts){
+  opts=opts||{};
+  var multi=!!opts.multiline, allowEmpty=!!opts.allowEmpty;
+  var field=multi
+    ? '<textarea id="mPromptIn" rows="3">'+esc(def||'')+'</textarea>'
+    : '<input type="text" id="mPromptIn" value="'+esc(def||'')+'">';
+  return openModal({title:title||'',message:msg,
+    body:'<div class="field">'+field+'</div>',
+    okText:opts.okText||'Save',cancelText:'Cancel',focus:'#mPromptIn',
+    onOk:function(w){
+      var v=w.querySelector('#mPromptIn').value;
+      if(!allowEmpty&&!v.trim()) return undefined;   // refuse to close on empty
+      return v;
+    }});
+}
+// Several editors used to fire three or four prompts back to back, so you could
+// not see what you had already typed and a cancel four dialogs in lost the lot.
+// fields: [{key,label,value,type:'text'|'textarea'|'number'|'url',hint,required}]
+// Resolves to an object keyed by `key`, or null if cancelled.
+function uiForm(title,message,fields,opts){
+  opts=opts||{};
+  var body=fields.map(function(f){
+    var id='mf-'+f.key;
+    var input;
+    if(f.type==='textarea') input='<textarea id="'+id+'" rows="'+(f.rows||3)+'">'+esc(f.value||'')+'</textarea>';
+    else if(f.type==='select') input='<select id="'+id+'">'+(f.options||[]).map(function(o){
+      return '<option value="'+esc(o.v)+'"'+(String(o.v)===String(f.value)?' selected':'')+'>'+esc(o.t)+'</option>';}).join('')+'</select>';
+    else input='<input type="'+(f.type||'text')+'" id="'+id+'"'+
+      (f.datalist?' list="'+f.datalist+'" autocomplete="off"':'')+
+      ' value="'+esc(f.value==null?'':f.value)+'">';
+    return '<div class="field"><label for="'+id+'">'+esc(f.label)+(f.required?'':' <span style="text-transform:none;letter-spacing:0;font-weight:500">(optional)</span>')+'</label>'+
+      input+(f.hint?'<p class="hint">'+esc(f.hint)+'</p>':'')+'</div>';
+  }).join('');
+  // A <datalist> has to be in the document for `list=` to resolve, and the modal
+  // is built fresh each time, so it ships inside the modal body.
+  if(fields.some(function(f){return f.datalist==='itemsug-modal';}))
+    body=itemDatalist('itemsug-modal')+body;
+  return openModal({title:title,message:message,body:body,
+    okText:opts.okText||'Save',cancelText:'Cancel',focus:'#mf-'+fields[0].key,
+    onOk:function(w){
+      var out={},bad=null;
+      fields.forEach(function(f){
+        var v=w.querySelector('#mf-'+f.key).value;
+        if(f.required&&!String(v).trim()&&!bad) bad=w.querySelector('#mf-'+f.key);
+        out[f.key]=v;
+      });
+      if(bad){bad.focus();return undefined;}          // stay open, land on the gap
+      return out;
+    }});
+}
+// Local calendar date, NOT toISOString() — that converts to UTC and returns
+// tomorrow's date any evening after 8pm EDT, which would misdate submissions.
+function todayISO(){var d=new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function daysUntil(iso){
+  if(!iso) return null;
+  var d=new Date(iso+'T00:00:00'); if(isNaN(d.getTime())) return null;
+  var t=new Date(); t.setHours(0,0,0,0);
+  return Math.round((d-t)/86400000);
+}
+
+/* ============================================================
+   QR CODES — byte mode, ECC level M, versions 1-10, no library.
+   These get printed onto stickers, so correctness matters more than brevity.
+   The output was verified module-for-module against the `qrcode-generator`
+   npm package across ASCII and UTF-8 inputs: every matrix is byte-identical.
+   Two things that are easy to get wrong and were:
+     - format-info copy 1 runs DOWN column 8 then LEFT along row 8 (it is not
+       the transpose of what you might guess), and
+     - mask selection scores each candidate with the format/version modules
+       left LIGHT; scoring them filled picks a different mask.
+   ============================================================ */
+var QR_EXP=[],QR_LOG=[];
+(function(){var x=1,i;for(i=0;i<256;i++){QR_EXP[i]=x;x<<=1;if(x&0x100)x^=0x11d;}
+  for(i=0;i<255;i++)QR_LOG[QR_EXP[i]]=i;})();
+function qrMul(a,b){return(!a||!b)?0:QR_EXP[(QR_LOG[a]+QR_LOG[b])%255];}
+function qrGenPoly(deg){
+  var poly=[1],d,i,next,k;
+  for(d=0;d<deg;d++){
+    next=[];for(k=0;k<poly.length+1;k++)next[k]=0;
+    for(i=0;i<poly.length;i++){next[i]^=poly[i];next[i+1]^=qrMul(poly[i],QR_EXP[d]);}
+    poly=next;
+  }
+  return poly;
+}
+function qrEC(data,ecLen){
+  var gen=qrGenPoly(ecLen),res=data.slice(),i,j,f;
+  for(i=0;i<ecLen;i++)res.push(0);
+  for(i=0;i<data.length;i++){
+    f=res[i]; if(!f)continue;
+    for(j=0;j<gen.length;j++)res[i+j]^=qrMul(gen[j],f);
+  }
+  return res.slice(data.length);
+}
+/* ECC level M: [ecPerBlock, blocksG1, dataG1, blocksG2, dataG2] */
+var QR_M={1:[10,1,16,0,0],2:[16,1,28,0,0],3:[26,1,44,0,0],4:[18,2,32,0,0],
+  5:[24,2,43,0,0],6:[16,4,27,0,0],7:[18,4,31,0,0],8:[22,2,38,2,39],
+  9:[22,3,36,2,37],10:[26,4,43,1,44]};
+var QR_ALIGN={1:[],2:[6,18],3:[6,22],4:[6,26],5:[6,30],6:[6,34],
+  7:[6,22,38],8:[6,24,42],9:[6,26,46],10:[6,28,50]};
+function qrCap(v){var t=QR_M[v];return t[1]*t[2]+t[3]*t[4];}
+var QR_MASK=[
+  function(i,j){return (i+j)%2===0;},
+  function(i){return i%2===0;},
+  function(i,j){return j%3===0;},
+  function(i,j){return (i+j)%3===0;},
+  function(i,j){return (Math.floor(i/2)+Math.floor(j/3))%2===0;},
+  function(i,j){return (i*j)%2+(i*j)%3===0;},
+  function(i,j){return ((i*j)%2+(i*j)%3)%2===0;},
+  function(i,j){return ((i+j)%2+(i*j)%3)%2===0;}
+];
+function qrUtf8(text){
+  var bytes=[],i,c;
+  for(i=0;i<text.length;i++){
+    c=text.charCodeAt(i);
+    if(c<0x80)bytes.push(c);
+    else if(c<0x800)bytes.push(0xc0|(c>>6),0x80|(c&63));
+    else bytes.push(0xe0|(c>>12),0x80|((c>>6)&63),0x80|(c&63));
+  }
+  return bytes;
+}
+function qrCodewords(text,version){
+  var bytes=qrUtf8(text),cap=qrCap(version),bits=[],i,k;
+  function put(val,len){for(var b=len-1;b>=0;b--)bits.push((val>>>b)&1);}
+  put(4,4);                                  // byte mode
+  put(bytes.length,version<10?8:16);         // char-count indicator
+  for(i=0;i<bytes.length;i++)put(bytes[i],8);
+  var maxBits=cap*8;
+  for(i=0;i<4&&bits.length<maxBits;i++)bits.push(0);
+  while(bits.length%8)bits.push(0);
+  var pads=[0xec,0x11],pi=0;
+  while(bits.length<maxBits)put(pads[pi++%2],8);
+  var dcw=[],v;
+  for(i=0;i<bits.length;i+=8){v=0;for(k=0;k<8;k++)v=(v<<1)|bits[i+k];dcw.push(v);}
+  var t=QR_M[version],ecLen=t[0],blocks=[],ec=[],off=0,b;
+  for(b=0;b<t[1];b++){blocks.push(dcw.slice(off,off+t[2]));off+=t[2];}
+  for(b=0;b<t[3];b++){blocks.push(dcw.slice(off,off+t[4]));off+=t[4];}
+  for(b=0;b<blocks.length;b++)ec.push(qrEC(blocks[b],ecLen));
+  var out=[],maxD=Math.max(t[2],t[4]);
+  for(i=0;i<maxD;i++)for(b=0;b<blocks.length;b++)if(i<blocks[b].length)out.push(blocks[b][i]);
+  for(i=0;i<ecLen;i++)for(b=0;b<ec.length;b++)out.push(ec[b][i]);
+  return out;
+}
+function qrFormatBits(mask){
+  var data=(0<<3)|mask,d=data<<10,i;     // level M = 00
+  for(i=4;i>=0;i--)if(d&(1<<(i+10)))d^=0x537<<i;
+  return ((data<<10)|d)^0x5412;
+}
+function qrVersionBits(v){
+  var d=v<<12,i;
+  for(i=5;i>=0;i--)if(d&(1<<(i+12)))d^=0x1f25<<i;
+  return (v<<12)|d;
+}
+function qrWriteFormat(mm,n,mask,version,blank){
+  var f=qrFormatBits(mask),i,bit;
+  for(i=0;i<15;i++){
+    bit=blank?0:((f>>>i)&1);
+    // copy 1: down column 8, round the corner, then left along row 8
+    if(i<6)mm[i][8]=bit;
+    else if(i===6)mm[7][8]=bit;
+    else if(i===7)mm[8][8]=bit;
+    else if(i===8)mm[8][7]=bit;
+    else mm[8][14-i]=bit;
+    // copy 2: split between the top-right and bottom-left finders
+    if(i<8)mm[8][n-1-i]=bit;
+    else mm[n-15+i][8]=bit;
+  }
+  mm[n-8][8]=blank?0:1;                  // dark module
+  if(version>=7){
+    var vb=qrVersionBits(version),b;
+    for(i=0;i<18;i++){
+      b=blank?0:((vb>>>i)&1);
+      mm[Math.floor(i/3)][n-11+(i%3)]=b;
+      mm[n-11+(i%3)][Math.floor(i/3)]=b;
+    }
+  }
+}
+function qrPenalty(m,n){
+  var p=0,row,col,r,c,same,dark,cnt,darkCount=0;
+  for(row=0;row<n;row++)for(col=0;col<n;col++){
+    same=0;dark=m[row][col];
+    for(r=-1;r<=1;r++){
+      if(row+r<0||row+r>=n)continue;
+      for(c=-1;c<=1;c++){
+        if(col+c<0||col+c>=n)continue;
+        if(r===0&&c===0)continue;
+        if(dark===m[row+r][col+c])same++;
+      }
+    }
+    if(same>5)p+=3+same-5;
+  }
+  for(row=0;row<n-1;row++)for(col=0;col<n-1;col++){
+    cnt=m[row][col]+m[row+1][col]+m[row][col+1]+m[row+1][col+1];
+    if(cnt===0||cnt===4)p+=3;
+  }
+  for(row=0;row<n;row++)for(col=0;col<n-6;col++)
+    if(m[row][col]&&!m[row][col+1]&&m[row][col+2]&&m[row][col+3]&&
+       m[row][col+4]&&!m[row][col+5]&&m[row][col+6])p+=40;
+  for(col=0;col<n;col++)for(row=0;row<n-6;row++)
+    if(m[row][col]&&!m[row+1][col]&&m[row+2][col]&&m[row+3][col]&&
+       m[row+4][col]&&!m[row+5][col]&&m[row+6][col])p+=40;
+  for(col=0;col<n;col++)for(row=0;row<n;row++)darkCount+=m[row][col];
+  p+=(Math.abs(100*darkCount/n/n-50)/5)*10;
+  return p;
+}
+function qrBuild(text,version){
+  var n=version*4+17,m=[],reserved=[],i,j,dr,dc;
+  for(i=0;i<n;i++){
+    m.push([]);reserved.push([]);
+    for(j=0;j<n;j++){m[i].push(0);reserved[i].push(0);}
+  }
+  function setF(r,c,v){m[r][c]=v;reserved[r][c]=1;}
+  function finder(r,c){
+    for(var a=-1;a<=7;a++)for(var b=-1;b<=7;b++){
+      var rr=r+a,cc=c+b;
+      if(rr<0||cc<0||rr>=n||cc>=n)continue;
+      var on=(a>=0&&a<=6&&b>=0&&b<=6)&&
+        (a===0||a===6||b===0||b===6||(a>=2&&a<=4&&b>=2&&b<=4));
+      setF(rr,cc,on?1:0);
+    }
+  }
+  finder(0,0);finder(0,n-7);finder(n-7,0);
+  for(i=8;i<n-8;i++){setF(6,i,i%2===0?1:0);setF(i,6,i%2===0?1:0);}
+  var ac=QR_ALIGN[version];
+  for(i=0;i<ac.length;i++)for(j=0;j<ac.length;j++){
+    var ar=ac[i],acol=ac[j];
+    if((ar<=7&&acol<=7)||(ar<=7&&acol>=n-8)||(ar>=n-8&&acol<=7))continue;
+    for(dr=-2;dr<=2;dr++)for(dc=-2;dc<=2;dc++)
+      setF(ar+dr,acol+dc,Math.max(Math.abs(dr),Math.abs(dc))!==1?1:0);
+  }
+  setF(n-8,8,1);
+  for(i=0;i<9;i++){if(!reserved[8][i])setF(8,i,0);if(!reserved[i][8])setF(i,8,0);}
+  for(i=0;i<8;i++){
+    if(!reserved[8][n-1-i])setF(8,n-1-i,0);
+    if(!reserved[n-1-i][8])setF(n-1-i,8,0);
+  }
+  if(version>=7)for(i=0;i<6;i++)for(j=0;j<3;j++){setF(i,n-11+j,0);setF(n-11+j,i,0);}
+
+  var cw=qrCodewords(text,version),bitIdx=0,total=cw.length*8;
+  function nextBit(){
+    if(bitIdx>=total)return 0;
+    var b=(cw[bitIdx>>3]>>>(7-(bitIdx&7)))&1;bitIdx++;return b;
+  }
+  var up=true;
+  for(var col=n-1;col>0;col-=2){
+    if(col===6)col--;                      // vertical timing column carries no data
+    for(var t2=0;t2<n;t2++){
+      var row=up?(n-1-t2):t2;
+      for(var s=0;s<2;s++){
+        var c2=col-s;
+        if(reserved[row][c2])continue;
+        m[row][c2]=nextBit();
+      }
+    }
+    up=!up;
+  }
+  function applyMask(mk){
+    var out=[],a,b;
+    for(a=0;a<n;a++)out.push(m[a].slice());
+    for(a=0;a<n;a++)for(b=0;b<n;b++)
+      if(!reserved[a][b]&&QR_MASK[mk](a,b))out[a][b]^=1;
+    return out;
+  }
+  var bestMask=0,bestScore=Infinity,mk,cand,sc;
+  for(mk=0;mk<8;mk++){
+    cand=applyMask(mk);
+    qrWriteFormat(cand,n,mk,version,true);
+    sc=qrPenalty(cand,n);
+    if(sc<bestScore){bestScore=sc;bestMask=mk;}
+  }
+  var outM=applyMask(bestMask);
+  qrWriteFormat(outM,n,bestMask,version,false);
+  return outM;
+}
+function qrMatrix(text){
+  var bytes=qrUtf8(String(text)).length,v,header;
+  for(v=1;v<=10;v++){
+    header=4+(v<10?8:16);
+    if(bytes*8+header<=qrCap(v)*8)return qrBuild(String(text),v);
+  }
+  return null;   // too long for v10 — no URL here comes close
+}
+/* The QR codes get PRINTED onto stickers. If you print them while previewing on
+   localhost, they would encode "http://localhost:8848/..." and be dead on any
+   phone. So a non-public host falls back to the deployed URL, and the page says
+   plainly that it did. Update PUBLIC_BASE if the repo is ever renamed. */
+var PUBLIC_BASE='https://sonnnnnion.github.io/ems-ops/';
+function isLocalPreview(){
+  var h=location.hostname;
+  return !h||h==='localhost'||h==='127.0.0.1'||location.protocol==='file:';
+}
+function publicBase(){
+  return isLocalPreview() ? PUBLIC_BASE
+    : location.origin+location.pathname.replace(/index\.html?$/i,'');
+}
+
+/* Inline SVG, one path for all dark modules. 4-module quiet zone is required by
+   the spec — without it many scanners simply won't lock on. */
+function qrSVG(text,px){
+  var m=qrMatrix(text);
+  if(!m) return '<div class="placeholder">Link too long to encode.</div>';
+  var n=m.length,quiet=4,size=n+quiet*2,d='',i,j;
+  for(i=0;i<n;i++)for(j=0;j<n;j++)
+    if(m[i][j])d+='M'+(j+quiet)+' '+(i+quiet)+'h1v1h-1z';
+  return '<svg class="qrsvg" viewBox="0 0 '+size+' '+size+'" width="'+px+'" height="'+px+'" '+
+    'shape-rendering="crispEdges" role="img" aria-label="QR code for '+esc(text)+'">'+
+    '<rect width="'+size+'" height="'+size+'" fill="#fff"/>'+
+    '<path d="'+d+'" fill="#000"/></svg>';
+}
+
+/* ============================================================================
+   SEED CONTENT
+   ----------------------------------------------------------------------------
+   Everything below is the site's default content. It is copied into `DB` on
+   first load and can then be edited in manager mode, so this object is a
+   starting point rather than the live copy.
+
+   PROVENANCE — worth knowing before you edit any of it:
+     * The 14 rooms and their slot counts are transcribed from the printed
+       "CMU EMS Room Check Tracker" and the Room Tasking Sheet System memo.
+     * The four cleaning verbs (vacuum / Swiffer / Clorox / organise) come from
+       the End of Year Office Cleanup Tasking sheet.
+     * The per-room item lists are NOT transcribed from anything — no room-level
+       checklist existed yet. They are drafted from the Office Manager role
+       description and the room photos, and are meant to be corrected by the
+       Office Manager rather than trusted as written.
+     * Bag contents are drafted from the bag photos and the equipment
+       spreadsheets. Which physical bag is called what is the one thing an agent
+       cannot verify from a photograph — confirm the names with the Equipment
+       Manager before printing any QR code.
+     * No live stock counts or expiry dates are stored here on purpose. Those
+       live in the spreadsheet. See README.
+   ========================================================================== */
+var DEFAULTS={
+  version:1,
+
+  // ONE Apps Script Web App in front of ONE spreadsheet. Every form writes to
+  // its own tab in that file, so Equipment and Office data sit side by side and
+  // can be cross-referenced with a formula. `form` in the payload picks the tab.
+  api:{url:''},
+
+  // Google accounts allowed to publish content edits. Verified server-side by
+  // the Apps Script; the list here only decides what the UI offers.
+  managers:{equipment:[],office:[],ops:[]},
+
+  /* ---------- rooms ------------------------------------------------------
+     `slots` is how many members may claim the room in one duty period: three
+     for the high-traffic rooms, two elsewhere. `photo` names a file in
+     assets/rooms/ and is the reference standard for "clean". */
+  rooms:[
+    {id:'equipment', name:'Equipment Room', tier:'high', slots:3, photo:'equipment-room',
+     tasks:['Restock the blue bins from the shelf stock','Bags and kits back on their own shelf',
+            'Nothing expired left in a stocked bin — pull it and flag it','Shelf and bin labels still readable',
+            'Floor clear enough to walk the aisle','Sweep or vacuum the floor']},
+    {id:'radio', name:'Radio Room', tier:'high', slots:3, photo:'radio-room',
+     tasks:['Every radio is in a charger or on the rack','Batteries on charge, none left loose',
+            'Chargers powered and none blinking a fault','Desk surface clear','Wipe the desk and keyboard',
+            'Vacuum the floor']},
+    {id:'kitchen', name:'Kitchen', tier:'high', slots:3, photo:'',
+     tasks:['Sink empty, dishes washed and put away','Counters wiped down',
+            'Fridge checked — anything expired or unlabelled binned','Microwave wiped inside',
+            'Trash and recycling taken out if over half full','Sweep or Swiffer the floor']},
+    {id:'training', name:'Training Room', tier:'high', slots:3, photo:'training-room',
+     tasks:['Chairs back around the table','Table wiped down','Manikins and training gear put away',
+            'TV and any equipment powered off','Whiteboard cleared','Sweep or Swiffer the floor']},
+    {id:'laundry', name:'Laundry', tier:'high', slots:3, photo:'',
+     tasks:['Washer empty','Dryer empty, lint trap cleared','Dirty laundry bin not overflowing',
+            'Clean bedding folded and put away','Detergent in stock','Floor clear and wiped']},
+    {id:'living', name:'Living Room', tier:'std', slots:2, photo:'living-room',
+     tasks:['Couch cushions straightened, blankets folded','Coffee table clear','Personal items moved to cubbies',
+            'Trash emptied if over half full','Vacuum the floor']},
+    {id:'office', name:'Office', tier:'std', slots:2, photo:'small-office',
+     tasks:['Desk surfaces clear','Loose paperwork filed or shredded','Shredder bin emptied if full',
+            'Printer has paper','Wipe the desk','Vacuum the floor']},
+    {id:'tech', name:'Tech Room (R+)', tier:'std', slots:2, photo:'storage-room',
+     tasks:['Tools returned to the chest','Bins pushed back and labels facing out','Boxes broken down',
+            'Nothing blocking the aisle','Sweep or vacuum the floor']},
+    {id:'bath1', name:'Bathroom 1 (front)', tier:'std', slots:2, photo:'bathroom-1',
+     tasks:['Toilet cleaned','Sink and mirror wiped','Toilet paper stocked','Paper towels stocked',
+            'Hand soap stocked','Trash emptied','Floor mopped or wiped']},
+    {id:'bath2', name:'Bathroom 2 (back)', tier:'std', slots:2, photo:'bathroom-2',
+     tasks:['Toilet cleaned','Sink and mirror wiped','Shower rinsed, drain clear','Toilet paper stocked',
+            'Paper towels stocked','Hand soap stocked','Trash emptied','Floor mopped or wiped']},
+    {id:'hall-up', name:'Upstairs Hallway', tier:'std', slots:2, photo:'',
+     tasks:['Nothing stored in the walkway','Walls and doorframes free of marks','Vacuum or sweep the floor']},
+    {id:'hall-down', name:'Downstairs Hallway', tier:'std', slots:2, photo:'',
+     tasks:['Nothing stored in the walkway','Walls and doorframes free of marks','Vacuum or sweep the floor']},
+    {id:'stairs', name:'Stairs', tier:'std', slots:2, photo:'',
+     tasks:['Steps clear — nothing left on a tread','Handrail wiped','Sweep or vacuum each step']},
+    {id:'foyer', name:'Foyer', tier:'std', slots:2, photo:'',
+     tasks:['Shoe cubbies tidy, shoes in their own cubby','Bulletin board current — nothing months out of date',
+            'Entry mat straight and clear','Trash emptied','Sweep or vacuum the floor']}
+  ],
+
+  /* ---------- bags and kits ---------------------------------------------
+     `active:false` means the bag exists but its check is not in use yet, so it
+     is listed for reference and kept out of the check picker. Trauma and squad
+     were both marked "form to be written during O-Week" in the Ops to-do, so
+     they start inactive with a first-draft list rather than a blank one. */
+  bags:[
+    {id:'jumpkit', name:'Jumpkit', active:true, where:'Duty room rack',
+     photos:['jumpkit-closed','jumpkit-open','jumpkit-closed-alt'],
+     note:'The response bag. There is more than one — check the one you actually carried.',
+     sections:[
+       {name:'Airway & breathing', items:[
+         {id:'jk-opa', label:'OPA set', qty:'1 set'},
+         {id:'jk-npa', label:'NPA set', qty:'1 set'},
+         {id:'jk-bvm', label:'Bag-valve mask', qty:'1'},
+         {id:'jk-nrb', label:'Non-rebreather masks', qty:'2'},
+         {id:'jk-nc', label:'Nasal cannulae', qty:'2'},
+         {id:'jk-o2', label:'Oxygen cylinder — pressure adequate, regulator fitted', qty:'1'},
+         {id:'jk-suction', label:'Manual suction', qty:'1'}]},
+       {name:'Bleeding & trauma', items:[
+         {id:'jk-gauze', label:'Sterile gauze pads (4x4)', qty:'10'},
+         {id:'jk-gauze2', label:'Sterile gauze pads (2x2)', qty:'10'},
+         {id:'jk-roller', label:'Roller bandages', qty:'4'},
+         {id:'jk-trauma', label:'Trauma dressings', qty:'2'},
+         {id:'jk-tq', label:'Tourniquet', qty:'1'},
+         {id:'jk-tape', label:'Medical tape', qty:'2'},
+         {id:'jk-sam', label:'SAM splint', qty:'1'},
+         {id:'jk-shears', label:'Trauma shears', qty:'1'}]},
+       {name:'Assessment', items:[
+         {id:'jk-bp', label:'BP cuff', qty:'1'},
+         {id:'jk-stetho', label:'Stethoscope', qty:'1'},
+         {id:'jk-pulseox', label:'Pulse oximeter', qty:'1'},
+         {id:'jk-penlight', label:'Penlight', qty:'1'},
+         {id:'jk-glucometer', label:'Glucometer with strips and lancets', qty:'1'}]},
+       {name:'PPE & sundries', items:[
+         {id:'jk-gloves', label:'Gloves — all sizes present', qty:'—'},
+         {id:'jk-masks', label:'Face masks', qty:'4'},
+         {id:'jk-eye', label:'Eye protection', qty:'2'},
+         {id:'jk-hotcold', label:'Instant hot / cold packs', qty:'2 each'},
+         {id:'jk-emesis', label:'Emesis bags', qty:'2'},
+         {id:'jk-blanket', label:'Emergency blanket', qty:'1'},
+         {id:'jk-sharps', label:'Sharps container — not full', qty:'1'},
+         {id:'jk-paper', label:'Patient care paperwork', qty:'—'}]}
+     ]},
+
+    {id:'event', name:'Event Bag', active:true, where:'Equipment room',
+     photos:['eventbag-top','eventbag-lid','eventbag-pouches','eventbag-main'],
+     note:'The green backpacks taken to standbys and events.',
+     sections:[
+       {name:'Top compartment', items:[
+         {id:'ev-bp', label:'BP cuff', qty:'1'},
+         {id:'ev-stetho', label:'Stethoscope', qty:'1'},
+         {id:'ev-clipboard', label:'Clipboard and paperwork', qty:'1'},
+         {id:'ev-gloves', label:'Gloves — all sizes present', qty:'—'}]},
+       {name:'Lid pockets', items:[
+         {id:'ev-tape', label:'Tape and self-adhering wrap', qty:'—'},
+         {id:'ev-gauzeroll', label:'Gauze rolls', qty:'4'},
+         {id:'ev-tq', label:'Tourniquets', qty:'2'},
+         {id:'ev-abd', label:'ABD pads', qty:'4'}]},
+       {name:'Front pouches', items:[
+         {id:'ev-bandaid', label:'Adhesive bandage pouch (blue)', qty:'1 pouch'},
+         {id:'ev-preps', label:'Alcohol / prep pouch (black)', qty:'1 pouch'},
+         {id:'ev-paperwork', label:'Paperwork pouch (red)', qty:'1 pouch'}]},
+       {name:'Main compartment', items:[
+         {id:'ev-o2', label:'Oxygen cylinder — pressure adequate, regulator fitted', qty:'1'},
+         {id:'ev-nrb', label:'Non-rebreather masks', qty:'2'},
+         {id:'ev-airway', label:'Airway roll (OPA / NPA)', qty:'1'},
+         {id:'ev-sam', label:'SAM splints', qty:'2'},
+         {id:'ev-hotpack', label:'Instant hot packs', qty:'2'},
+         {id:'ev-coldpack', label:'Instant cold packs', qty:'2'},
+         {id:'ev-suction', label:'Manual suction', qty:'1'}]}
+     ]},
+
+    {id:'blue', name:'Blue Bag', active:true, where:'Equipment room',
+     photos:['bluebag-aed','bluebag-open'],
+     note:'Carries the AED, suction and the blue-bag medication kit.',
+     sections:[
+       {name:'Devices', items:[
+         {id:'bl-aed', label:'AED — status light green, pads sealed and in date', qty:'1'},
+         {id:'bl-pads', label:'Spare AED pads', qty:'1 set'},
+         {id:'bl-suction', label:'LCSU suction unit — charged', qty:'1'},
+         {id:'bl-catheter', label:'Suction catheters', qty:'2'}]},
+       {name:'Airway', items:[
+         {id:'bl-opa', label:'OPA set', qty:'1 set'},
+         {id:'bl-npa', label:'NPA set', qty:'1 set'},
+         {id:'bl-bvm', label:'Bag-valve mask', qty:'1'},
+         {id:'bl-lube', label:'Lubricating jelly', qty:'2'}]},
+       {name:'Medication kit', items:[
+         {id:'bl-epi3', label:'Epinephrine auto-injector 0.3 mg', qty:'1'},
+         {id:'bl-epi15', label:'Epinephrine auto-injector 0.15 mg', qty:'1'},
+         {id:'bl-aspirin', label:'Aspirin, 36-tablet bottle', qty:'1'},
+         {id:'bl-naloxone', label:'Naloxone syringes 2 mg / 2 mL', qty:'2'},
+         {id:'bl-mad', label:'Intranasal atomiser (MAD)', qty:'2'},
+         {id:'bl-strips', label:'Blood glucose test strips', qty:'100'},
+         {id:'bl-lancets', label:'Blood glucose lancets', qty:'100'},
+         {id:'bl-meter', label:'Blood glucose meter', qty:'1'}]}
+     ]},
+
+    {id:'ccpod', name:'Crew Chief Pod', active:true, where:'With the crew chief',
+     photos:['medkit-open'],
+     note:'The medication pod the crew chief carries.',
+     sections:[
+       {name:'Medication', items:[
+         {id:'cc-epi3', label:'Epinephrine auto-injector 0.3 mg', qty:'2'},
+         {id:'cc-epi15', label:'Epinephrine auto-injector 0.15 mg', qty:'1'},
+         {id:'cc-aspirin', label:'Aspirin, 36-tablet bottle', qty:'1'},
+         {id:'cc-naloxone', label:'Naloxone syringes 2 mg / 2 mL', qty:'2'},
+         {id:'cc-mad', label:'Intranasal atomiser (MAD)', qty:'2'}]},
+       {name:'Dressings & testing', items:[
+         {id:'cc-quikclot', label:'QuikClot EMS 4x4 dressing', qty:'1'},
+         {id:'cc-petrolatum', label:'Petrolatum dressings', qty:'5'},
+         {id:'cc-strips', label:'Blood glucose test strips', qty:'100'},
+         {id:'cc-lancets', label:'Blood glucose lancets', qty:'100'},
+         {id:'cc-gauze', label:'2x2 sterile gauze', qty:'4'},
+         {id:'cc-alcohol', label:'Alcohol wipes', qty:'10'},
+         {id:'cc-bandaid', label:'Adhesive bandages', qty:'10'}]},
+       {name:'Paperwork', items:[
+         {id:'cc-naloxdoc', label:'Naloxone administration documentation', qty:'2'},
+         {id:'cc-narcanform', label:'Narcan kit restock request form', qty:'2'}]}
+     ]},
+
+    {id:'trauma', name:'Trauma Bag', active:false, where:'Equipment room',
+     photos:['jumpkit-closed-alt'],
+     note:'Contents not yet agreed. This list is a starting point for the Equipment Manager, not a standard.',
+     sections:[
+       {name:'Bleeding control', items:[
+         {id:'tr-tq', label:'Tourniquets', qty:'2'},
+         {id:'tr-israeli', label:'Pressure dressings', qty:'4'},
+         {id:'tr-quikclot', label:'Haemostatic gauze', qty:'2'},
+         {id:'tr-chest', label:'Chest seals', qty:'2'},
+         {id:'tr-abd', label:'ABD pads', qty:'6'},
+         {id:'tr-roller', label:'Roller bandages', qty:'6'}]},
+       {name:'Splinting & packaging', items:[
+         {id:'tr-sam', label:'SAM splints', qty:'2'},
+         {id:'tr-cervical', label:'Cervical collar', qty:'1'},
+         {id:'tr-triangular', label:'Triangular bandages', qty:'4'},
+         {id:'tr-blanket', label:'Emergency blanket', qty:'2'},
+         {id:'tr-shears', label:'Trauma shears', qty:'1'}]}
+     ]},
+
+    {id:'squad', name:'Squad Car Kit', active:false, where:'Police vehicles',
+     photos:[],
+     note:'Contents not yet agreed. Checked in the vehicle; the seal is the point of the check.',
+     sections:[
+       {name:'Seal & access', items:[
+         {id:'sq-present', label:'Kit present in the vehicle', qty:'1'},
+         {id:'sq-seal', label:'Seal intact — record the number below', qty:'1'},
+         {id:'sq-access', label:'Kit reachable without moving other equipment', qty:'—'}]},
+       {name:'Contents', items:[
+         {id:'sq-aed', label:'AED — status light green, pads in date', qty:'1'},
+         {id:'sq-gloves', label:'Gloves', qty:'—'},
+         {id:'sq-tq', label:'Tourniquet', qty:'1'},
+         {id:'sq-dressing', label:'Trauma dressings', qty:'2'},
+         {id:'sq-cpr', label:'CPR barrier mask', qty:'1'},
+         {id:'sq-blanket', label:'Emergency blanket', qty:'1'}]}
+     ]},
+
+    {id:'mci', name:'MCI Kit', active:false, where:'Equipment room',
+     photos:['mci-kit'],
+     note:'Regional MCI kit. Checked on a longer cycle than the response bags.',
+     sections:[
+       {name:'Triage', items:[
+         {id:'mci-tags', label:'Triage tag pack', qty:'1'},
+         {id:'mci-tape', label:'Triage ribbon — all four colours', qty:'1 set'},
+         {id:'mci-vests', label:'Role vests (Triage / Operations)', qty:'2'},
+         {id:'mci-glow', label:'Glow sticks — all colours', qty:'1 set'}]},
+       {name:'Scene', items:[
+         {id:'mci-barrier', label:'Barrier tape', qty:'2'},
+         {id:'mci-duct', label:'Duct tape', qty:'1'},
+         {id:'mci-marker', label:'Markers and pencils', qty:'—'},
+         {id:'mci-paint', label:'Marking paint', qty:'1'},
+         {id:'mci-notes', label:'Note pads', qty:'1'}]}
+     ]}
+  ],
+
+  /* ---------- post-call / post-shift ------------------------------------
+     Both transcribed near-verbatim from the Operations to-do, which is the only
+     place either list has been written down. */
+  postCall:[
+    {name:'Before the kit goes back', items:[
+      {id:'pc-wipe', label:'Anything used has been wiped down'},
+      {id:'pc-dirty', label:'Anything needing deeper cleaning is in the to-sanitise spot, not back in the bag'},
+      {id:'pc-refill', label:'Everything used has been replaced from stock'},
+      {id:'pc-gloves', label:'Fresh gloves in the bag'},
+      {id:'pc-paperwork', label:'Refill paperwork replaced'},
+      {id:'pc-sharps', label:'Sharps disposed of properly'},
+      {id:'pc-biohazard', label:'Any biohazard waste bagged and in the right bin'}]},
+    {name:'Recorded', items:[
+      {id:'pc-logged', label:'Call logged'},
+      {id:'pc-shortage', label:'Anything I could not replace is written below'}]}
+  ],
+  postShift:[
+    {name:'Back where it belongs', items:[
+      {id:'ps-jumpkit', label:'Jumpkit back in the radio room'},
+      {id:'ps-restock', label:'Jumpkit fully restocked'},
+      {id:'ps-radio', label:'Radio back in the radio room'},
+      {id:'ps-battery', label:'Radio battery back on the charger'},
+      {id:'ps-shoes', label:'Shoes tucked back in their cubby'},
+      {id:'ps-laundry', label:'Used shirts and bedding in the dirty laundry bin'}]}
+  ],
+
+  /* ---------- spaces that are not on the tracker ------------------------
+     The printed tracker lists 14 rooms and these two are not among them, so
+     they are not claimable tasks. They are still the Office Manager's to look
+     after, and there are reference photos, so they appear in the room reference
+     without appearing in the check picker. */
+  otherSpaces:[
+    {id:'duty', name:'Duty Room', photo:'duty-room',
+     note:'Jumpkit rack, uniforms and radio chargers.'},
+    {id:'crew', name:'Crew Quarters', photo:'crew-quarters',
+     note:'Bunks, cubbies and personal storage.'}
+  ],
+
+  /* ---------- office supplies (non-medical) ----------------------------- */
+  officeSupplies:[
+    {id:'os-soap',   item:'Hand soap',        where:'Supplies cabinet', par:'2 spare'},
+    {id:'os-towels', item:'Paper towels',     where:'Supplies cabinet', par:'4 rolls'},
+    {id:'os-tp',     item:'Toilet paper',     where:'Supplies cabinet', par:'6 rolls'},
+    {id:'os-gloves', item:'Gloves (PPE case)',where:'Front PPE case',   par:'1 box / size'},
+    {id:'os-masks',  item:'Face masks',       where:'Front PPE case',   par:'1 box'},
+    {id:'os-pens',   item:'Pens',             where:'Office',           par:'—'},
+    {id:'os-markers',item:'Markers',          where:'Office',           par:'—'},
+    {id:'os-tape',   item:'Tape',             where:'Office',           par:'—'},
+    {id:'os-paper',  item:'Printer paper',    where:'Office',           par:'1 ream spare'},
+    {id:'os-labels', item:'Labels / label maker tape', where:'Equipment room', par:'—'},
+    {id:'os-trash',  item:'Trash bags',       where:'Supplies cabinet', par:'—'},
+    {id:'os-cleaner',item:'Cleaning supplies (Clorox, Swiffer refills)', where:'Supplies cabinet', par:'—'}
+  ],
+
+  /* ---------- inventory schema ------------------------------------------
+     Names, homes and par levels only. Counts and expiry dates deliberately live
+     in the spreadsheet and not in this file — see the note in the Inventory
+     view for why. */
+  inventory:[
+    {id:'iv-strips-cc', item:'Blood glucose test strips', loc:'CC Pod', par:100, cat:'Testing'},
+    {id:'iv-lancets-cc', item:'Blood glucose lancets', loc:'CC Pod', par:100, cat:'Testing'},
+    {id:'iv-epi3-cc', item:'Epinephrine auto-injector 0.3 mg', loc:'CC Pod', par:2, cat:'Medication'},
+    {id:'iv-epi15-cc', item:'Epinephrine auto-injector 0.15 mg', loc:'CC Pod', par:1, cat:'Medication'},
+    {id:'iv-petro-cc', item:'Petrolatum dressings', loc:'CC Pod', par:5, cat:'Dressings'},
+    {id:'iv-quik-cc', item:'QuikClot EMS 4x4 dressing', loc:'CC Pod', par:1, cat:'Dressings'},
+    {id:'iv-asa-cc', item:'Aspirin, 36-tablet bottle', loc:'CC Pod', par:1, cat:'Medication'},
+    {id:'iv-nalox-cc', item:'Naloxone syringes 2 mg / 2 mL', loc:'CC Pod', par:2, cat:'Medication'},
+    {id:'iv-naloxhcl-cc', item:'Naloxone hydrochloride', loc:'CC Pod', par:2, cat:'Medication'},
+    {id:'iv-mad-cc', item:'Intranasal atomiser (MAD)', loc:'CC Pod', par:2, cat:'Airway'},
+
+    {id:'iv-strips-bb', item:'Blood glucose test strips', loc:'Blue Bag', par:100, cat:'Testing'},
+    {id:'iv-lancets-bb', item:'Blood glucose lancets', loc:'Blue Bag', par:100, cat:'Testing'},
+    {id:'iv-epi3-bb', item:'Epinephrine auto-injector 0.3 mg', loc:'Blue Bag', par:1, cat:'Medication'},
+    {id:'iv-epi15-bb', item:'Epinephrine auto-injector 0.15 mg', loc:'Blue Bag', par:1, cat:'Medication'},
+    {id:'iv-asa-bb', item:'Aspirin, 36-tablet bottle', loc:'Blue Bag', par:1, cat:'Medication'},
+    {id:'iv-nalox-bb', item:'Naloxone syringes 2 mg / 2 mL', loc:'Blue Bag', par:2, cat:'Medication'},
+    {id:'iv-naloxhcl-bb', item:'Naloxone hydrochloride', loc:'Blue Bag', par:2, cat:'Medication'},
+
+    {id:'iv-adren-er', item:'Adrenaline, 1 mL single-dose vials', loc:'Equipment Room', par:2, cat:'Medication'},
+    {id:'iv-epi3-er', item:'Epinephrine auto-injector 0.3 mg', loc:'Equipment Room', par:2, cat:'Medication'},
+    {id:'iv-epi15-er', item:'Epinephrine auto-injector 0.15 mg', loc:'Equipment Room', par:1, cat:'Medication'},
+    {id:'iv-epirite-er', item:'EpiRite syringes, 1 mL', loc:'Equipment Room', par:100, cat:'Medication'},
+    {id:'iv-sterifix-er', item:'Sterifix filter needles, 3.8 cm', loc:'Equipment Room', par:100, cat:'Medication'},
+    {id:'iv-asa-er', item:'Aspirin, 36-tablet bottle', loc:'Equipment Room', par:1, cat:'Medication'},
+    {id:'iv-mad-er', item:'Intranasal atomiser (MAD)', loc:'Equipment Room', par:2, cat:'Airway'}
+  ],
+
+  /* ---------- the roles -------------------------------------------------
+     Condensed from the three role descriptions. Deliberately no names: the site
+     is public and a role outlives the person holding it. */
+  roles:[
+    {id:'equipment', title:'Equipment Manager', time:'~1 hour / week',
+     summary:'Keeps equipment stocked, stored in the right place, working, and in date.',
+     duties:[
+       {h:'Equipment organisation', items:[
+         'Keep the equipment room organised, labelled, and restock bins weekly',
+         'Make and update labels for shelves, bins, bags, cabinets and equipment areas',
+         'Separate full, empty, expired, broken, contaminated or training-only equipment',
+         'Maintain an inventory system so equipment movement can be tracked']},
+       {h:'Equipment checks', items:[
+         'Make sure squad checks, jumpkit checks and event bag checks get completed',
+         'Follow up when equipment is missing, expired, broken or low',
+         'Make sure check forms are completed and filed',
+         'Update notes, forms and tracking when equipment issues are found']},
+       {h:'Squad car equipment', items:[
+         'Run squad car equipment checks — form, cadence, and who does them',
+         'Medical equipment in police vehicles is present, stocked, sealed and usable']},
+       {h:'Radios and batteries', items:[
+         'Radios clean, charged and functional',
+         'Chargers and storage areas organised',
+         'Report radio or battery problems to the Operations Officer']},
+       {h:'Maintenance and safety', items:[
+         'Check equipment for wear and tear, remove what is no longer usable',
+         'Contaminated equipment decontaminated properly',
+         'Biohazardous waste handled through the right disposal process']},
+       {h:'Improvement projects', items:[
+         'Barcode scanning or inventory spreadsheets to track equipment',
+         'Clearer labels for equipment closets and the station cabinet',
+         'Better forms for jumpkit checkout, event bag checkout and car bag checks']}
+     ]},
+    {id:'office', title:'Office Manager', time:'~45 min / week',
+     summary:'Keeps the office working: shared spaces, the chore system, and non-medical restock.',
+     duties:[
+       {h:'Cleaning support', items:[
+         'Prepare and print the weekly room check tracker',
+         'Maintain the room check form and tell Operations who has not completed their chore requirement',
+         'Decide which rooms should come up more often based on use and recurring issues',
+         'Address cleanliness issues found through room checks or direct observation',
+         'Arrange a deeper clean once a semester when routine checks are not enough']},
+       {h:'Organisation', items:[
+         'Check shared rooms for order and usability — crew quarters, living room, kitchen, ' +
+         'training room, offices, storage, bathrooms, hallways and tech spaces',
+         'Recommend rearrangements that make the office more functional']},
+       {h:'Restocking supplies', items:[
+         'Soap, paper towels and toilet paper stocked in the supplies cabinet',
+         'Front PPE case stocked with gloves, masks and other PPE',
+         'Monitor pens, markers, tape, printer paper, labels and shared supplies',
+         'Keep a restock list and report needs before supplies run out']},
+       {h:'Office improvement', items:[
+         'Projects: Why I Love EMS, community bulletin board, rank-up plan visual',
+         'Suggest furniture updates — chairs, desks, bean bags, shoe racks, storage',
+         'Better storage for blankets, bedding kits, personal items and hygiene supplies',
+         'Identify maintenance concerns: pipes, broken furniture, damaged areas']}
+     ]},
+    {id:'bike', title:'Bike Manager', time:'~1 hour / week',
+     summary:'Bike readiness, pre-ride and jumpkit checks, repairs and the out-of-service call.',
+     external:'https://sonnnnnion.github.io/bike-ops/',
+     duties:[
+       {h:'Where this lives', items:[
+         'The Bike Manager role has its own site with its own checks, QR codes and inventory',
+         'Nothing about bikes is duplicated here — follow the link so there is one source of truth']}
+     ]}
+  ],
+
+  issues:[],
+  restockLog:[]
+};
+
+
+/* ============================================================================
+   STORAGE
+   `DB` is the live copy. loadDB() iterates the keys of DEFAULTS, so adding a new
+   key later is safe for anyone with data already in localStorage: the new key
+   falls back to its default instead of coming back undefined.
+   ========================================================================== */
+var LS_DB='emsops_db_v1', LS_DRAFT='emsops_draft_v1', LS_ROLE='emsops_role_v1';
+var DB={};
+
+function loadDB(){
+  var raw=null;
+  try{ raw=JSON.parse(localStorage.getItem(LS_DB)||'null'); }catch(e){ raw=null; }
+  Object.keys(DEFAULTS).forEach(function(k){
+    var v = raw && Object.prototype.hasOwnProperty.call(raw,k) ? raw[k] : null;
+    // A stored value of the wrong shape is worse than no stored value: it blanks
+    // whole views with no error. Fall back per key rather than per object.
+    var want=Object.prototype.toString.call(DEFAULTS[k]);
+    DB[k] = (v!=null && Object.prototype.toString.call(v)===want) ? v
+          : JSON.parse(JSON.stringify(DEFAULTS[k]));
+  });
+}
+function saveDB(){
+  try{ localStorage.setItem(LS_DB,JSON.stringify(DB)); }
+  catch(e){ /* private mode / quota — the site still works, edits just don't persist */ }
+}
+function resetDB(){
+  try{ localStorage.removeItem(LS_DB); }catch(e){}
+  loadDB(); renderAll();
+}
+
+/* ============================================================================
+   ROLES
+   Four audiences: everyone, Equipment Manager, Office Manager, Operations
+   Officer. The officer is not a fourth set of tools — it is both manager sets at
+   once, so `can()` treats 'ops' as a superset.
+
+   This is a convenience gate, not a security boundary. Anyone can open devtools
+   and set the role. Nothing on this page is secret; what protects submitted data
+   is the Apps Script, which checks a real Google token server-side.
+   ========================================================================== */
+var ROLE='member';
+var ROLE_LABEL={member:'Member view',equipment:'Equipment Manager',office:'Office Manager',ops:'Operations Officer'};
+
+function can(need){
+  if(!need) return true;
+  if(ROLE==='ops') return true;                    // the officer sees everything
+  if(need==='mgr') return ROLE!=='member';
+  return need.split(/\s+/).indexOf(ROLE)>=0;
+}
+
+/* Gate in JS rather than CSS. The bike site hid manager controls with
+   `.webonly{display:none}` plus a reveal rule, and twice shipped a leak because
+   some later rule set `display` at equal specificity and won. Setting the
+   `hidden` property has no specificity to lose: [hidden] carries !important, and
+   a permitted element gets no rule applied at all, so its own layout survives. */
+function applyGates(root){
+  var els=(root||document).querySelectorAll('[data-need]');
+  for(var i=0;i<els.length;i++) els[i].hidden = !can(els[i].getAttribute('data-need'));
+}
+
+var MANAGER_VIEWS={tracker:'office',restock:'office',inventory:'equipment',log:'mgr',settings:'mgr'};
+
+function setRole(r,quiet){
+  ROLE = ROLE_LABEL[r] ? r : 'member';
+  try{ localStorage.setItem(LS_ROLE,ROLE); }catch(e){}
+  var pill=document.getElementById('rolePill');
+  pill.textContent=ROLE_LABEL[ROLE];
+  pill.classList.toggle('web',ROLE!=='member');
+  document.getElementById('roleBtn').textContent = ROLE==='member' ? '🔒 Manager' : '✓ Signed in';
+  applyGates();
+  // A gated view reached by hash must not simply stay open when the role drops.
+  var cur=document.querySelector('.view.active');
+  var v=cur&&cur.getAttribute('data-view');
+  if(v && MANAGER_VIEWS[v] && !can(MANAGER_VIEWS[v])) go('home');
+  if(!quiet) renderAll();
+}
+
+function openRolePicker(){
+  if(ROLE!=='member'){
+    uiConfirm('You are signed in as '+ROLE_LABEL[ROLE]+'. Sign out?','Manager access',
+              {ok:'Sign out',cancel:'Stay signed in'})
+      .then(function(y){ if(y) setRole('member'); });
+    return;
+  }
+  uiForm('Manager access',
+    'Pick your role. This unlocks that role\'s tools on this device — it does not '+
+    'protect anything, so keep anything sensitive off this site.',
+    [{id:'role',label:'Role',type:'select',options:[
+        {v:'office',t:'Office Manager'},
+        {v:'equipment',t:'Equipment Manager'},
+        {v:'ops',t:'Operations Officer (both)'}]}],
+    {ok:'Unlock'})
+   .then(function(v){ if(v&&v.role) setRole(v.role); });
+}
+
+/* ============================================================================
+   NAVIGATION
+   ========================================================================== */
+var HOME='home';
+function navIsOpen(){ return document.body.classList.contains('nav-open'); }
+function navIsDrawer(){ return window.matchMedia('(max-width:820px)').matches; }
+function setNav(open){
+  document.body.classList.toggle('nav-open',!!open);
+  var t=document.getElementById('navToggle');
+  if(t) t.setAttribute('aria-expanded',open?'true':'false');
+}
+function toggleNav(){ setNav(!navIsOpen()); }
+function closeNav(){ if(navIsOpen()) setNav(false); }
+
+function go(v,fromHash){
+  // Enforced here, not just by hiding the nav item — every view is
+  // hash-addressable, so hiding the button alone would gate nothing.
+  if(MANAGER_VIEWS[v] && !can(MANAGER_VIEWS[v])) v=HOME;
+  var target=document.querySelector('.view[data-view="'+v+'"]');
+  if(!target){ v=HOME; target=document.querySelector('.view[data-view="'+HOME+'"]'); }
+
+  var views=document.querySelectorAll('.view');
+  for(var i=0;i<views.length;i++) views[i].classList.remove('active');
+  target.classList.add('active');
+
+  var items=document.querySelectorAll('.sb-item');
+  for(var j=0;j<items.length;j++){
+    var on=items[j].getAttribute('data-view')===v;
+    items[j].classList.toggle('active',on);
+    if(on) items[j].setAttribute('aria-current','page'); else items[j].removeAttribute('aria-current');
+  }
+  if(!fromHash && location.hash.slice(1)!==v) location.hash=v;
+  closeNav();
+  window.scrollTo(0,0);
+}
+
+/* ============================================================================
+   THE FORM ENGINE
+   One engine drives every check on the site. A form is described by a config
+   object; nothing about a specific form is hard-coded below.
+   ========================================================================== */
+var FORMS={
+  'room-check':{
+    host:'roomCheckHost', tab:'Room Checks',
+    lead:'One task per duty period. Pick the room you claimed on the printed tracker.',
+    who:{callsign:true,name:true,andrew:true},
+    pick:{key:'room', label:'Which room did you take?', from:'rooms'},
+    extras:[
+      {id:'restock', label:'Anything that needs restocking?',
+       hint:'Soap, paper towels, toilet paper, PPE, office supplies.'},
+      {id:'maint', label:'Anything broken or needing maintenance?',
+       hint:'Pipes, furniture, damage, anything that needs someone with tools.'}
+    ]
+  },
+  'bag-check':{
+    host:'bagCheckHost', tab:'Bag Checks',
+    lead:'Check every item. Anything you leave unticked is filed as missing.',
+    who:{callsign:true,name:true,andrew:true},
+    pick:{key:'bag', label:'Which bag or kit?', from:'bags'},
+    extras:[{id:'seal', label:'Seal number, if this kit is sealed', hint:'Squad car kits only. Leave blank otherwise.'}]
+  },
+  'post-call':{
+    host:'postCallHost', tab:'Post-Call',
+    lead:'Everything here happens before the kit goes back on the rack.',
+    who:{callsign:true,name:true,andrew:false},
+    fixed:'postCall',
+    extras:[{id:'used', label:'What did you use and replace?',
+             hint:'So the Equipment Manager knows what came off the shelf.'},
+            {id:'short', label:'Anything you could not replace?',
+             hint:'This is the one that matters — an unreplaced item is a gap on the next call.'}]
+  },
+  'post-shift':{
+    host:'postShiftHost', tab:'Post-Shift',
+    lead:'Six things. It takes under a minute.',
+    who:{callsign:true,name:true,andrew:false},
+    fixed:'postShift',
+    extras:[]
+  },
+  'report':{
+    host:'reportHost', tab:'Reports',
+    lead:'Anyone can file this. It goes to the manager whose area it is.',
+    who:{callsign:true,name:true,andrew:false},
+    freeform:{
+      area:{label:'What area is this?', options:[
+        {v:'Equipment', t:'Equipment — a bag, kit, radio or device'},
+        {v:'Office', t:'Office — a room, furniture, supplies or cleanliness'},
+        {v:'Bike', t:'Bike — a bicycle or bike jumpkit'},
+        {v:'Other', t:'Something else'}]},
+      urgency:{label:'How urgent?', options:[
+        {v:'Blocking', t:'Blocking — something is unusable right now'},
+        {v:'Soon', t:'Soon — it will become a problem'},
+        {v:'Whenever', t:'Whenever — worth knowing about'}]}
+    },
+    extras:[{id:'what', label:'What is wrong?', hint:'Be specific enough that someone can find it.', rows:4, required:true},
+            {id:'where', label:'Where is it?', hint:'Which room, which bag, which shelf.'}]
+  }
+};
+
+var formDone={}, lastResult={};
+
+function fcfg(fid){ return FORMS[fid]; }
+
+/* ---- pick-list source: rooms and bags are both {id,name} lists ---- */
+function pickList(from){
+  if(from==='rooms') return DB.rooms.map(function(r){
+    return {id:r.id,name:r.name,sub:r.slots+' slots'}; });
+  return DB.bags.filter(function(b){return b.active;}).map(function(b){
+    return {id:b.id,name:b.name,sub:b.where}; });
+}
+function pickSections(fid,id){
+  var c=fcfg(fid);
+  if(c.fixed) return DB[c.fixed];
+  if(c.pick.from==='rooms'){
+    var r=DB.rooms.filter(function(x){return x.id===id;})[0];
+    if(!r) return [];
+    return [{name:r.name, items:r.tasks.map(function(t,i){
+      return {id:r.id+'-'+i, label:t}; })}];
+  }
+  var b=DB.bags.filter(function(x){return x.id===id;})[0];
+  return b?b.sections:[];
+}
+
+var formPick={};   // fid -> selected room/bag id
+
+function renderCheck(fid){
+  var c=fcfg(fid); var host=document.getElementById(c.host); if(!host) return;
+  if(formDone[fid]){ host.innerHTML=donePanel(fid); applyGates(host); return; }
+  var h='';
+
+  h+='<p class="view-sub" style="margin-top:0">'+esc(c.lead)+'</p>';
+  h+='<div id="'+fid+'-draftnote"></div>';
+
+  /* --- who --- */
+  h+='<div class="card brandtop"><h3>Who is filing this?</h3>';
+  if(c.who.callsign){
+    h+='<div class="field"><label for="'+fid+'-cs">Call sign</label>'+
+       '<input type="text" id="'+fid+'-cs" placeholder="e.g. 12" autocapitalize="characters" '+
+       'oninput="onFormInput(\''+fid+'\')"></div>';
+  }
+  if(c.who.name){
+    h+='<div class="field-row">'+
+       '<div class="field"><label for="'+fid+'-fn">First name</label>'+
+       '<input type="text" id="'+fid+'-fn" oninput="onFormInput(\''+fid+'\')"></div>'+
+       '<div class="field"><label for="'+fid+'-ln">Last name</label>'+
+       '<input type="text" id="'+fid+'-ln" oninput="onFormInput(\''+fid+'\')"></div></div>';
+  }
+  if(c.who.andrew){
+    // Andrew ID is what actually resolves to a person across EMS records; two
+    // members can share a first and last name.
+    h+='<div class="field"><label for="'+fid+'-aid">Andrew ID</label>'+
+       '<input type="text" id="'+fid+'-aid" maxlength="10" autocapitalize="none" autocorrect="off" '+
+       'spellcheck="false" oninput="onFormInput(\''+fid+'\')"></div>';
+  }
+  h+='<p class="hint" style="margin-top:0">The date is recorded automatically.</p></div>';
+
+  /* --- picker --- */
+  if(c.pick){
+    var list=pickList(c.pick.from);
+    h+='<div class="card mt"><h3>'+esc(c.pick.label)+'</h3>';
+    if(!list.length){
+      h+='<p class="hint" style="margin-top:0">Nothing is in service to check right now.</p>';
+    }else{
+      h+='<div class="roomgrid">';
+      list.forEach(function(o){
+        h+='<button type="button" class="roompick'+(formPick[fid]===o.id?' on':'')+'" '+
+           'onclick="setPick(\''+fid+'\',\''+esc(o.id)+'\')">'+esc(o.name)+
+           '<span class="rp-sub">'+esc(o.sub||'')+'</span></button>';
+      });
+      h+='</div>';
+    }
+    h+='</div>';
+  }
+
+  /* --- freeform (the problem report) --- */
+  if(c.freeform){
+    Object.keys(c.freeform).forEach(function(k){
+      var f=c.freeform[k];
+      h+='<div class="card mt"><h3>'+esc(f.label)+'</h3>';
+      f.options.forEach(function(o){
+        h+='<label class="checkline"><input type="radio" name="'+fid+'-'+k+'" data-radio="'+k+'" '+
+           'value="'+esc(o.v)+'" onchange="onFormInput(\''+fid+'\')">'+
+           '<span class="lbl">'+esc(o.t)+'</span></label>';
+      });
+      h+='</div>';
+    });
+  }
+
+  /* --- checklist --- */
+  h+='<div id="'+fid+'-body">'+checkBody(fid)+'</div>';
+
+  /* --- extras --- */
+  (c.extras||[]).forEach(function(x){
+    h+='<div class="card mt"><h3>'+esc(x.label)+'</h3>'+
+       (x.hint?'<p style="font-size:13px;color:var(--ink-mute);margin:0 0 10px">'+esc(x.hint)+'</p>':'')+
+       '<textarea id="'+fid+'-x-'+x.id+'" rows="'+(x.rows||3)+'" placeholder="'+
+       (x.required?'Required':'Leave blank if nothing')+'" oninput="onFormInput(\''+fid+'\')"></textarea></div>';
+  });
+
+  h+='<div id="'+fid+'-verdict"></div>'+
+     '<div class="row mt"><button class="btn solid" onclick="submitCheck(\''+fid+'\')">Submit</button>'+
+     '<button class="btn ghost" onclick="discardCheck(\''+fid+'\')">Clear</button>'+
+     '<span id="'+fid+'-savemsg" style="font-size:12.5px;color:var(--ink-faint)"></span></div>';
+
+  host.innerHTML=h;
+  applyGates(host);
+  restoreDraft(fid);
+  calcCheck(fid);
+}
+
+function checkBody(fid){
+  var c=fcfg(fid);
+  if(c.freeform) return '';
+  var secs=pickSections(fid,formPick[fid]);
+  if(!secs.length){
+    return '<div class="card mt"><p class="hint" style="margin:0">'+
+      (c.pick?'Pick one above and its checklist appears here.':'Nothing to check.')+'</p></div>';
+  }
+  var h='';
+  secs.forEach(function(sec){
+    h+='<div class="card mt"><h3>'+esc(sec.name)+'</h3>';
+    (sec.items||[]).forEach(function(it){
+      h+='<label class="checkline"><input type="checkbox" data-item="'+esc(it.id)+'" '+
+         'data-label="'+esc(it.label)+'" onchange="onFormInput(\''+fid+'\')">'+
+         '<span class="lbl">'+esc(it.label)+'</span>'+
+         (it.qty?'<span class="qty">'+esc(it.qty)+'</span>':'')+'</label>';
+    });
+    h+='</div>';
+  });
+  return h;
+}
+
+function setPick(fid,id){
+  formPick[fid]=id;
+  var host=document.getElementById(fcfg(fid).host);
+  // Re-render only the two parts that depend on the pick, so the identity
+  // fields the member has already typed into are not wiped.
+  var picks=host.querySelectorAll('.roompick');
+  for(var i=0;i<picks.length;i++) picks[i].classList.remove('on');
+  var body=document.getElementById(fid+'-body');
+  if(body) body.innerHTML=checkBody(fid);
+  var list=pickList(fcfg(fid).pick.from);
+  for(var j=0;j<list.length;j++) if(list[j].id===id && picks[j]) picks[j].classList.add('on');
+  saveDraft(fid); calcCheck(fid);
+}
+
+/* ---- live state ---- */
+function readCheck(fid){
+  var c=fcfg(fid), host=document.getElementById(c.host);
+  var out={form:c.tab, date:todayISO(), pick:formPick[fid]||'', done:[], missing:[], radios:{}, extras:{}};
+  if(!host) return out;
+  var g=function(s){var e=document.getElementById(fid+'-'+s);return e?e.value.trim():'';};
+  out.callsign=g('cs'); out.first=g('fn'); out.last=g('ln'); out.andrew=g('aid');
+  var boxes=host.querySelectorAll('[data-item]');
+  for(var i=0;i<boxes.length;i++){
+    var lbl=boxes[i].getAttribute('data-label');
+    if(boxes[i].checked) out.done.push(lbl); else out.missing.push(lbl);
+  }
+  var radios=host.querySelectorAll('[data-radio]');
+  for(var j=0;j<radios.length;j++) if(radios[j].checked) out.radios[radios[j].getAttribute('data-radio')]=radios[j].value;
+  (c.extras||[]).forEach(function(x){
+    var e=document.getElementById(fid+'-x-'+x.id);
+    out.extras[x.id]=e?e.value.trim():'';
+  });
+  var picked=(c.pick?pickList(c.pick.from).filter(function(o){return o.id===out.pick;})[0]:null);
+  out.pickName=picked?picked.name:'';
+  return out;
+}
+
+function calcCheck(fid){
+  var c=fcfg(fid), s=readCheck(fid), box=document.getElementById(fid+'-verdict');
+  if(!box) return;
+  if(c.freeform){ box.innerHTML=''; return; }
+  var total=s.done.length+s.missing.length;
+  if(!total){ box.innerHTML=''; return; }
+  var cls = s.missing.length===0 ? 'ok' : 'warn';
+  box.innerHTML='<div class="verdict '+(cls==='ok'?'ok':'')+'">'+
+    '<div class="big">'+s.done.length+' of '+total+' done</div>'+
+    '<div class="detail">'+(s.missing.length===0
+      ? 'Everything on the list is accounted for.'
+      : s.missing.length+' item'+(s.missing.length===1?'':'s')+' left unticked — '+
+        'they are filed as missing or not done so someone can follow up.')+'</div></div>';
+}
+
+function onFormInput(fid){ calcCheck(fid); saveDraft(fid); }
+
+/* ---- drafts ----
+   Kept out of DB on purpose: a half-finished form is one person's device state,
+   not site content, and must never end up in an export. */
+function readDrafts(){ try{ return JSON.parse(localStorage.getItem(LS_DRAFT)||'{}'); }catch(e){ return {}; } }
+function writeDrafts(d){ try{ localStorage.setItem(LS_DRAFT,JSON.stringify(d)); }catch(e){} }
+
+function saveDraft(fid){
+  var c=fcfg(fid), host=document.getElementById(c.host); if(!host) return;
+  var d=readDrafts(), s=readCheck(fid), ticked=[];
+  var boxes=host.querySelectorAll('[data-item]');
+  for(var i=0;i<boxes.length;i++) if(boxes[i].checked) ticked.push(boxes[i].getAttribute('data-item'));
+  var any = s.callsign||s.first||s.last||s.andrew||ticked.length||s.pick||
+            Object.keys(s.radios).length||Object.keys(s.extras).some(function(k){return s.extras[k];});
+  if(!any){ delete d[fid]; writeDrafts(d); renderDraftNote(fid); return; }
+  d[fid]={at:Date.now(),callsign:s.callsign,first:s.first,last:s.last,andrew:s.andrew,
+          pick:s.pick,ticked:ticked,radios:s.radios,extras:s.extras};
+  writeDrafts(d);
+  var m=document.getElementById(fid+'-savemsg'); if(m) m.textContent='Saved on this device';
+  renderDraftNote(fid);
+}
+
+function restoreDraft(fid){
+  var d=readDrafts()[fid]; if(!d) return;
+  var set=function(s,v){var e=document.getElementById(fid+'-'+s); if(e&&v) e.value=v;};
+  set('cs',d.callsign); set('fn',d.first); set('ln',d.last); set('aid',d.andrew);
+  if(d.pick && !formPick[fid]){ formPick[fid]=d.pick;
+    var body=document.getElementById(fid+'-body'); if(body) body.innerHTML=checkBody(fid);
+    var host=document.getElementById(fcfg(fid).host);
+    var picks=host.querySelectorAll('.roompick'), list=pickList(fcfg(fid).pick.from);
+    for(var i=0;i<list.length;i++) if(list[i].id===d.pick && picks[i]) picks[i].classList.add('on');
+  }
+  (d.ticked||[]).forEach(function(id){
+    var b=document.querySelector('#'+fcfg(fid).host+' [data-item="'+id+'"]'); if(b) b.checked=true;
+  });
+  Object.keys(d.radios||{}).forEach(function(k){
+    var r=document.querySelector('#'+fcfg(fid).host+' [data-radio="'+k+'"][value="'+d.radios[k]+'"]');
+    if(r) r.checked=true;
+  });
+  Object.keys(d.extras||{}).forEach(function(k){
+    var e=document.getElementById(fid+'-x-'+k); if(e) e.value=d.extras[k]||'';
+  });
+  renderDraftNote(fid);
+}
+
+function renderDraftNote(fid){
+  var host=document.getElementById(fid+'-draftnote'); if(!host) return;
+  var d=readDrafts()[fid];
+  host.innerHTML = d ? '<div class="draftnote">Picking up where you left off — '+
+    'this is saved on this device only, and is not filed until you submit. '+
+    '<button class="btn xs" onclick="discardCheck(\''+fid+'\')">Start over</button></div>' : '';
+}
+
+function clearDraft(fid){ var d=readDrafts(); delete d[fid]; writeDrafts(d); }
+
+function discardCheck(fid){
+  uiConfirm('Clear everything on this form?','Start over',{ok:'Clear',cancel:'Keep it'})
+    .then(function(y){
+      if(!y) return;
+      clearDraft(fid); formPick[fid]=null; formDone[fid]=false; renderCheck(fid);
+    });
+}
+
+/* ---- submit ---- */
+function submitCheck(fid){
+  var c=fcfg(fid), s=readCheck(fid), missing=[];
+  if(c.who.callsign && !s.callsign) missing.push('your call sign');
+  if(c.who.name && !(s.first&&s.last)) missing.push('your name');
+  if(c.pick && !s.pick) missing.push(c.pick.from==='rooms'?'which room you took':'which bag you checked');
+  (c.extras||[]).forEach(function(x){ if(x.required && !s.extras[x.id]) missing.push(x.label.toLowerCase()); });
+  if(c.freeform) Object.keys(c.freeform).forEach(function(k){
+    if(!s.radios[k]) missing.push(c.freeform[k].label.toLowerCase()); });
+
+  if(missing.length){
+    uiAlert('Still needed: '+missing.join(', ')+'.','Not quite done');
+    return;
+  }
+  if(!c.freeform && !c.fixed && !s.done.length && !s.missing.length){
+    uiAlert('There is nothing ticked on this checklist yet.','Nothing to submit'); return;
+  }
+  doSubmit(fid,s);
+}
+
+function doSubmit(fid,s){
+  var c=fcfg(fid);
+  var payload={
+    form:c.tab, date:s.date, submitted:new Date().toISOString(),
+    callsign:s.callsign, name:(s.first+' '+s.last).trim(), andrew:s.andrew,
+    subject:s.pickName, done:s.done.join(' | '), missing:s.missing.join(' | '),
+    doneCount:s.done.length, missingCount:s.missing.length
+  };
+  Object.keys(s.radios).forEach(function(k){ payload[k]=s.radios[k]; });
+  Object.keys(s.extras).forEach(function(k){ payload[k]=s.extras[k]; });
+
+  var url=(DB.api&&DB.api.url)||'';
+  var sent=false;
+  if(url){
+    try{
+      // no-cors: the response is opaque, so "sent" is never proof of "stored".
+      // The completion panel says so, and Settings ▸ Test connection is what
+      // actually verifies the endpoint.
+      fetch(url,{method:'POST',mode:'no-cors',
+        headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body:JSON.stringify(payload)});
+      sent=true;
+    }catch(e){ sent=false; }
+  }
+
+  // Anything unticked, plus any free-text concern, becomes a tracked problem so
+  // it is not lost if the spreadsheet is not wired up yet.
+  var openedBy=(s.first+' '+s.last).trim()||s.callsign||'Anonymous';
+  if(c.tab==='Reports'){
+    addIssue({area:s.radios.area||'Other', urgency:s.radios.urgency||'Whenever',
+      what:s.extras.what||'', where:s.extras.where||'', by:openedBy});
+  }else{
+    s.missing.forEach(function(m){
+      addIssue({area:c.tab==='Room Checks'?'Office':'Equipment', urgency:'Soon',
+        what:m, where:s.pickName, by:openedBy});
+    });
+    ['restock','maint','short'].forEach(function(k){
+      if(s.extras[k]) addIssue({area:c.tab==='Room Checks'?'Office':'Equipment',
+        urgency:'Soon', what:s.extras[k], where:s.pickName, by:openedBy});
+    });
+  }
+
+  lastResult[fid]={sent:sent, url:!!url, s:s, tab:c.tab};
+  formDone[fid]=true;
+  clearDraft(fid);
+  formPick[fid]=null;
+  renderCheck(fid);
+}
+
+function donePanel(fid){
+  var r=lastResult[fid]||{}, s=r.s||{};
+  var clean = !s.missing || !s.missing.length;
+  var cls = clean?'ok':'warn';
+  var h='<div class="donecard '+cls+'">'+
+    '<div class="donetick">'+(clean?'✓':'!')+'</div>'+
+    '<h3>'+(clean?'Filed — everything accounted for':'Filed — with follow-ups')+'</h3>'+
+    '<div class="doneverdict">'+esc(s.pickName||fcfg(fid).tab)+'</div>';
+  if(s.missing && s.missing.length){
+    h+='<div class="donemissing"><b>Passed on for follow-up</b><ul>';
+    s.missing.slice(0,12).forEach(function(m){ h+='<li>'+esc(m)+'</li>'; });
+    if(s.missing.length>12) h+='<li>and '+(s.missing.length-12)+' more</li>';
+    h+='</ul></div>';
+  }
+  h+='<div class="donewhere">'+(r.url
+      ? 'Sent to the Operations spreadsheet. The browser cannot read the reply, so if this '+
+        'is the first submission of the term ask a manager to confirm the row landed.'
+      : '<b>Not sent anywhere yet.</b> No spreadsheet is connected, so this was recorded on '+
+        'this device only. A manager needs to finish the setup in Site Settings.')+'</div>';
+  h+='<div class="donetail"><button class="btn solid" onclick="startAgain(\''+fid+'\')">File another</button>'+
+     '<button class="btn ghost" onclick="go(\'home\')">Done for now</button></div></div>';
+  return h;
+}
+function startAgain(fid){ formDone[fid]=false; renderCheck(fid); }
+
+/* ============================================================================
+   PROBLEM LOG
+   ========================================================================== */
+function addIssue(o){
+  DB.issues.unshift({id:uid('iss'),at:Date.now(),open:true,
+    area:o.area||'Other', urgency:o.urgency||'Whenever',
+    what:o.what||'', where:o.where||'', by:o.by||''});
+  if(DB.issues.length>500) DB.issues.length=500;
+  saveDB();
+}
+function resolveIssue(id){
+  DB.issues.forEach(function(i){ if(i.id===id) i.open=false; });
+  saveDB(); renderLog();
+}
+function reopenIssue(id){
+  DB.issues.forEach(function(i){ if(i.id===id) i.open=true; });
+  saveDB(); renderLog();
+}
+
+
+/* ============================================================================
+   VIEW RENDERERS
+   ========================================================================== */
+
+/* ---- home: one card per role ---- */
+function renderRoleCards(){
+  var host=document.getElementById('roleCards'); if(!host) return;
+  var ICON={equipment:'▦',office:'⌂',bike:'⚙'};
+  host.innerHTML=DB.roles.map(function(r){
+    var ext=!!r.external;
+    return '<button type="button" class="rolecard'+(ext?' ext':'')+'" '+
+      (ext?'onclick="openExternal(\''+esc(r.external)+'\',\''+esc(r.title)+'\')"'
+          :'onclick="go(\'roles\')"')+'>'+
+      '<span class="rc-ic">'+(ICON[r.id]||'◈')+'</span>'+
+      '<b>'+esc(r.title)+'</b>'+
+      '<p>'+esc(r.summary)+'</p>'+
+      '<span class="rc-go">'+(ext?'Open the bike site':'What this covers')+'</span></button>';
+  }).join('');
+}
+
+function openExternal(url,title){
+  uiConfirm('The '+title+' role has its own site, with its own checks and QR codes. '+
+            'Open it in a new tab?','Leaving Operations',{ok:'Open it',cancel:'Stay here'})
+    .then(function(y){ if(y) window.open(url,'_blank','noopener'); });
+}
+
+/* ---- rooms & standards ---- */
+function renderRooms(){
+  var host=document.getElementById('roomsHost'); if(!host) return;
+  var h='<div class="notice"><b>Three slots or two.</b>'+
+    '<p>The five highest-traffic rooms take three members per duty period; the rest take two. '+
+    'Pick any open slot on the printed tracker.</p></div>';
+
+  h+='<div class="photogrid">';
+  DB.rooms.forEach(function(r){
+    if(!r.photo) return;
+    h+='<button type="button" class="photo" onclick="openLightbox(\'assets/rooms/'+esc(r.photo)+
+       '.jpg\',\''+esc(r.name)+'\')">'+
+       '<img src="assets/rooms/'+esc(r.photo)+'.jpg" alt="'+esc(r.name)+'" loading="lazy">'+
+       '<div class="pcap">'+esc(r.name)+'<small>'+r.slots+' slots per duty period</small></div></button>';
+  });
+  h+='</div>';
+  h+='<p class="hint">Photos are the reference standard for "clean" — this is what the room '+
+     'should look like when the check is done. Rooms without a photo have not been shot yet.</p>';
+
+  if(DB.otherSpaces && DB.otherSpaces.length){
+    h+='<h3 class="mt-lg" style="font-family:var(--font-display);font-size:19px">'+
+       'Other spaces</h3>'+
+       '<p style="font-size:13.5px;color:var(--ink-mute);margin:4px 0 0">Not on the tracker, so '+
+       'not claimable as a duty-period task — still the Office Manager\'s to keep an eye on.</p>'+
+       '<div class="photogrid">';
+    DB.otherSpaces.forEach(function(s){
+      h+='<button type="button" class="photo" onclick="openLightbox(\'assets/rooms/'+esc(s.photo)+
+         '.jpg\',\''+esc(s.name)+'\')">'+
+         '<img src="assets/rooms/'+esc(s.photo)+'.jpg" alt="'+esc(s.name)+'" loading="lazy">'+
+         '<div class="pcap">'+esc(s.name)+'<small>'+esc(s.note)+'</small></div></button>';
+    });
+    h+='</div>';
+  }
+
+  h+='<h3 class="mt-lg" style="font-family:var(--font-display);font-size:19px">Every room, and what its check covers</h3>';
+  DB.rooms.forEach(function(r,i){
+    h+='<div class="acc"><button type="button" class="acchead" onclick="toggleAcc(this)">'+
+       '<span class="num">'+(r.tier==='high'?'3':'2')+'</span>'+
+       '<span>'+esc(r.name)+'</span><span class="chev">▾</span></button>'+
+       '<div class="accbody"><ul>'+
+       r.tasks.map(function(t){return '<li>'+esc(t)+'</li>';}).join('')+
+       '</ul>'+
+       '<div class="row" data-need="office" style="margin-top:10px">'+
+       '<button class="btn xs" onclick="editRoomTasks(\''+esc(r.id)+'\')">Edit this list</button></div>'+
+       '</div></div>';
+  });
+  host.innerHTML=h;
+  applyGates(host);
+}
+
+function toggleAcc(btn){ btn.parentNode.classList.toggle('open'); }
+
+function editRoomTasks(id){
+  var r=DB.rooms.filter(function(x){return x.id===id;})[0]; if(!r) return;
+  uiPrompt('One task per line. These are the items a member ticks off for '+r.name+'.',
+           r.tasks.join('\n'), 'Edit '+r.name, {rows:12})
+    .then(function(v){
+      if(v==null) return;
+      r.tasks=v.split('\n').map(function(s){return s.trim();}).filter(Boolean);
+      saveDB(); renderRooms(); renderCheck('room-check');
+    });
+}
+
+/* ---- bag contents ---- */
+function renderBags(){
+  var host=document.getElementById('bagsHost'); if(!host) return;
+  var h='<div class="notice"><b>Names need confirming.</b>'+
+    '<p>These photos came from the equipment folder without labels. Which physical bag is '+
+    'called what was inferred from the photos and the inventory sheet, so the Equipment '+
+    'Manager should confirm every name before any of these QR codes get printed.</p></div>';
+
+  DB.bags.forEach(function(b){
+    h+='<div class="card mt"><h3>'+esc(b.name)+
+       (b.active?'':' <span class="tag warn">check not in use yet</span>')+'</h3>'+
+       '<p style="font-size:13.5px;color:var(--ink-mute);margin:0 0 4px">'+esc(b.note||'')+'</p>'+
+       '<p style="font-size:12px;color:var(--ink-faint);margin:0">Lives in: '+esc(b.where)+'</p>';
+    if(b.photos&&b.photos.length){
+      h+='<div class="photogrid">';
+      b.photos.forEach(function(p){
+        h+='<button type="button" class="photo" onclick="openLightbox(\'assets/bags/'+esc(p)+
+           '.jpg\',\''+esc(b.name)+'\')">'+
+           '<img src="assets/bags/'+esc(p)+'.jpg" alt="'+esc(b.name)+'" loading="lazy">'+
+           '<div class="pcap">'+esc(b.name)+'<small>'+esc(p.replace(/-/g,' '))+'</small></div></button>';
+      });
+      h+='</div>';
+    }
+    var n=0; (b.sections||[]).forEach(function(s){ n+=(s.items||[]).length; });
+    h+='<div class="acc mt"><button type="button" class="acchead" onclick="toggleAcc(this)">'+
+       '<span class="num">'+n+'</span><span>Contents list</span><span class="chev">▾</span></button>'+
+       '<div class="accbody">';
+    (b.sections||[]).forEach(function(s){
+      h+='<b style="display:block;margin:10px 0 4px;font-size:13px">'+esc(s.name)+'</b><ul>';
+      (s.items||[]).forEach(function(it){
+        h+='<li>'+esc(it.label)+(it.qty&&it.qty!=='—'?' <span class="mono" style="font-size:12px;color:var(--ink-faint)">'+esc(it.qty)+'</span>':'')+'</li>';
+      });
+      h+='</ul>';
+    });
+    h+='</div></div>';
+    h+='<div class="row mt" data-need="equipment">'+
+       '<button class="btn xs" onclick="toggleBagActive(\''+esc(b.id)+'\')">'+
+       (b.active?'Take this check out of use':'Put this check into use')+'</button></div>';
+    h+='</div>';
+  });
+  host.innerHTML=h;
+  applyGates(host);
+}
+
+function toggleBagActive(id){
+  var b=DB.bags.filter(function(x){return x.id===id;})[0]; if(!b) return;
+  var live=DB.bags.filter(function(x){return x.active;});
+  if(b.active && live.length===1){
+    uiAlert('That is the last bag check in service. Put another one into use first, '+
+            'or the bag check form has nothing to offer.','Cannot take it out');
+    return;
+  }
+  b.active=!b.active; saveDB(); renderBags(); renderCheck('bag-check');
+}
+
+/* ---- roles ---- */
+function renderRoles(){
+  var host=document.getElementById('rolesHost'); if(!host) return;
+  var h='';
+  DB.roles.forEach(function(r){
+    h+='<div class="card mt"><h3>'+esc(r.title)+'</h3>'+
+       '<p style="font-size:12px;color:var(--ink-faint);margin:0 0 6px;text-transform:uppercase;'+
+       'letter-spacing:.08em">'+esc(r.time||'')+'</p>'+
+       '<p style="font-size:14.5px;color:var(--ink-soft);margin:0 0 12px">'+esc(r.summary)+'</p>';
+    if(r.external){
+      h+='<button class="btn solid sm" onclick="openExternal(\''+esc(r.external)+'\',\''+
+         esc(r.title)+'\')">Open the Bike Ops site</button>';
+    }
+    (r.duties||[]).forEach(function(d){
+      h+='<div class="acc"><button type="button" class="acchead" onclick="toggleAcc(this)">'+
+         '<span class="num">'+d.items.length+'</span><span>'+esc(d.h)+'</span>'+
+         '<span class="chev">▾</span></button><div class="accbody"><ul>'+
+         d.items.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ul></div></div>';
+    });
+    h+='</div>';
+  });
+  host.innerHTML=h;
+}
+
+/* ---- QR codes ----
+   Real scannable codes, generated in-page: no library, no network call, and
+   nothing that stops working when some QR service changes its URL scheme. */
+var QR_TARGETS=[
+  {view:'room-check', title:'Room Check',        who:'Post on the tracker board'},
+  {view:'bag-check',  title:'Bag Check',         who:'Equipment room and duty room rack'},
+  {view:'post-call',  title:'Post-Call Restock', who:'Radio room, by the kit shelf'},
+  {view:'post-shift', title:'End of Shift',      who:'By the door and the cubbies'},
+  {view:'report',     title:'Report a Problem',  who:'Anywhere — foyer, equipment room, kitchen'},
+  {view:'bags',       title:"What's in each bag",who:'Inside the equipment room'},
+  {view:'home',       title:'Operations Home',   who:'General purpose'}
+];
+
+function renderQR(){
+  var host=document.getElementById('qrHost'); if(!host) return;
+  var base=publicBase();
+  var h='';
+  if(isLocalPreview()){
+    h+='<div class="notice"><b>Preview note.</b><p>You are on localhost, so these codes '+
+       'deliberately encode the live address rather than <span class="mono">localhost</span> — '+
+       'printing from here still produces stickers that work on a phone.</p></div>';
+  }
+  h+='<div class="qrsheet">';
+  QR_TARGETS.forEach(function(t){
+    var url=base+'#'+t.view;
+    h+='<div class="qrcard"><h4>'+esc(t.title)+'</h4>'+
+       '<div class="qrwho">'+esc(t.who)+'</div>'+
+       qrSVG(url,190)+
+       '<div class="qrlink">'+esc(url)+'</div></div>';
+  });
+  h+='</div>';
+  h+='<div class="row mt noprint"><button class="btn solid" onclick="window.print()">Print this sheet</button></div>';
+  h+='<p class="hint noprint">Scan each one with a phone before printing a batch. '+
+     'If the repository is ever renamed, update <span class="mono">PUBLIC_BASE</span> or every '+
+     'printed code goes to a dead address.</p>';
+  host.innerHTML=h;
+}
+
+/* ---- duty-period tracker (printable) ---- */
+function renderTracker(){
+  var host=document.getElementById('trackerHost'); if(!host) return;
+  var maxSlots=0; DB.rooms.forEach(function(r){ if(r.slots>maxSlots) maxSlots=r.slots; });
+  var h='<div class="notice noprint"><b>How this works.</b>'+
+    '<p>Print one of these per duty period and put it on the board with the Room Check QR code. '+
+    'A member writes their call sign in an open slot, does that room\'s list, then files the form. '+
+    'The paper sheet is the quick visual; the form responses are the record.</p></div>';
+
+  h+='<div class="row noprint"><button class="btn solid" onclick="window.print()">Print tracker</button>'+
+     '<button class="btn ghost" onclick="go(\'qr\')">Get the QR code</button></div>';
+
+  h+='<div class="trackhead mt"><div class="th-t">CMU EMS Room Check Tracker</div>'+
+     '<div class="th-dp">DP: <b>&nbsp;</b></div></div>';
+  h+='<table class="tracker"><thead><tr><th>Room / task</th>';
+  for(var i=1;i<=maxSlots;i++) h+='<th>Call sign '+i+'</th>';
+  h+='</tr></thead><tbody>';
+  DB.rooms.forEach(function(r){
+    h+='<tr class="'+(r.tier==='high'?'high':'')+'"><th scope="row">'+esc(r.name)+'</th>';
+    for(var k=1;k<=maxSlots;k++){
+      h+= k<=r.slots ? '<td class="slot"></td>'
+                     : '<td class="slot" style="background:var(--bg-2)"></td>';
+    }
+    h+='</tr>';
+  });
+  h+='</tbody></table>';
+  h+='<p style="font-size:12.5px;color:var(--ink-mute);margin-top:10px">'+
+     'After completing the Room Check form, write your call sign in the next available space. '+
+     'Each member completes one task per duty period. Shaded cells are not available for that room.</p>';
+  host.innerHTML=h;
+}
+
+/* ---- office restock ---- */
+function renderRestock(){
+  var host=document.getElementById('restockHost'); if(!host) return;
+  var h='<div class="notice"><b>Non-medical only.</b>'+
+    '<p>Medical stock is tracked in the equipment inventory, not here. This list exists so '+
+    'supplies get reordered before they run out rather than after.</p></div>';
+  h+='<div class="invwrap"><table class="invtable"><thead><tr>'+
+     '<th>Item</th><th>Where it lives</th><th>Keep on hand</th><th></th></tr></thead><tbody>';
+  DB.officeSupplies.forEach(function(s){
+    h+='<tr><td>'+esc(s.item)+'</td><td>'+esc(s.where)+'</td><td class="num">'+esc(s.par)+'</td>'+
+       '<td><button class="btn xs" onclick="flagRestock(\''+esc(s.id)+'\')">Flag as low</button></td></tr>';
+  });
+  h+='</tbody></table></div>';
+  h+='<div class="row mt"><button class="btn ghost sm" onclick="addSupply()">Add an item</button></div>';
+  host.innerHTML=h;
+}
+
+function flagRestock(id){
+  var s=DB.officeSupplies.filter(function(x){return x.id===id;})[0]; if(!s) return;
+  addIssue({area:'Office',urgency:'Soon',what:s.item+' is low or out',where:s.where,by:ROLE_LABEL[ROLE]});
+  uiAlert(s.item+' is on the problem list now.','Flagged').then(function(){ go('log'); });
+}
+
+function addSupply(){
+  uiForm('Add a supply','Something the office should not run out of.',
+    [{id:'item',label:'Item',type:'text'},
+     {id:'where',label:'Where it lives',type:'text'},
+     {id:'par',label:'Keep on hand',type:'text'}],{ok:'Add'})
+   .then(function(v){
+     if(!v||!v.item) return;
+     DB.officeSupplies.push({id:uid('os'),item:v.item,where:v.where||'—',par:v.par||'—'});
+     saveDB(); renderRestock();
+   });
+}
+
+/* ---- equipment inventory ---- */
+function renderInventory(){
+  var host=document.getElementById('inventoryHost'); if(!host) return;
+  var h='<div class="notice warn"><b>Counts are not stored on this page, on purpose.</b>'+
+    '<p>This site is public. A public page listing exactly how much of each medication is '+
+    'held and where is not something to put up without deciding to. What lives here is the '+
+    'schema — what should exist, where it belongs, and how many. Live counts and expiry dates '+
+    'stay in the Operations spreadsheet, which is only shared with the people who need it.</p></div>';
+
+  var groups={};
+  DB.inventory.forEach(function(i){ (groups[i.loc]=groups[i.loc]||[]).push(i); });
+
+  h+='<div class="invwrap"><table class="invtable"><thead><tr>'+
+     '<th>Item</th><th>Category</th><th>Par</th></tr></thead><tbody>';
+  Object.keys(groups).forEach(function(loc){
+    h+='<tr class="grp"><td colspan="3">'+esc(loc)+'</td></tr>';
+    groups[loc].forEach(function(i){
+      h+='<tr><td>'+esc(i.item)+'</td><td>'+esc(i.cat)+'</td><td class="num">'+esc(String(i.par))+'</td></tr>';
+    });
+  });
+  h+='</tbody></table></div>';
+
+  h+='<div class="row mt"><button class="btn ghost sm" onclick="openSheet()">Open the spreadsheet</button>'+
+     '<button class="btn ghost sm" onclick="addInvItem()">Add an item</button></div>';
+  h+='<p class="hint">Par is the number that should be there after a restock — it is what a '+
+     'check compares against, not what is there now.</p>';
+  host.innerHTML=h;
+}
+
+function openSheet(){
+  var u=(DB.api&&DB.api.sheet)||'';
+  if(!u){ uiAlert('No spreadsheet link is saved yet. A manager can add it in Site Settings.',
+                  'Not linked'); return; }
+  window.open(u,'_blank','noopener');
+}
+
+function addInvItem(){
+  uiForm('Add an item','Adds it to the schema. Counts still live in the spreadsheet.',
+    [{id:'item',label:'Item',type:'text'},
+     {id:'loc',label:'Where it lives',type:'text'},
+     {id:'cat',label:'Category',type:'text'},
+     {id:'par',label:'Par',type:'text'}],{ok:'Add'})
+   .then(function(v){
+     if(!v||!v.item) return;
+     DB.inventory.push({id:uid('iv'),item:v.item,loc:v.loc||'Equipment Room',
+                        cat:v.cat||'Equipment',par:v.par||'—'});
+     saveDB(); renderInventory();
+   });
+}
+
+/* ---- problem log ---- */
+function renderLog(){
+  var host=document.getElementById('logHost'); if(!host) return;
+  var open=DB.issues.filter(function(i){return i.open;});
+  var closed=DB.issues.filter(function(i){return !i.open;});
+  var h='';
+  if(!DB.issues.length){
+    h='<div class="card"><p class="hint" style="margin:0">Nothing has been reported yet. '+
+      'Anything left unticked on a check, and anything filed through Report a Problem, lands here.</p></div>';
+    host.innerHTML=h; return;
+  }
+  var badge={Blocking:'crit',Soon:'warn',Whenever:'brand'};
+  var row=function(i,isOpen){
+    return '<li><span class="tag '+(badge[i.urgency]||'brand')+'">'+esc(i.urgency)+'</span> '+
+      '<b>'+esc(i.what)+'</b>'+
+      (i.where?' <span style="color:var(--ink-faint)">— '+esc(i.where)+'</span>':'')+
+      '<div style="font-size:11.5px;color:var(--ink-faint);margin-top:2px">'+
+      esc(i.area)+' · '+esc(i.by||'anonymous')+' · '+new Date(i.at).toLocaleDateString()+'</div>'+
+      '<button class="issx" onclick="'+(isOpen?'resolveIssue':'reopenIssue')+'(\''+i.id+'\')">'+
+      (isOpen?'Mark resolved':'Reopen')+'</button></li>';
+  };
+  h+='<div class="card"><h3>Open — '+open.length+'</h3>';
+  h+= open.length ? '<ul class="isslist">'+open.map(function(i){return row(i,true);}).join('')+'</ul>'
+                  : '<p class="noissues">Nothing open.</p>';
+  h+='</div>';
+  if(closed.length){
+    h+='<div class="acc mt"><button type="button" class="acchead" onclick="toggleAcc(this)">'+
+       '<span class="num">'+closed.length+'</span><span>Resolved</span><span class="chev">▾</span></button>'+
+       '<div class="accbody"><ul class="isslist">'+
+       closed.slice(0,50).map(function(i){return row(i,false);}).join('')+'</ul></div></div>';
+  }
+  host.innerHTML=h;
+}
+
+/* ---- settings ---- */
+function renderSettings(){
+  var host=document.getElementById('settingsHost'); if(!host) return;
+  var h='<div class="card brandtop"><h3>Where submissions go</h3>'+
+    '<p style="font-size:13.5px;color:var(--ink-mute);margin:0 0 12px">'+
+    'One Apps Script Web App in front of one spreadsheet. Every form writes to its own tab in '+
+    'that file, so Equipment and Office data sit side by side. Setup steps are in '+
+    '<span class="mono">SETUP-BACKEND.md</span>.</p>'+
+    '<div class="field"><label for="apiUrl">Apps Script Web App URL</label>'+
+    '<input type="url" id="apiUrl" placeholder="https://script.google.com/macros/s/…/exec" '+
+    'value="'+esc((DB.api&&DB.api.url)||'')+'"></div>'+
+    '<div class="field"><label for="sheetUrl">Spreadsheet link (for managers)</label>'+
+    '<input type="url" id="sheetUrl" placeholder="https://docs.google.com/spreadsheets/d/…" '+
+    'value="'+esc((DB.api&&DB.api.sheet)||'')+'"></div>'+
+    '<div class="row"><button class="btn solid" onclick="saveApi()">Save</button>'+
+    '<button class="btn ghost" onclick="testApi()">Test connection</button>'+
+    '<span id="apiMsg" style="font-size:13px"></span></div></div>';
+
+  h+='<div class="card mt"><h3>This device</h3>'+
+    '<p style="font-size:13.5px;color:var(--ink-mute);margin:0 0 10px">'+
+    'Edits made in manager mode are saved in this browser. They do not reach anyone else '+
+    'until the publish step described in the setup document is wired up.</p>'+
+    '<div class="row"><button class="btn ghost" onclick="exportDB()">Export a copy</button>'+
+    '<button class="btn danger" onclick="confirmReset()">Reset to defaults</button></div></div>';
+
+  h+='<div class="card mt"><h3>What this site is not</h3>'+
+    '<p style="font-size:13.5px;color:var(--ink-soft);margin:0">'+
+    'Manager mode hides tools from casual visitors. It is not a login and it does not protect '+
+    'anything — the page source is public and the role can be set from a browser console. '+
+    'Keep member names, medication counts, door codes and anything else you would not put on '+
+    'a poster off this site.</p></div>';
+  host.innerHTML=h;
+}
+
+function saveApi(){
+  DB.api=DB.api||{};
+  DB.api.url=(document.getElementById('apiUrl').value||'').trim();
+  DB.api.sheet=(document.getElementById('sheetUrl').value||'').trim();
+  saveDB();
+  document.getElementById('apiMsg').textContent='Saved on this device.';
+}
+
+/* A POST is sent with mode:'no-cors', so its response is unreadable and "sent"
+   proves nothing. A GET is readable, so the ping is what actually tells you
+   whether the endpoint is live and pointed at the right file. */
+function testApi(){
+  var u=(document.getElementById('apiUrl').value||'').trim();
+  var msg=document.getElementById('apiMsg');
+  if(!u){ msg.textContent='Paste a URL first.'; return; }
+  msg.textContent='Testing…';
+  fetch(u+(u.indexOf('?')<0?'?':'&')+'ping=1')
+    .then(function(r){ return r.text(); })
+    .then(function(t){
+      var j=null; try{ j=JSON.parse(t); }catch(e){}
+      if(j&&j.ok){ msg.innerHTML='<span style="color:var(--ok)">Live — '+esc(j.sheet||'connected')+'</span>'; }
+      else if(/<!doctype/i.test(t)){ msg.innerHTML='<span style="color:var(--oos)">Got a web page, not JSON — '+
+        'the deployment is probably not set to "Anyone".</span>'; }
+      else{ msg.innerHTML='<span style="color:var(--warn)">Reached it, but the reply was unexpected.</span>'; }
+    })
+    .catch(function(){
+      msg.innerHTML='<span style="color:var(--oos)">Could not reach it. Check the URL, and that '+
+        'the deployment allows "Anyone".</span>';
+    });
+}
+
+function exportDB(){
+  var blob=new Blob([JSON.stringify(DB,null,2)],{type:'application/json'});
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='ems-ops-content-'+todayISO()+'.json';
+  a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); },1000);
+}
+
+function confirmReset(){
+  uiConfirm('This throws away every edit made in this browser and puts the site back to its '+
+            'shipped content. Submitted forms are not affected.','Reset content',
+            {ok:'Reset',cancel:'Keep my edits',danger:true})
+    .then(function(y){ if(y) resetDB(); });
+}
+
+/* ---- lightbox ---- */
+function openLightbox(src,cap){
+  document.getElementById('lbImg').src=src;
+  document.getElementById('lbImg').alt=cap||'';
+  document.getElementById('lbCap').textContent=cap||'';
+  document.getElementById('lightbox').hidden=false;
+}
+function closeLightbox(){
+  document.getElementById('lightbox').hidden=true;
+  document.getElementById('lbImg').src='';
+}
+
+/* ============================================================================
+   BOOT
+   ========================================================================== */
+function renderAll(){
+  renderRoleCards();
+  renderRooms();
+  renderBags();
+  renderRoles();
+  renderQR();
+  renderTracker();
+  renderRestock();
+  renderInventory();
+  renderLog();
+  renderSettings();
+  Object.keys(FORMS).forEach(renderCheck);
+  applyGates();
+}
+
+function init(){
+  loadDB();
+
+  var saved='member';
+  try{ saved=localStorage.getItem(LS_ROLE)||'member'; }catch(e){}
+  setRole(saved,true);
+
+  document.getElementById('nav').addEventListener('click',function(e){
+    var b=e.target.closest ? e.target.closest('.sb-item') : null;
+    if(b && b.getAttribute('data-view')) go(b.getAttribute('data-view'));
+  });
+
+  window.addEventListener('hashchange',function(){
+    go(location.hash.slice(1)||HOME,true);
+  });
+
+  document.addEventListener('keydown',function(e){
+    if(e.key==='Escape' && !document.getElementById('lightbox').hidden) closeLightbox();
+  });
+
+  renderAll();
+  go(location.hash.slice(1)||HOME,true);
+}
+
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init);
+else init();
+
+</script>
+</body>
+</html>

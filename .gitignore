@@ -1,0 +1,19 @@
+# ---- Raw source material. Never commit. -------------------------------------
+# These are the originals Rithi shared: role docs, inventory spreadsheets with
+# live medication stock, and photos with EXIF. Only sanitized, transcribed
+# content goes on the site.
+ops things.zip
+extracted/
+*.docx
+*.xlsx
+bagcontents.pdf
+Operations Managers/
+
+# Session notes — internal, may quote raw material
+HANDOFF.md
+
+# ---- OS / editor -------------------------------------------------------------
+.DS_Store
+._*
+.vscode/
+*.swp
