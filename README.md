@@ -30,18 +30,51 @@ Then open <http://localhost:8850/index.html>. **Serve it over HTTP, not
 `file://`** — a `file://` page is treated as a frozen snapshot by some preview
 tools, which silently ignores edits and drops query strings.
 
-## The five forms
+## The six forms
 
-| Form | Goes to tab | Who fills it |
-|---|---|---|
-| Room Check | `Room Checks` | every tech / probie, once per duty period |
-| Bag & Equipment Check | `Bag Checks` | whoever checks a jumpkit, event bag, blue bag or pod |
-| Post-Call Restock | `Post-Call` | after a call, before the kit goes back |
-| End of Shift | `Post-Shift` | everyone, at the end of a duty period |
-| Report a Problem | `Reports` | anyone, any time |
+| Form | Goes to tab | Who fills it | Seen by |
+|---|---|---|---|
+| Check Out a Bag | `Checkouts` | anyone taking a jumpkit or event bag out | members |
+| Room Check | `Room Checks` | every tech / probie, once per duty period | members |
+| Post-Call Restock | `Post-Call` | after a call, before the kit goes back | members |
+| End of Shift | `Post-Shift` | everyone, at the end of a duty period | members |
+| Report a Problem | `Reports` | anyone, any time | members |
+| Full Contents Check | `Bag Checks` | the item-by-item audit | Equipment Manager |
 
-All five write into **one spreadsheet**, one tab each, so Equipment and Office
+All six write into **one spreadsheet**, one tab each, so Equipment and Office
 data can be cross-referenced in a formula. See `SETUP-BACKEND.md`.
+
+**Checkout and contents check are deliberately different forms.** A member taking
+a bag out answers two questions and is done; the item-by-item audit is a
+manager's job and would not get done honestly eighty times a week.
+
+## Usage capture is structured, not typed
+
+The post-call form asks *what did you use, and from where* as repeating rows:
+item picked from a list, a quantity, and which physical bag it came out of,
+picked from a list. Nothing is free text.
+
+This is the point of the whole thing. The spreadsheet this replaces recorded the
+same item as `glucose stuff`, `glucose strip` and `glucometer strips`, and the
+same bag as `Jumpkit E`, `jumpkit` and `supervisor jumpkit` — and most rows
+carried no quantity at all. Nothing can be summed out of that, which is why
+nobody could ever produce a buy-list from it.
+
+Both axes are summed by **ID**, never by display name, so renaming a bag in
+manager mode corrects the label on historic rows instead of splitting one bag
+into two in the totals.
+
+## Reports
+
+Manager-only. **Equipment to buy** (summed usage over the period), **concerns
+reported**, and per-bag consumption, over this week / this month / year to date.
+The year runs from **August**, not January, because an EMS year turns over in
+August and a January cut would split it. The week starts **Saturday**, so a
+Friday report covers the week just worked.
+
+The site generates this on demand. It **cannot** send the Friday email — a web
+page only runs while someone has it open — so the scheduled send is a
+time-driven trigger inside the Apps Script. Both are in `SETUP-BACKEND.md` §7.
 
 Every form is hash-addressable (`#room-check`, `#bag-check`, …) which is what
 makes the QR codes possible. The **QR Codes** view generates real scannable codes
@@ -53,11 +86,21 @@ against the `qrcode-generator` npm package on all seven targets.
 There is no login. The site is open; the **Manager** button reveals one of three
 tool sets:
 
-| Role | Gets |
+A **member** sees six things: the five forms they fill in, plus the bag contents
+reference. Nothing else. The QR print sheet, the role descriptions, the room
+standards gallery and the contents audit are all manager detail — useful to two
+people, clutter to everyone else.
+
+| Role | Also gets |
 |---|---|
-| Office Manager | duty-period tracker, office restock list, problem log |
-| Equipment Manager | equipment inventory, bag activation, problem log |
+| Office Manager | duty-period tracker, room standards, office restock list, reports, problem log |
+| Equipment Manager | full contents check, equipment inventory, bags-in-service list, reports, problem log |
 | Operations Officer | all of the above |
+
+The one thing members lose by moving the room gallery behind a role is the "what
+does clean look like" photo — so that photo now appears *inside* the room check
+form once a room is picked, which is where someone standing in the room actually
+wants it.
 
 Gating is done in JS: `applyGates()` sets the `hidden` property on every
 `[data-need]` element, and CSS carries one `[hidden]{display:none !important}`
@@ -101,13 +144,19 @@ document, and are marked as such in the interface:
    cleaning verbs used on the end-of-year sheet, and the room photos. The Office
    Manager can edit any of them in place.
 
-2. **Which bag is called what.** The bag photos arrived unlabelled. Names were
-   inferred from the photos plus the locations used in the inventory sheet
-   (`CC Pod`, `Blue Bag`, `Equipment Room`). That inference is flagged on the
-   page, and the Equipment Manager should confirm every name **before any QR
-   code is printed** — a sticker pointing at the wrong bag check is worse than no
-   sticker. Trauma and Squad Car checks ship inactive, because the Ops to-do
-   records both as forms still to be written.
+2. **Which bag is called what.** The bag photos arrived unlabelled. Kit-type
+   names were inferred from the photos plus the locations used in the inventory
+   sheet (`CC Pod`, `Blue Bag`, `Equipment Room`). Trauma and Squad Car checks
+   ship inactive, because the Ops to-do records both as forms still to be
+   written.
+
+3. **The list of bags in service.** `Jumpkit B`, `C` and `E`, `Supervisor
+   Jumpkit`, `Event Bag 3`, `CC Pod`, `Oxygen bag` and `Trailer` all appear in
+   the existing equipment sheet, so those are evidenced. A lettered scheme was
+   assumed from that and **A and D were added on that basis alone** — nobody has
+   confirmed they exist. This list drives every checkout and every usage row, so
+   it is the first thing the Equipment Manager should correct; it is editable
+   under Equipment Inventory ▸ Bags in service, and renaming preserves history.
 
 ## Editing
 

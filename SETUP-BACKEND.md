@@ -166,15 +166,21 @@ Then send one real submission through and confirm the row lands.
 var LAYOUT = {
   'Room Checks': ['date', 'submitted', 'callsign', 'name', 'andrew', 'subject',
                   'doneCount', 'missingCount', 'done', 'missing', 'restock', 'maint'],
+  'Checkouts':   ['date', 'submitted', 'callsign', 'name', 'subject',
+                  'condition', 'detail'],
   'Bag Checks':  ['date', 'submitted', 'callsign', 'name', 'andrew', 'subject',
                   'doneCount', 'missingCount', 'done', 'missing', 'seal'],
-  'Post-Call':   ['date', 'submitted', 'callsign', 'name', 'doneCount',
-                  'missingCount', 'done', 'missing', 'used', 'short'],
+  'Post-Call':   ['date', 'submitted', 'callsign', 'name', 'callnum', 'doneCount',
+                  'missingCount', 'done', 'missing', 'usageText', 'usageCount',
+                  'short', 'usageJson'],
   'Post-Shift':  ['date', 'submitted', 'callsign', 'name', 'doneCount',
                   'missingCount', 'done', 'missing'],
   'Reports':     ['date', 'submitted', 'callsign', 'name', 'area', 'urgency',
                   'what', 'where']
 };
+
+// Who gets the Friday email. Add the Operations Officer and the two managers.
+var REPORT_TO = ['cmuemsoperations@gmail.com'];
 
 // Human-readable column titles for the header row.
 var TITLES = {
@@ -182,8 +188,10 @@ var TITLES = {
   andrew: 'Andrew ID', subject: 'Room / bag', doneCount: 'Done',
   missingCount: 'Missing', done: 'Completed items', missing: 'Missing items',
   restock: 'Restock needed', maint: 'Maintenance concern', seal: 'Seal number',
-  used: 'Used and replaced', short: 'Could not replace', area: 'Area',
-  urgency: 'Urgency', what: 'What is wrong', where: 'Where'
+  short: 'Could not replace', area: 'Area', urgency: 'Urgency',
+  what: 'What is wrong', where: 'Where', condition: 'Condition at pickup',
+  detail: 'Detail', callnum: 'Call number', usageText: 'Used',
+  usageCount: 'Units used', usageJson: 'Used (data)'
 };
 
 function tabFor(name) {
@@ -239,7 +247,196 @@ function doPost(e) {
 
 ---
 
-## 7. Checking it from a terminal
+## 7. The Friday report
+
+This is the part the website cannot do. A web page only runs while somebody has
+it open, so "email me every Friday" has to live somewhere that runs on its own —
+which is Apps Script.
+
+Paste this **below** the code in §6, in the same file.
+
+```javascript
+// ---- reporting -------------------------------------------------------------
+// Sums the machine-readable usage column, NOT the human one. That column exists
+// precisely because prose cannot be added up: the old Equipment Exhausted sheet
+// recorded the same item as "glucose stuff", "glucose strip" and "glucometer
+// strips", and the same bag as "Jumpkit E", "jumpkit" and "supervisor jumpkit",
+// which is why nobody could ever produce a buy-list from it.
+
+function periodStartMs(period) {
+  var d = new Date();
+  d.setHours(0, 0, 0, 0);
+  if (period === 'week') {
+    d.setDate(d.getDate() - ((d.getDay() + 1) % 7));   // week starts Saturday
+  } else if (period === 'month') {
+    d.setDate(1);
+  } else {
+    var y = d.getFullYear(), aug = new Date(y, 7, 1);  // EMS year turns over in August
+    d = (d >= aug) ? aug : new Date(y - 1, 7, 1);
+  }
+  return d.getTime();
+}
+
+function collect(period) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var since = periodStartMs(period);
+  var used = {};      // itemId -> {qty, from:{unitId:qty}}
+  var calls = {};
+  var concerns = [];
+
+  var pc = ss.getSheetByName('Post-Call');
+  if (pc && pc.getLastRow() > 1) {
+    var cols = LAYOUT['Post-Call'];
+    var iJson = cols.indexOf('usageJson'), iSub = cols.indexOf('submitted'),
+        iCall = cols.indexOf('callnum');
+    var rows = pc.getRange(2, 1, pc.getLastRow() - 1, cols.length).getValues();
+    rows.forEach(function (r) {
+      if (new Date(r[iSub]).getTime() < since) return;
+      if (r[iCall]) calls[r[iCall]] = 1;
+      if (!r[iJson]) return;
+      var list;
+      try { list = JSON.parse(r[iJson]); } catch (err) { return; }
+      list.forEach(function (u) {
+        var e = used[u.i] || (used[u.i] = { qty: 0, from: {} });
+        e.qty += Number(u.q) || 0;
+        e.from[u.f] = (e.from[u.f] || 0) + (Number(u.q) || 0);
+      });
+    });
+  }
+
+  // Concerns come from three places, because a member can raise one from a
+  // problem report, a room check, or a checkout that found something wrong.
+  [['Reports', 'what', 'where', 'urgency'],
+   ['Room Checks', 'maint', 'subject', null],
+   ['Checkouts', 'detail', 'subject', null]].forEach(function (spec) {
+    var sh = ss.getSheetByName(spec[0]);
+    if (!sh || sh.getLastRow() < 2) return;
+    var cols = LAYOUT[spec[0]];
+    var iw = cols.indexOf(spec[1]), il = cols.indexOf(spec[2]),
+        iu = spec[3] ? cols.indexOf(spec[3]) : -1, isub = cols.indexOf('submitted');
+    var rows = sh.getRange(2, 1, sh.getLastRow() - 1, cols.length).getValues();
+    rows.forEach(function (r) {
+      if (new Date(r[isub]).getTime() < since) return;
+      if (!r[iw]) return;
+      concerns.push({ what: r[iw], where: r[il] || '',
+                      urgency: iu >= 0 ? (r[iu] || 'Whenever') : 'Soon',
+                      source: spec[0] });
+    });
+  });
+
+  return { period: period, since: since, used: used,
+           concerns: concerns, calls: Object.keys(calls).length };
+}
+
+// Names live in the website, not here, so the sheet stays the record and the
+// site stays the vocabulary. NAMES is refreshed by the site; until it has been,
+// the report falls back to raw ids, which is ugly but never wrong.
+function nameMap() {
+  var raw = PropertiesService.getScriptProperties().getProperty('NAMES');
+  if (!raw) return { items: {}, units: {} };
+  try { return JSON.parse(raw); } catch (err) { return { items: {}, units: {} }; }
+}
+
+function reportText(period) {
+  var d = collect(period), n = nameMap();
+  var label = { week: 'weekly', month: 'monthly', ytd: 'year-to-date' }[period] || period;
+  var L = ['CMU EMS Operations — ' + label + ' report',
+           'Covering ' + new Date(d.since).toDateString() + ' to today', '',
+           'EQUIPMENT TO BUY'];
+
+  var ids = Object.keys(d.used).sort(function (a, b) { return d.used[b].qty - d.used[a].qty; });
+  if (!ids.length) {
+    L.push('  (nothing logged as used — check that post-call forms are being filled in)');
+  } else {
+    ids.forEach(function (id) {
+      var e = d.used[id];
+      var from = Object.keys(e.from).map(function (u) { return (n.units[u] || u); });
+      L.push('  ' + e.qty + ' x ' + (n.items[id] || id) + '   — from ' + from.join(', '));
+    });
+  }
+
+  L.push('', 'CONCERNS REPORTED (' + d.concerns.length + ')');
+  if (!d.concerns.length) L.push('  (none)');
+  else d.concerns.forEach(function (c) {
+    L.push('  [' + c.urgency + '] ' + c.what + (c.where ? ' — ' + c.where : '') +
+           '   (' + c.source + ')');
+  });
+
+  L.push('', 'Calls logged: ' + d.calls);
+  L.push('', 'Full detail: https://sonnnnnion.github.io/ems-ops/#reports');
+  return L.join('\n');
+}
+
+// This is the function the trigger calls. Keep the name.
+function sendWeeklyReport() {
+  var body = reportText('week');
+  MailApp.sendEmail({
+    to: REPORT_TO.join(','),
+    subject: 'CMU EMS Ops — weekly equipment and concerns',
+    body: body
+  });
+}
+
+function sendMonthlyReport() {
+  MailApp.sendEmail({
+    to: REPORT_TO.join(','),
+    subject: 'CMU EMS Ops — monthly equipment and concerns',
+    body: reportText('month')
+  });
+}
+
+// Lets the site read the same numbers back, and lets it push the display names
+// this script uses in the email.
+function doGetReport(e) {
+  var p = (e && e.parameter) || {};
+  if (p.names) {
+    PropertiesService.getScriptProperties().setProperty('NAMES', p.names);
+    return { ok: true, stored: true };
+  }
+  return { ok: true, report: collect(p.report || 'week'), text: reportText(p.report || 'week') };
+}
+```
+
+Then **replace the `doGet` from §6 with this one**, so the report endpoint is
+reachable:
+
+```javascript
+function doGet(e) {
+  var p = (e && e.parameter) || {};
+  if (p.report || p.names) {
+    return ContentService.createTextOutput(JSON.stringify(doGetReport(e)))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var out = { ok: true, sheet: ss.getName(), tabs: {} };
+  Object.keys(LAYOUT).forEach(function (nm) {
+    var sh = ss.getSheetByName(nm);
+    out.tabs[nm] = sh ? Math.max(0, sh.getLastRow() - 1) : 0;
+  });
+  return ContentService.createTextOutput(JSON.stringify(out))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+```
+
+### Setting the Friday trigger
+
+1. In the Apps Script editor, click the **clock icon** (Triggers) in the left rail.
+2. **Add Trigger**.
+3. Function: **`sendWeeklyReport`** · Event source: **Time-driven** ·
+   Type: **Week timer** · Day: **Friday** · Time: whatever hour suits.
+4. Save. Authorise the mail permission when asked.
+
+Add a second trigger for `sendMonthlyReport` on a **Month timer** if you want the
+monthly one too.
+
+**Test it before you trust it:** select `sendWeeklyReport` from the function
+dropdown and press **Run**. Check the inbox. An empty report on a quiet week is
+correct; an empty report after a busy week means post-call forms are not being
+filled in, which is a people problem rather than a code one.
+
+---
+
+## 8. Checking it from a terminal
 
 ```bash
 curl -sL "PASTE_YOUR_EXEC_URL_HERE?ping=1"

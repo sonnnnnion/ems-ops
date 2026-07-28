@@ -48,9 +48,22 @@ re-read the exact region immediately before each `Edit`.
   `calcCheck`/`submitCheck` are generic. Adding a form means adding a `FORMS`
   entry, a `<section class="view">` with a host div, and a `LAYOUT` row in the
   Apps Script. Nothing form-specific is hard-coded in the engine.
+- **`DB.bags` is kit TYPES; `DB.bagUnits` is the physical objects.** A contents
+  check picks a type (what should be inside), a checkout and a usage row pick a
+  unit (which bag on the rack). Don't merge them.
+- **Everything sums by id, on every axis.** `reportData()` groups usage by
+  `u.item` and `u.from` — the ids — and only resolves display names once the
+  totals are built. Grouping on `u.itemName` or `u.fromName` splits one bag into
+  two the moment somebody renames it, which is the same class of bug as the
+  `glucose stuff` / `glucose strip` mess in the sheet this replaces. The stored
+  `*Name` fields exist *only* as a fallback for an id that has since been deleted.
 - **Rooms and bags are keyed by `id`**, never by name — `name` is editable in
   manager mode. `formPick[fid]` and `DB.issues[].where` both hold ids or
   resolved display names, never a name used as a key.
+- **Member vs manager is an IA decision, not just gating.** Members see the five
+  forms plus bag contents; everything else is `data-need`-gated. Every
+  `QR_TARGETS` entry must land on a member-reachable view or the printed sticker
+  bounces the scanner to home — there is a test for this.
 - **Dialogs** — `uiAlert` / `uiConfirm` / `uiPrompt` / `uiForm`, promise-based,
   in `openModal`. **No `window.alert/confirm/prompt`** — the native ones render
   as "sonnnnnion.github.io says", which reads as a browser warning rather than as

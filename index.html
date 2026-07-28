@@ -208,16 +208,13 @@
   body.is-web .webonly.blockonly{display:block}
   /* `.webonly` was only ever designed for inline controls, so revealing it forces
      inline-flex. On a card that turned the whole panel into a flex row and dealt
-     its heading, text and button out as columns. Block-level things that are gated
-     have to say so, or they come back visible but shaped wrong. */
-  body.is-web .card.webonly,
-  body.is-web .sharenote.webonly{display:block}
-  /* The Site Settings nav item needs `flex`, which neither rule above gives it.
-     It used to get that from an inline style set in setWeb() — a SECOND gating
-     mechanism, which meant anything toggling `is-web` without going through
-     setWeb (devtools, a future caller) left the item visible in member view.
-     Stated here instead, so `.is-web` remains the only switch. */
-  body.is-web .sb-item.webonly{display:flex}
+     its heading, text and button out as columns.
+
+     Those rules are GONE. Gating here is `applyGates()` setting the `hidden`
+     property, and the last three lines of that comment are exactly why: the
+     class-pair approach needs a bespoke reveal rule per display type, and every
+     one of them is a chance to leak. Nothing below should reintroduce
+     `.webonly` or `body.is-web`. */
 
   .tag{font-family:var(--font-mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;border:1.5px solid var(--rule);padding:3px 7px;background:#fff;display:inline-block}
   .tag.crit{background:var(--oos);color:#fff;border-color:transparent}
@@ -561,6 +558,48 @@
   .countline .cl-lbl small{display:block;color:var(--ink-faint);font-size:11.5px}
   .countline input{padding:8px 10px;font-size:14px;text-align:center;font-family:var(--font-mono)}
 
+  /* ---------- structured usage rows ---------- */
+  .urow{display:grid;grid-template-columns:1fr 110px 1fr 36px;gap:9px;align-items:center;
+    padding:9px 0;border-bottom:1px solid var(--rule-soft)}
+  .urow:last-child{border-bottom:0}
+  .urow select{min-width:0}
+  .uqty{position:relative;display:flex;align-items:center;gap:6px}
+  .uqty input{text-align:center;font-family:var(--font-mono);padding-left:8px;padding-right:8px}
+  .uunit{font-size:11px;color:var(--ink-faint);white-space:nowrap}
+  .urow .btn{padding:6px 9px;justify-self:end}
+  /* On a phone the four columns become two rows: item on its own line, then
+     quantity, source and the remove button. Four columns at 375px made every
+     select too narrow to read the item name, which is the one thing that has to
+     be readable for the data to come out clean. */
+  @media(max-width:640px){
+    /* The quantity gets the FIXED narrow column and the source gets the flexible
+       one, not the other way round: a two-digit number needs no room, and a
+       truncated "Crew Ch…" is the thing that makes someone pick the wrong bag. */
+    .urow{grid-template-columns:88px 1fr 36px;grid-template-areas:'item item item' 'qty from x';
+      gap:8px;padding:12px 0}
+    .urow>select:first-child{grid-area:item}
+    .urow .uqty{grid-area:qty;min-width:0}
+    .urow .uqty input{min-width:0;flex:1}
+    .urow>select:nth-of-type(2){grid-area:from}
+    .urow .btn{grid-area:x}
+  }
+
+  /* ---------- reports ---------- */
+  .repgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:16px 0}
+  .repstat{border:1px solid var(--rule);border-radius:var(--r-md);background:var(--card);padding:15px 17px;
+    box-shadow:var(--shadow-sm)}
+  .repstat .rs-n{font-family:var(--font-display);font-size:26px;font-weight:700;line-height:1;color:var(--brand)}
+  .repstat .rs-l{font-size:11.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-faint);margin-top:6px}
+  .periodbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+  .periodbar button{padding:9px 15px;border-radius:999px;border:1.5px solid var(--rule-strong);
+    background:var(--card);cursor:pointer;font:inherit;font-size:13.5px;font-weight:600;color:var(--ink-soft)}
+  .periodbar button.on{background:var(--brand);border-color:var(--brand);color:#fff}
+  .buyrow{display:flex;align-items:baseline;gap:10px;padding:9px 0;border-bottom:1px solid var(--rule-soft)}
+  .buyrow:last-child{border-bottom:0}
+  .buyrow .bq{font-family:var(--font-mono);font-weight:700;color:var(--brand);min-width:52px}
+  .buyrow .bn{flex:1;min-width:0}
+  .buyrow .bf{font-size:11.5px;color:var(--ink-faint);text-align:right}
+
   /* A <label> holding a whole sentence must undo the global uppercase/tracked
      label rule, or it renders as unreadable small caps. */
   .checkline .lbl,.countline .cl-lbl,.photo .pcap{text-transform:none;letter-spacing:normal}
@@ -616,28 +655,32 @@
 
   <div class="navscrim" id="navScrim" onclick="closeNav()"></div>
   <nav class="sidebar" id="nav">
-    <!-- Ordered by what a member on duty actually opens. The two things almost
-         everyone comes here to do — a room check and a bag check — sit at the
-         top; management tooling is gated and sits at the bottom. -->
+    <!-- A member sees the forms they fill in and the reference needed to fill
+         them, and nothing else. The QR print sheet, the role descriptions, the
+         room standards gallery and the item-by-item contents audit are all
+         manager detail: useful to the two managers, clutter to the eighty people
+         who just took Jumpkit B out for a shift. -->
     <div class="sb-label">On duty</div>
     <button type="button" class="sb-item active" data-view="home"><span class="ic">◈</span>Start here</button>
+    <button type="button" class="sb-item" data-view="checkout"><span class="ic">▸</span>Check Out a Bag</button>
     <button type="button" class="sb-item" data-view="room-check"><span class="ic">✔</span>Room Check</button>
-    <button type="button" class="sb-item" data-view="bag-check"><span class="ic">✚</span>Bag &amp; Equipment Check</button>
     <button type="button" class="sb-item" data-view="post-call"><span class="ic">↻</span>Post-Call Restock</button>
     <button type="button" class="sb-item" data-view="post-shift"><span class="ic">⇥</span>End of Shift</button>
     <button type="button" class="sb-item" data-view="report"><span class="ic">⚑</span>Report a Problem</button>
 
     <div class="sb-label">Reference</div>
-    <button type="button" class="sb-item" data-view="rooms"><span class="ic">▦</span>Rooms &amp; Standards</button>
     <button type="button" class="sb-item" data-view="bags"><span class="ic">▩</span>What's in each bag</button>
-    <button type="button" class="sb-item" data-view="roles"><span class="ic">§</span>The Ops Roles</button>
-    <button type="button" class="sb-item" data-view="qr"><span class="ic">▤</span>QR Codes</button>
 
     <div class="sb-label" data-need="mgr">Manage</div>
-    <button type="button" class="sb-item" data-need="office" data-view="tracker"><span class="ic">▤</span>Duty-Period Tracker</button>
-    <button type="button" class="sb-item" data-need="office" data-view="restock"><span class="ic">▤</span>Office Restock List</button>
+    <button type="button" class="sb-item" data-need="mgr" data-view="reports"><span class="ic">▤</span>Reports</button>
+    <button type="button" class="sb-item" data-need="equipment" data-view="bag-check"><span class="ic">✚</span>Full Contents Check</button>
     <button type="button" class="sb-item" data-need="equipment" data-view="inventory"><span class="ic">▦</span>Equipment Inventory</button>
+    <button type="button" class="sb-item" data-need="office" data-view="tracker"><span class="ic">▤</span>Duty-Period Tracker</button>
+    <button type="button" class="sb-item" data-need="office" data-view="rooms"><span class="ic">▦</span>Rooms &amp; Standards</button>
+    <button type="button" class="sb-item" data-need="office" data-view="restock"><span class="ic">▤</span>Office Restock List</button>
     <button type="button" class="sb-item" data-need="mgr" data-view="log"><span class="ic">⚑</span>Reported Problems</button>
+    <button type="button" class="sb-item" data-need="mgr" data-view="roles"><span class="ic">§</span>The Ops Roles</button>
+    <button type="button" class="sb-item" data-need="mgr" data-view="qr"><span class="ic">▤</span>QR Codes</button>
     <button type="button" class="sb-item" data-need="mgr" data-view="settings"><span class="ic">⚙</span>Site Settings</button>
   </nav>
 
@@ -654,12 +697,14 @@
       <div class="card brandtop mt">
         <h3>What do you need to do?</h3>
         <div class="quick">
+          <button type="button" onclick="go('checkout')"><span class="ic">▸</span>Take a bag out</button>
           <button type="button" onclick="go('room-check')"><span class="ic">✔</span>Complete a room check</button>
-          <button type="button" onclick="go('bag-check')"><span class="ic">✚</span>Check a bag or kit</button>
           <button type="button" onclick="go('post-call')"><span class="ic">↻</span>Restock after a call</button>
           <button type="button" onclick="go('post-shift')"><span class="ic">⇥</span>Close out my shift</button>
           <button type="button" onclick="go('report')"><span class="ic">⚑</span>Report something broken</button>
           <button type="button" onclick="go('bags')"><span class="ic">▩</span>See what's in a bag</button>
+          <button type="button" data-need="mgr" onclick="go('reports')"><span class="ic">▤</span>Pull an ops report</button>
+          <button type="button" data-need="equipment" onclick="go('bag-check')"><span class="ic">✚</span>Full contents check</button>
         </div>
       </div>
 
@@ -681,10 +726,20 @@
       <div id="roomCheckHost"></div>
     </section>
 
-    <!-- ===== BAG CHECK ======================================================= -->
+    <!-- ===== CHECK OUT A BAG (member) =======================================
+         The light one. A member taking a bag out answers two questions: which
+         one, and was anything already missing. Twenty seconds. The item-by-item
+         audit is a different form, and it belongs to the Equipment Manager. -->
+    <section class="view" data-view="checkout">
+      <h2 class="view-title">Check out a <em>bag</em></h2>
+      <p class="view-sub">Taking a jumpkit or event bag out. Quick — two questions.</p>
+      <div id="checkoutHost"></div>
+    </section>
+
+    <!-- ===== FULL CONTENTS CHECK (Equipment Manager) ======================== -->
     <section class="view" data-view="bag-check">
-      <h2 class="view-title">Bag &amp; equipment <em>check</em></h2>
-      <p class="view-sub">Jumpkits, event bags, the blue bag, trauma and squad-car kits.</p>
+      <h2 class="view-title">Full contents <em>check</em></h2>
+      <p class="view-sub">The item-by-item audit. Slower than a checkout, and not something to ask of every member.</p>
       <div id="bagCheckHost"></div>
     </section>
 
@@ -756,6 +811,16 @@
       <h2 class="view-title">Equipment <em>inventory</em></h2>
       <p class="view-sub">Par levels and where each item lives. Live counts come from the spreadsheet.</p>
       <div id="inventoryHost"></div>
+    </section>
+
+    <!-- ===== REPORTS ========================================================
+         What to buy, and what people have flagged, over a chosen period. The
+         site can show this on demand; it cannot send the Friday email, because
+         it is not running on Fridays — that trigger lives in the Apps Script. -->
+    <section class="view" data-view="reports">
+      <h2 class="view-title">Ops <em>reports</em></h2>
+      <p class="view-sub">Equipment to buy and concerns raised, by week, month or year to date.</p>
+      <div id="reportsHost"></div>
     </section>
 
     <!-- ===== REPORTED PROBLEMS ============================================== -->
@@ -1476,6 +1541,83 @@ var DEFAULTS={
       {id:'ps-laundry', label:'Used shirts and bedding in the dirty laundry bin'}]}
   ],
 
+  /* ---------- physical units in service ---------------------------------
+     `bags` above describes kit TYPES and what should be in them. This is the
+     list of actual objects on the rack, and it is what "where did this come
+     from" picks from.
+
+     Why it has to be a list and not a text box: the existing Equipment
+     Exhausted sheet records the same jumpkit as `Jumpkit E`, `jumpkit`,
+     `supervisor jumpkit` and `Supervisor jumpkit`, and the same item as
+     `glucose stuff` three times over. Nothing can be summed out of that, which
+     is exactly why nobody could generate a buy-list from it. Picking from a
+     list is the whole fix.
+
+     Seeded from the units that actually appear in that sheet — B, C and E are
+     evidenced, so a lettered scheme is assumed and A and D are included.
+     **Confirm the real list with the Equipment Manager and delete what does not
+     exist**; every one of these is editable. */
+  bagUnits:[
+    {id:'jk-a', name:'Jumpkit A', type:'jumpkit', active:true},
+    {id:'jk-b', name:'Jumpkit B', type:'jumpkit', active:true},
+    {id:'jk-c', name:'Jumpkit C', type:'jumpkit', active:true},
+    {id:'jk-d', name:'Jumpkit D', type:'jumpkit', active:true},
+    {id:'jk-e', name:'Jumpkit E', type:'jumpkit', active:true},
+    {id:'jk-sup', name:'Supervisor Jumpkit', type:'jumpkit', active:true},
+    {id:'ev-1', name:'Event Bag 1', type:'event', active:true},
+    {id:'ev-2', name:'Event Bag 2', type:'event', active:true},
+    {id:'ev-3', name:'Event Bag 3', type:'event', active:true},
+    {id:'u-blue', name:'Blue Bag', type:'blue', active:true},
+    {id:'u-ccpod', name:'Crew Chief Pod', type:'ccpod', active:true},
+    {id:'u-o2', name:'Oxygen Bag', type:'other', active:true},
+    {id:'u-trailer', name:'Trailer / Trailer Cart', type:'other', active:true},
+    {id:'u-room', name:'Equipment Room shelf', type:'other', active:true}
+  ],
+
+  /* ---------- consumables -----------------------------------------------
+     The things that actually get used up on a call, which is what a buy-list
+     is made of. Deliberately NOT derived from the bag contents lists: those
+     include checks like "AED — status light green", which is not something you
+     reorder. `unit` is what one of them is, so a count means the same thing to
+     everyone entering it and to whoever reads the report. */
+  consumables:[
+    {id:'c-bandaid',   name:'Adhesive bandages',            unit:'each'},
+    {id:'c-gauze4',    name:'Sterile gauze 4x4',            unit:'each'},
+    {id:'c-gauze2',    name:'Sterile gauze 2x2',            unit:'each'},
+    {id:'c-roller',    name:'Roller gauze',                 unit:'roll'},
+    {id:'c-abd',       name:'ABD pad',                      unit:'each'},
+    {id:'c-coban',     name:'Coban / self-adhering wrap',   unit:'roll'},
+    {id:'c-ace',       name:'Ace bandage / elastic wrap',   unit:'each'},
+    {id:'c-tape',      name:'Medical tape',                 unit:'roll'},
+    {id:'c-coldpack',  name:'Instant cold pack',            unit:'each'},
+    {id:'c-hotpack',   name:'Instant hot pack',             unit:'each'},
+    {id:'c-eyewash',   name:'Eye wash',                     unit:'bottle'},
+    {id:'c-tongue',    name:'Tongue depressor',             unit:'each'},
+    {id:'c-ccollar',   name:'C-collar',                     unit:'each'},
+    {id:'c-sam',       name:'SAM splint',                   unit:'each'},
+    {id:'c-tq',        name:'Tourniquet',                   unit:'each'},
+    {id:'c-trauma',    name:'Trauma dressing',              unit:'each'},
+    {id:'c-glucstrip', name:'Glucometer test strips',       unit:'strip'},
+    {id:'c-lancet',    name:'Lancets',                      unit:'each'},
+    {id:'c-nrb',       name:'Non-rebreather mask',          unit:'each'},
+    {id:'c-nc',        name:'Nasal cannula',                unit:'each'},
+    {id:'c-opa',       name:'OPA',                          unit:'each'},
+    {id:'c-npa',       name:'NPA',                          unit:'each'},
+    {id:'c-bvm',       name:'Bag-valve mask',               unit:'each'},
+    {id:'c-suction',   name:'Suction catheter',             unit:'each'},
+    {id:'c-gloves',    name:'Gloves',                       unit:'pair'},
+    {id:'c-mask',      name:'Face mask',                    unit:'each'},
+    {id:'c-alcohol',   name:'Alcohol prep pad',             unit:'each'},
+    {id:'c-emesis',    name:'Emesis bag',                   unit:'each'},
+    {id:'c-blanket',   name:'Emergency blanket',            unit:'each'},
+    {id:'c-o2',        name:'Oxygen (cylinder swapped)',    unit:'cylinder'},
+    {id:'c-paperwork', name:'Patient care paperwork',       unit:'sheet'}
+  ],
+
+  // Every structured usage row filed from a post-call form. This is what the
+  // reports sum. Kept separate from `issues`, which is prose.
+  usage:[],
+
   /* ---------- spaces that are not on the tracker ------------------------
      The printed tracker lists 14 rooms and these two are not among them, so
      they are not claimable tasks. They are still the Office Manager's to look
@@ -1669,7 +1811,11 @@ function applyGates(root){
   for(var i=0;i<els.length;i++) els[i].hidden = !can(els[i].getAttribute('data-need'));
 }
 
-var MANAGER_VIEWS={tracker:'office',restock:'office',inventory:'equipment',log:'mgr',settings:'mgr'};
+var MANAGER_VIEWS={
+  tracker:'office', restock:'office', rooms:'office',
+  inventory:'equipment', 'bag-check':'equipment',
+  reports:'mgr', log:'mgr', roles:'mgr', qr:'mgr', settings:'mgr'
+};
 
 function setRole(r,quiet){
   ROLE = ROLE_LABEL[r] ? r : 'member';
@@ -1736,6 +1882,15 @@ function go(v,fromHash){
     if(on) items[j].setAttribute('aria-current','page'); else items[j].removeAttribute('aria-current');
   }
   if(!fromHash && location.hash.slice(1)!==v) location.hash=v;
+
+  // Views that summarise other data have to be rebuilt on arrival, not just at
+  // boot. Submitting a post-call form adds usage rows and re-renders that form,
+  // but nothing told the reports view its numbers had changed — so it showed
+  // whatever was true when the page loaded, which for a report is worse than
+  // showing nothing.
+  if(v==='reports') renderReports();
+  if(v==='log') renderLog();
+
   closeNav();
   window.scrollTo(0,0);
 }
@@ -1758,6 +1913,23 @@ var FORMS={
        hint:'Pipes, furniture, damage, anything that needs someone with tools.'}
     ]
   },
+  // The member-facing one. Which unit, and was anything already missing —
+  // the "was anything missing" field is what the Ops to-do asked for.
+  'checkout':{
+    host:'checkoutHost', tab:'Checkouts',
+    lead:'Filed when you take a bag out. Two questions, then you are done.',
+    who:{callsign:true,name:true,andrew:false},
+    pick:{key:'unit', label:'Which one are you taking?', from:'units'},
+    freeform:{
+      condition:{label:'Was anything missing or wrong when you picked it up?', options:[
+        {v:'Complete', t:'No — it looked complete and sealed'},
+        {v:'Missing', t:'Yes — something is missing or used up'},
+        {v:'Broken', t:'Yes — something is damaged or not working'}]}
+    },
+    extras:[{id:'detail', label:'If something was wrong, what?',
+             hint:'Leave blank if it was fine. Anything written here goes straight to the Equipment Manager.'}]
+  },
+  // The manager one. Same engine, but the item-by-item list.
   'bag-check':{
     host:'bagCheckHost', tab:'Bag Checks',
     lead:'Check every item. Anything you leave unticked is filed as missing.',
@@ -1770,8 +1942,12 @@ var FORMS={
     lead:'Everything here happens before the kit goes back on the rack.',
     who:{callsign:true,name:true,andrew:false},
     fixed:'postCall',
-    extras:[{id:'used', label:'What did you use and replace?',
-             hint:'So the Equipment Manager knows what came off the shelf.'},
+    // The structured bit. Item, how many, which unit it came out of — all
+    // picked, none typed, so the Friday buy-list can actually be summed.
+    usage:{label:'What did you use, and from where?',
+           hint:'One row per item. This is what the equipment-to-buy report adds up, '+
+                'so a rough count is far more useful than a blank.'},
+    extras:[{id:'callnum', label:'Call number', hint:'If you have it. It is how this links to the call record.', short:true},
             {id:'short', label:'Anything you could not replace?',
              hint:'This is the one that matters — an unreplaced item is a gap on the next call.'}]
   },
@@ -1810,12 +1986,18 @@ function fcfg(fid){ return FORMS[fid]; }
 function pickList(from){
   if(from==='rooms') return DB.rooms.map(function(r){
     return {id:r.id,name:r.name,sub:r.slots+' slots'}; });
+  // 'units' is the physical objects on the rack; 'bags' is the kit types and
+  // their contents lists. A checkout picks a unit, a contents check picks a type.
+  if(from==='units') return (DB.bagUnits||[]).filter(function(u){return u.active;})
+    .map(function(u){ return {id:u.id,name:u.name,sub:''}; });
   return DB.bags.filter(function(b){return b.active;}).map(function(b){
     return {id:b.id,name:b.name,sub:b.where}; });
 }
 function pickSections(fid,id){
   var c=fcfg(fid);
   if(c.fixed) return DB[c.fixed];
+  if(!c.pick) return [];
+  if(c.pick.from==='units') return [];        // a checkout has no checklist
   if(c.pick.from==='rooms'){
     var r=DB.rooms.filter(function(x){return x.id===id;})[0];
     if(!r) return [];
@@ -1894,12 +2076,25 @@ function renderCheck(fid){
   /* --- checklist --- */
   h+='<div id="'+fid+'-body">'+checkBody(fid)+'</div>';
 
+  /* --- structured usage rows --- */
+  if(c.usage){
+    h+='<div class="card mt"><h3>'+esc(c.usage.label)+'</h3>'+
+       '<p style="font-size:13px;color:var(--ink-mute);margin:0 0 10px">'+esc(c.usage.hint||'')+'</p>'+
+       '<div id="'+fid+'-usage"></div>'+
+       '<div class="row" style="margin-top:10px"><button class="btn ghost sm" type="button" '+
+       'onclick="addUsageRow(\''+fid+'\')">+ Add an item</button></div></div>';
+  }
+
   /* --- extras --- */
   (c.extras||[]).forEach(function(x){
     h+='<div class="card mt"><h3>'+esc(x.label)+'</h3>'+
        (x.hint?'<p style="font-size:13px;color:var(--ink-mute);margin:0 0 10px">'+esc(x.hint)+'</p>':'')+
-       '<textarea id="'+fid+'-x-'+x.id+'" rows="'+(x.rows||3)+'" placeholder="'+
-       (x.required?'Required':'Leave blank if nothing')+'" oninput="onFormInput(\''+fid+'\')"></textarea></div>';
+       (x.short
+         ? '<input type="text" id="'+fid+'-x-'+x.id+'" placeholder="'+
+           (x.required?'Required':'Optional')+'" oninput="onFormInput(\''+fid+'\')">'
+         : '<textarea id="'+fid+'-x-'+x.id+'" rows="'+(x.rows||3)+'" placeholder="'+
+           (x.required?'Required':'Leave blank if nothing')+'" oninput="onFormInput(\''+fid+'\')"></textarea>')+
+       '</div>';
   });
 
   h+='<div id="'+fid+'-verdict"></div>'+
@@ -1909,8 +2104,65 @@ function renderCheck(fid){
 
   host.innerHTML=h;
   applyGates(host);
+  if(c.usage) renderUsage(fid);
   restoreDraft(fid);
   calcCheck(fid);
+}
+
+/* ---------- structured usage rows ----------
+   Item and source are <select>s, quantity is a number. Nothing here is free
+   text, and that is the entire point: the existing Equipment Exhausted sheet
+   is unusable because "glucose stuff" and "glucose strip" and "glucometer
+   strips" are three different strings describing one thing, and no row carries
+   a quantity at all. A select plus a number can be summed; prose cannot. */
+var usageRows={};      // fid -> [{item, qty, from}]
+
+function usageState(fid){
+  if(!usageRows[fid] || !usageRows[fid].length) usageRows[fid]=[{item:'',qty:1,from:''}];
+  return usageRows[fid];
+}
+
+function renderUsage(fid){
+  var host=document.getElementById(fid+'-usage'); if(!host) return;
+  var rows=usageState(fid);
+  var items=DB.consumables||[], units=(DB.bagUnits||[]).filter(function(u){return u.active;});
+  host.innerHTML=rows.map(function(r,i){
+    var itemOpts='<option value="">— pick an item —</option>'+items.map(function(c){
+      return '<option value="'+esc(c.id)+'"'+(r.item===c.id?' selected':'')+'>'+esc(c.name)+'</option>';
+    }).join('');
+    var unitOpts='<option value="">— from where? —</option>'+units.map(function(u){
+      return '<option value="'+esc(u.id)+'"'+(r.from===u.id?' selected':'')+'>'+esc(u.name)+'</option>';
+    }).join('');
+    var unitName=(items.filter(function(c){return c.id===r.item;})[0]||{}).unit||'';
+    return '<div class="urow">'+
+      '<select aria-label="Item" onchange="setUsage(\''+fid+'\','+i+',\'item\',this.value)">'+itemOpts+'</select>'+
+      '<div class="uqty"><input type="number" min="1" step="1" value="'+esc(String(r.qty||1))+'" '+
+        'aria-label="How many" onchange="setUsage(\''+fid+'\','+i+',\'qty\',this.value)">'+
+        '<span class="uunit">'+esc(unitName)+'</span></div>'+
+      '<select aria-label="Where from" onchange="setUsage(\''+fid+'\','+i+',\'from\',this.value)">'+unitOpts+'</select>'+
+      '<button class="btn xs" type="button" aria-label="Remove this row" '+
+        'onclick="delUsageRow(\''+fid+'\','+i+')">✕</button>'+
+    '</div>';
+  }).join('');
+}
+
+function setUsage(fid,i,k,v){
+  var rows=usageState(fid);
+  if(!rows[i]) return;
+  rows[i][k] = (k==='qty') ? Math.max(1,parseInt(v,10)||1) : v;
+  if(k==='item') renderUsage(fid);       // the unit label depends on the item
+  onFormInput(fid);
+}
+function addUsageRow(fid){ usageState(fid).push({item:'',qty:1,from:''}); renderUsage(fid); onFormInput(fid); }
+function delUsageRow(fid,i){
+  var rows=usageState(fid);
+  rows.splice(i,1);
+  if(!rows.length) rows.push({item:'',qty:1,from:''});
+  renderUsage(fid); onFormInput(fid);
+}
+// Only complete rows count — a half-filled row is someone mid-thought, not data.
+function usageComplete(fid){
+  return (usageRows[fid]||[]).filter(function(r){ return r.item && r.from; });
 }
 
 function checkBody(fid){
@@ -1922,6 +2174,20 @@ function checkBody(fid){
       (c.pick?'Pick one above and its checklist appears here.':'Nothing to check.')+'</p></div>';
   }
   var h='';
+  // The room standards gallery is manager-side now, so the one photo that
+  // matters — what this room should look like when you are done — comes to the
+  // member here, where they are actually standing in the room.
+  if(c.pick && c.pick.from==='rooms'){
+    var room=DB.rooms.filter(function(r){return r.id===formPick[fid];})[0];
+    if(room && room.photo){
+      h+='<div class="card mt"><h3>What "done" looks like</h3>'+
+         '<button type="button" class="photo" style="max-width:340px" '+
+         'onclick="openLightbox(\'assets/rooms/'+esc(room.photo)+'.jpg\',\''+esc(room.name)+'\')">'+
+         '<img src="assets/rooms/'+esc(room.photo)+'.jpg" alt="'+esc(room.name)+
+         ' reference photo" loading="lazy">'+
+         '<div class="pcap">'+esc(room.name)+'<small>Tap to enlarge</small></div></button></div>';
+    }
+  }
   secs.forEach(function(sec){
     h+='<div class="card mt"><h3>'+esc(sec.name)+'</h3>';
     (sec.items||[]).forEach(function(it){
@@ -1969,12 +2235,29 @@ function readCheck(fid){
   });
   var picked=(c.pick?pickList(c.pick.from).filter(function(o){return o.id===out.pick;})[0]:null);
   out.pickName=picked?picked.name:'';
+  if(c.usage) out.usage=usageComplete(fid).map(function(r){
+    var it=(DB.consumables||[]).filter(function(x){return x.id===r.item;})[0]||{};
+    var un=(DB.bagUnits||[]).filter(function(x){return x.id===r.from;})[0]||{};
+    return {item:r.item, itemName:it.name||r.item, qty:r.qty||1,
+            unit:it.unit||'', from:r.from, fromName:un.name||r.from};
+  });
   return out;
 }
 
 function calcCheck(fid){
   var c=fcfg(fid), s=readCheck(fid), box=document.getElementById(fid+'-verdict');
   if(!box) return;
+  if(c.usage){
+    var rows=s.usage||[];
+    var n=rows.reduce(function(a,r){return a+r.qty;},0);
+    box.innerHTML = rows.length
+      ? '<div class="verdict ok"><div class="big">'+rows.length+' item'+(rows.length===1?'':'s')+
+        ' logged'+(n!==rows.length?' ('+n+' total)':'')+'</div>'+
+        '<div class="detail">This is what the equipment-to-buy report will add up.</div></div>'
+      : '<div class="verdict"><div class="big">Nothing logged yet</div>'+
+        '<div class="detail">If you genuinely used nothing, that is fine — submit as is.</div></div>';
+    return;
+  }
   if(c.freeform){ box.innerHTML=''; return; }
   var total=s.done.length+s.missing.length;
   if(!total){ box.innerHTML=''; return; }
@@ -2000,11 +2283,13 @@ function saveDraft(fid){
   var d=readDrafts(), s=readCheck(fid), ticked=[];
   var boxes=host.querySelectorAll('[data-item]');
   for(var i=0;i<boxes.length;i++) if(boxes[i].checked) ticked.push(boxes[i].getAttribute('data-item'));
-  var any = s.callsign||s.first||s.last||s.andrew||ticked.length||s.pick||
+  var rows=(c.usage?usageComplete(fid):[]);
+  var any = s.callsign||s.first||s.last||s.andrew||ticked.length||s.pick||rows.length||
             Object.keys(s.radios).length||Object.keys(s.extras).some(function(k){return s.extras[k];});
   if(!any){ delete d[fid]; writeDrafts(d); renderDraftNote(fid); return; }
   d[fid]={at:Date.now(),callsign:s.callsign,first:s.first,last:s.last,andrew:s.andrew,
-          pick:s.pick,ticked:ticked,radios:s.radios,extras:s.extras};
+          pick:s.pick,ticked:ticked,radios:s.radios,extras:s.extras,
+          usage:rows.map(function(r){return {item:r.item,qty:r.qty,from:r.from};})};
   writeDrafts(d);
   var m=document.getElementById(fid+'-savemsg'); if(m) m.textContent='Saved on this device';
   renderDraftNote(fid);
@@ -2030,6 +2315,16 @@ function restoreDraft(fid){
   Object.keys(d.extras||{}).forEach(function(k){
     var e=document.getElementById(fid+'-x-'+k); if(e) e.value=d.extras[k]||'';
   });
+  if(fcfg(fid).usage && (d.usage||[]).length){
+    // Drop any row whose item or unit has since been deleted in manager mode,
+    // rather than restoring a select that has no matching option.
+    var items={}, units={};
+    (DB.consumables||[]).forEach(function(c){ items[c.id]=1; });
+    (DB.bagUnits||[]).forEach(function(u){ units[u.id]=1; });
+    var kept=d.usage.filter(function(r){ return items[r.item] && units[r.from]; });
+    if(kept.length){ usageRows[fid]=kept.map(function(r){
+      return {item:r.item,qty:r.qty||1,from:r.from}; }); renderUsage(fid); }
+  }
   renderDraftNote(fid);
 }
 
@@ -2056,7 +2351,10 @@ function submitCheck(fid){
   var c=fcfg(fid), s=readCheck(fid), missing=[];
   if(c.who.callsign && !s.callsign) missing.push('your call sign');
   if(c.who.name && !(s.first&&s.last)) missing.push('your name');
-  if(c.pick && !s.pick) missing.push(c.pick.from==='rooms'?'which room you took':'which bag you checked');
+  if(c.pick && !s.pick) missing.push(
+    c.pick.from==='rooms' ? 'which room you took'
+    : c.pick.from==='units' ? 'which bag you are taking'
+    : 'which bag you checked');
   (c.extras||[]).forEach(function(x){ if(x.required && !s.extras[x.id]) missing.push(x.label.toLowerCase()); });
   if(c.freeform) Object.keys(c.freeform).forEach(function(k){
     if(!s.radios[k]) missing.push(c.freeform[k].label.toLowerCase()); });
@@ -2065,8 +2363,15 @@ function submitCheck(fid){
     uiAlert('Still needed: '+missing.join(', ')+'.','Not quite done');
     return;
   }
-  if(!c.freeform && !c.fixed && !s.done.length && !s.missing.length){
+  if(!c.freeform && !c.fixed && !c.usage && !s.done.length && !s.missing.length){
     uiAlert('There is nothing ticked on this checklist yet.','Nothing to submit'); return;
+  }
+  // A checkout that says something is wrong, with no word on what, is a dead end
+  // for whoever picks it up.
+  if(fid==='checkout' && s.radios.condition && s.radios.condition!=='Complete' && !s.extras.detail){
+    uiAlert('You have said something was missing or damaged — please say what, '+
+            'or the Equipment Manager has nothing to act on.','One more thing');
+    return;
   }
   doSubmit(fid,s);
 }
@@ -2081,6 +2386,27 @@ function doSubmit(fid,s){
   };
   Object.keys(s.radios).forEach(function(k){ payload[k]=s.radios[k]; });
   Object.keys(s.extras).forEach(function(k){ payload[k]=s.extras[k]; });
+
+  // Usage goes to the sheet twice, deliberately. `usageText` is one readable
+  // cell a human can skim on the Post-Call tab; `usageJson` is the machine copy
+  // the Friday report sums. Writing only the prose version is how the existing
+  // Equipment Exhausted sheet ended up unsummable.
+  if(s.usage && s.usage.length){
+    payload.usageText=s.usage.map(function(r){
+      return r.qty+'x '+r.itemName+' ('+r.fromName+')'; }).join(' | ');
+    payload.usageJson=JSON.stringify(s.usage.map(function(r){
+      return {i:r.item,q:r.qty,f:r.from}; }));
+    payload.usageCount=s.usage.reduce(function(a,r){return a+r.qty;},0);
+    // Local mirror, so reports work before the backend exists.
+    var stamp=Date.now();
+    s.usage.forEach(function(r){
+      DB.usage.unshift({id:uid('use'), at:stamp, date:s.date, item:r.item, itemName:r.itemName,
+        qty:r.qty, unit:r.unit, from:r.from, fromName:r.fromName,
+        call:s.extras.callnum||'', by:(s.first+' '+s.last).trim()||s.callsign||''});
+    });
+    if(DB.usage.length>2000) DB.usage.length=2000;
+    saveDB();
+  }
 
   var url=(DB.api&&DB.api.url)||'';
   var sent=false;
@@ -2102,6 +2428,14 @@ function doSubmit(fid,s){
   if(c.tab==='Reports'){
     addIssue({area:s.radios.area||'Other', urgency:s.radios.urgency||'Whenever',
       what:s.extras.what||'', where:s.extras.where||'', by:openedBy});
+  }else if(c.tab==='Checkouts'){
+    // A checkout only raises a problem when the member says there is one.
+    if(s.radios.condition && s.radios.condition!=='Complete'){
+      addIssue({area:'Equipment',
+        urgency:s.radios.condition==='Broken'?'Blocking':'Soon',
+        what:s.extras.detail||('Reported '+s.radios.condition.toLowerCase()+' at checkout'),
+        where:s.pickName, by:openedBy});
+    }
   }else{
     s.missing.forEach(function(m){
       addIssue({area:c.tab==='Room Checks'?'Office':'Equipment', urgency:'Soon',
@@ -2117,6 +2451,7 @@ function doSubmit(fid,s){
   formDone[fid]=true;
   clearDraft(fid);
   formPick[fid]=null;
+  usageRows[fid]=null;
   renderCheck(fid);
 }
 
@@ -2336,9 +2671,12 @@ function renderRoles(){
 /* ---- QR codes ----
    Real scannable codes, generated in-page: no library, no network call, and
    nothing that stops working when some QR service changes its URL scheme. */
+// Every one of these lands on a MEMBER-visible view. A code that opens a view a
+// member cannot reach would send whoever scanned it to the home page, which
+// reads as a broken sticker.
 var QR_TARGETS=[
+  {view:'checkout',   title:'Check Out a Bag',   who:'Duty room rack, and the equipment room shelf'},
   {view:'room-check', title:'Room Check',        who:'Post on the tracker board'},
-  {view:'bag-check',  title:'Bag Check',         who:'Equipment room and duty room rack'},
   {view:'post-call',  title:'Post-Call Restock', who:'Radio room, by the kit shelf'},
   {view:'post-shift', title:'End of Shift',      who:'By the door and the cubbies'},
   {view:'report',     title:'Report a Problem',  who:'Anywhere — foyer, equipment room, kitchen'},
@@ -2464,6 +2802,29 @@ function renderInventory(){
      '<button class="btn ghost sm" onclick="addInvItem()">Add an item</button></div>';
   h+='<p class="hint">Par is the number that should be there after a restock — it is what a '+
      'check compares against, not what is there now.</p>';
+
+  /* ---- the physical units ----
+     This list is what members pick from when they check a bag out and when they
+     say where something was used, so a wrong entry here produces wrong data
+     everywhere downstream. It is seeded from names that appear in the existing
+     Equipment Exhausted sheet, with the gaps in the lettering guessed. */
+  h+='<h3 class="mt-lg" style="font-family:var(--font-display);font-size:19px">Bags in service</h3>'+
+     '<div class="notice warn"><b>Check this list first.</b>'+
+     '<p>Jumpkits B, C and E appear in the old equipment sheet, so a lettered scheme was '+
+     'assumed and A and D were added on that basis. Nobody has confirmed they exist. '+
+     'Delete what is not real and add what is missing — every checkout and every usage '+
+     'row is filed against a name from this list.</p></div>';
+  h+='<div class="invwrap"><table class="invtable"><thead><tr>'+
+     '<th>Name</th><th>Type</th><th>In service</th><th></th></tr></thead><tbody>';
+  (DB.bagUnits||[]).forEach(function(u){
+    h+='<tr><td>'+esc(u.name)+'</td><td>'+esc(u.type)+'</td>'+
+       '<td>'+(u.active?'<span class="tag ok">yes</span>':'<span class="tag">no</span>')+'</td>'+
+       '<td><button class="btn xs" onclick="renameUnit(\''+esc(u.id)+'\')">Rename</button> '+
+       '<button class="btn xs" onclick="toggleUnit(\''+esc(u.id)+'\')">'+
+       (u.active?'Retire':'Restore')+'</button></td></tr>';
+  });
+  h+='</tbody></table></div>'+
+     '<div class="row mt"><button class="btn ghost sm" onclick="addUnit()">Add a bag</button></div>';
   host.innerHTML=h;
 }
 
@@ -2472,6 +2833,42 @@ function openSheet(){
   if(!u){ uiAlert('No spreadsheet link is saved yet. A manager can add it in Site Settings.',
                   'Not linked'); return; }
   window.open(u,'_blank','noopener');
+}
+
+/* Units are renamed, never re-keyed. Every checkout and usage row already filed
+   points at the id, so a rename corrects the label on historic data instead of
+   orphaning it — which is the whole reason the report can sum across a term. */
+function renameUnit(id){
+  var u=(DB.bagUnits||[]).filter(function(x){return x.id===id;})[0]; if(!u) return;
+  uiPrompt('What is this bag actually called? Past checkouts keep pointing at it.',
+           u.name,'Rename bag')
+    .then(function(v){
+      if(v==null) return;
+      v=v.trim(); if(!v) return;
+      u.name=v; saveDB(); renderAll();
+    });
+}
+function toggleUnit(id){
+  var u=(DB.bagUnits||[]).filter(function(x){return x.id===id;})[0]; if(!u) return;
+  var live=(DB.bagUnits||[]).filter(function(x){return x.active;});
+  if(u.active && live.length===1){
+    uiAlert('That is the last bag in service — the checkout form would have nothing '+
+            'to offer. Add another first.','Cannot retire it');
+    return;
+  }
+  u.active=!u.active; saveDB(); renderAll();
+}
+function addUnit(){
+  uiForm('Add a bag','A physical bag or kit on the rack, not a kit type.',
+    [{id:'name',label:'Name as written on the bag',type:'text'},
+     {id:'type',label:'Type',type:'select',options:[
+       {v:'jumpkit',t:'Jumpkit'},{v:'event',t:'Event bag'},{v:'blue',t:'Blue bag'},
+       {v:'ccpod',t:'Crew chief pod'},{v:'other',t:'Something else'}]}],{ok:'Add'})
+   .then(function(v){
+     if(!v||!v.name) return;
+     DB.bagUnits.push({id:uid('unit'),name:v.name.trim(),type:v.type||'other',active:true});
+     saveDB(); renderAll();
+   });
 }
 
 function addInvItem(){
@@ -2486,6 +2883,232 @@ function addInvItem(){
                         cat:v.cat||'Equipment',par:v.par||'—'});
      saveDB(); renderInventory();
    });
+}
+
+/* ============================================================================
+   REPORTS
+   "an email every friday with a list of equipment to buy and any concerns
+   people reported" — that is the ask, and this is the on-demand half of it.
+
+   The site cannot send a Friday email: it only runs when someone has it open.
+   The scheduled send lives in the Apps Script, where a time-driven trigger can
+   fire whether or not anyone is looking. What follows is the same report,
+   generated on demand, so a manager can pull it any time and so the numbers can
+   be sanity-checked against the sheet.
+   ========================================================================== */
+var REPORT_PERIOD='week';
+
+/* "8 eachs" is not a unit. `each` is a counting word, not a noun, so it is
+   dropped entirely — "8 Adhesive bandages" already says it. Everything else
+   pluralises normally. */
+function unitLabel(unit,qty){
+  if(!unit || unit==='each') return '';
+  return qty===1 ? unit : unit+'s';
+}
+
+function periodStart(p){
+  var d=new Date(); d.setHours(0,0,0,0);
+  if(p==='week'){
+    // Week starts Saturday, so a Friday report covers the week just worked
+    // rather than cutting it in half.
+    var back=(d.getDay()+1)%7;
+    d.setDate(d.getDate()-back);
+  }else if(p==='month'){
+    d.setDate(1);
+  }else{
+    // Year to date runs from the start of the academic year, not January —
+    // an EMS year turns over in August, and a January cut would split it.
+    var y=d.getFullYear(), aug=new Date(y,7,1);
+    d = d>=aug ? aug : new Date(y-1,7,1);
+  }
+  return d.getTime();
+}
+function periodLabel(p){
+  var from=new Date(periodStart(p));
+  var f=function(x){return x.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});};
+  return f(from)+' → today';
+}
+function setPeriod(p){ REPORT_PERIOD=p; renderReports(); }
+
+function reportData(p){
+  var since=periodStart(p);
+  var usage=(DB.usage||[]).filter(function(u){ return u.at>=since; });
+  var issues=(DB.issues||[]).filter(function(i){ return i.at>=since; });
+
+  // Sum by ID, never by display name — on BOTH axes. A row filed before a bag
+  // was renamed carries the old `fromName`, so grouping on that string splits
+  // one bag into two ("Jumpkit B" + "Jumpkit Bravo"), which is the same class of
+  // bug as "glucose stuff" vs "glucose strip". Names are resolved from the
+  // current DB at render time; the stored copy is only a fallback for a unit
+  // that has since been deleted outright.
+  var itemName=function(id,fallback){
+    var c=(DB.consumables||[]).filter(function(x){return x.id===id;})[0];
+    return c?c.name:(fallback||id);
+  };
+  var unitName=function(id,fallback){
+    var u=(DB.bagUnits||[]).filter(function(x){return x.id===id;})[0];
+    return u?u.name:(fallback||id);
+  };
+
+  var byItem={};
+  usage.forEach(function(u){
+    var e=byItem[u.item] || (byItem[u.item]={id:u.item,unit:u.unit,qty:0,from:{}});
+    e.qty+=u.qty;
+    e.from[u.from]=(e.from[u.from]||0)+u.qty;
+  });
+  var buy=Object.keys(byItem).map(function(k){
+    var e=byItem[k];
+    e.name=itemName(e.id, (usage.filter(function(u){return u.item===e.id;})[0]||{}).itemName);
+    // resolve source ids to current names only once the summing is done
+    var named={};
+    Object.keys(e.from).forEach(function(fid){
+      var n=unitName(fid,(usage.filter(function(u){return u.from===fid;})[0]||{}).fromName);
+      named[n]=(named[n]||0)+e.from[fid];
+    });
+    e.from=named;
+    return e;
+  }).sort(function(a,b){ return b.qty-a.qty || a.name.localeCompare(b.name); });
+
+  var byUnitId={};
+  usage.forEach(function(u){ byUnitId[u.from]=(byUnitId[u.from]||0)+u.qty; });
+  var byUnit={};
+  Object.keys(byUnitId).forEach(function(fid){
+    var n=unitName(fid,(usage.filter(function(u){return u.from===fid;})[0]||{}).fromName);
+    byUnit[n]=(byUnit[n]||0)+byUnitId[fid];
+  });
+
+  return {
+    since:since, usage:usage, buy:buy, byUnit:byUnit,
+    issuesOpen:issues.filter(function(i){return i.open;}),
+    issuesAll:issues,
+    calls:Object.keys(usage.reduce(function(a,u){ if(u.call) a[u.call]=1; return a; },{})).length
+  };
+}
+
+function renderReports(){
+  var host=document.getElementById('reportsHost'); if(!host) return;
+  var p=REPORT_PERIOD, d=reportData(p);
+  var live=!!(DB.api&&DB.api.url);
+
+  var h='<div class="periodbar">'+
+    [['week','This week'],['month','This month'],['ytd','Year to date']].map(function(o){
+      return '<button type="button" class="'+(p===o[0]?'on':'')+'" onclick="setPeriod(\''+o[0]+'\')">'+
+             o[1]+'</button>';
+    }).join('')+'</div>'+
+    '<p class="hint" style="margin-top:8px">'+esc(periodLabel(p))+'</p>';
+
+  // Be honest about where the numbers come from. A manager reading a buy-list
+  // needs to know whether it covers the whole team or just their own phone.
+  h+= live
+    ? '<div class="notice"><b>These numbers are from this browser.</b>'+
+      '<p>A spreadsheet is connected, so every submission is being stored — but reading it '+
+      'back into this page needs the reporting endpoint from <span class="mono">SETUP-BACKEND.md</span> '+
+      '§8. Until that is deployed, what you see here covers only what was filed on this device. '+
+      'The Friday email runs inside the Apps Script and does see everything.</p></div>'
+    : '<div class="notice warn"><b>No spreadsheet connected.</b>'+
+      '<p>Nothing is being stored centrally yet, so this report covers only what was filed on '+
+      'this device. Finish Site Settings and the report becomes real.</p></div>';
+
+  h+='<div class="repgrid">'+
+     '<div class="repstat"><div class="rs-n">'+d.buy.length+'</div><div class="rs-l">items to restock</div></div>'+
+     '<div class="repstat"><div class="rs-n">'+d.usage.reduce(function(a,u){return a+u.qty;},0)+
+       '</div><div class="rs-l">units used</div></div>'+
+     '<div class="repstat"><div class="rs-n">'+d.issuesOpen.length+'</div><div class="rs-l">open concerns</div></div>'+
+     '<div class="repstat"><div class="rs-n">'+d.calls+'</div><div class="rs-l">calls logged</div></div>'+
+     '</div>';
+
+  /* ---- equipment to buy ---- */
+  h+='<div class="card"><h3>Equipment to buy</h3>';
+  if(!d.buy.length){
+    h+='<p class="hint" style="margin:0">Nothing has been logged as used in this period. '+
+       'If that looks wrong, it means post-call forms are not being filled in.</p>';
+  }else{
+    h+='<p style="font-size:13px;color:var(--ink-mute);margin:0 0 8px">'+
+       'Summed from post-call forms. Quantities are what members reported using.</p>';
+    d.buy.forEach(function(b){
+      var froms=Object.keys(b.from).sort(function(x,y){return b.from[y]-b.from[x];});
+      var u=unitLabel(b.unit,b.qty);
+      h+='<div class="buyrow"><span class="bq">'+b.qty+
+         (u?'<span style="font-weight:400"> '+esc(u)+'</span>':'')+'</span>'+
+         '<span class="bn">'+esc(b.name)+'</span>'+
+         '<span class="bf">'+esc(froms.slice(0,3).join(', '))+
+         (froms.length>3?' +'+(froms.length-3):'')+'</span></div>';
+    });
+  }
+  h+='</div>';
+
+  /* ---- concerns ---- */
+  h+='<div class="card mt"><h3>Concerns reported</h3>';
+  if(!d.issuesAll.length){
+    h+='<p class="hint" style="margin:0">Nothing reported in this period.</p>';
+  }else{
+    var badge={Blocking:'crit',Soon:'warn',Whenever:'brand'};
+    h+='<ul class="isslist">'+d.issuesOpen.map(function(i){
+      return '<li><span class="tag '+(badge[i.urgency]||'brand')+'">'+esc(i.urgency)+'</span>'+
+        '<b>'+esc(i.what)+'</b>'+(i.where?' <span style="color:var(--ink-faint)">— '+esc(i.where)+'</span>':'')+
+        '</li>';
+    }).join('')+'</ul>';
+    var closed=d.issuesAll.length-d.issuesOpen.length;
+    if(closed) h+='<p class="hint">'+closed+' more were reported and resolved in this period.</p>';
+  }
+  h+='</div>';
+
+  /* ---- which units are consuming most ---- */
+  var units=Object.keys(d.byUnit).sort(function(a,b){return d.byUnit[b]-d.byUnit[a];});
+  if(units.length){
+    h+='<div class="card mt"><h3>Where it is going</h3>'+
+       '<p style="font-size:13px;color:var(--ink-mute);margin:0 0 8px">'+
+       'Units used, by bag. A bag well above the others is either busier or leaking.</p>';
+    units.forEach(function(u){
+      h+='<div class="buyrow"><span class="bq">'+d.byUnit[u]+'</span><span class="bn">'+esc(u)+'</span></div>';
+    });
+    h+='</div>';
+  }
+
+  h+='<div class="row mt noprint">'+
+     '<button class="btn solid" onclick="copyReport()">Copy for email</button>'+
+     '<button class="btn ghost" onclick="window.print()">Print</button>'+
+     '<span id="repMsg" style="font-size:13px;color:var(--ink-faint)"></span></div>';
+
+  host.innerHTML=h;
+  applyGates(host);
+}
+
+function reportText(){
+  var p=REPORT_PERIOD, d=reportData(p);
+  var L=['CMU EMS Operations — '+({week:'weekly',month:'monthly',ytd:'year-to-date'}[p])+' report',
+         periodLabel(p),'',
+         'EQUIPMENT TO BUY'];
+  if(!d.buy.length) L.push('  (nothing logged as used)');
+  else d.buy.forEach(function(b){
+    var u=unitLabel(b.unit,b.qty);
+    L.push('  '+b.qty+(u?' '+u:'')+' x '+b.name+'  — from '+Object.keys(b.from).join(', '));
+  });
+  L.push('', 'CONCERNS REPORTED ('+d.issuesOpen.length+' open)');
+  if(!d.issuesOpen.length) L.push('  (none)');
+  else d.issuesOpen.forEach(function(i){
+    L.push('  ['+i.urgency+'] '+i.what+(i.where?' — '+i.where:''));
+  });
+  L.push('', 'Calls logged: '+d.calls+'   Units used: '+
+         d.usage.reduce(function(a,u){return a+u.qty;},0));
+  return L.join('\n');
+}
+
+function copyReport(){
+  var t=reportText(), msg=document.getElementById('repMsg');
+  var done=function(){ if(msg) msg.textContent='Copied.'; };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(t).then(done,function(){ fallbackCopy(t,done); });
+  }else fallbackCopy(t,done);
+}
+function fallbackCopy(t,done){
+  var ta=document.createElement('textarea');
+  ta.value=t; ta.setAttribute('readonly',''); ta.style.position='fixed'; ta.style.opacity='0';
+  document.body.appendChild(ta); ta.select();
+  try{ document.execCommand('copy'); done(); }catch(e){
+    uiAlert('Could not copy automatically. Print instead, or select the text by hand.','Copy failed');
+  }
+  document.body.removeChild(ta);
 }
 
 /* ---- problem log ---- */
@@ -2538,6 +3161,7 @@ function renderSettings(){
     'value="'+esc((DB.api&&DB.api.sheet)||'')+'"></div>'+
     '<div class="row"><button class="btn solid" onclick="saveApi()">Save</button>'+
     '<button class="btn ghost" onclick="testApi()">Test connection</button>'+
+    '<button class="btn ghost" onclick="pushNames()">Send item names</button>'+
     '<span id="apiMsg" style="font-size:13px"></span></div></div>';
 
   h+='<div class="card mt"><h3>This device</h3>'+
@@ -2567,6 +3191,32 @@ function saveApi(){
 /* A POST is sent with mode:'no-cors', so its response is unreadable and "sent"
    proves nothing. A GET is readable, so the ping is what actually tells you
    whether the endpoint is live and pointed at the right file. */
+/* The sheet stores item and bag IDs, because an ID survives a rename and a
+   display name does not. That makes the Friday email read "8 x c-bandaid"
+   unless the script knows the names — so this hands them over. Re-run it after
+   renaming or adding anything, or the email will show a raw id for the new one. */
+function pushNames(){
+  var u=((document.getElementById('apiUrl')||{}).value||'').trim()||((DB.api&&DB.api.url)||'');
+  var msg=document.getElementById('apiMsg');
+  if(!u){ msg.textContent='Save the Web App URL first.'; return; }
+  var names={items:{},units:{}};
+  (DB.consumables||[]).forEach(function(c){ names.items[c.id]=c.name; });
+  (DB.bagUnits||[]).forEach(function(b){ names.units[b.id]=b.name; });
+  msg.textContent='Sending…';
+  fetch(u+(u.indexOf('?')<0?'?':'&')+'names='+encodeURIComponent(JSON.stringify(names)))
+    .then(function(r){ return r.text(); })
+    .then(function(t){
+      var j=null; try{ j=JSON.parse(t); }catch(e){}
+      msg.innerHTML = (j&&j.ok&&j.stored)
+        ? '<span style="color:var(--ok)">Names sent — the Friday email will read properly.</span>'
+        : '<span style="color:var(--warn)">Reached it, but it did not confirm. The script may '+
+          'predate the reporting section of the setup doc.</span>';
+    })
+    .catch(function(){
+      msg.innerHTML='<span style="color:var(--oos)">Could not reach it.</span>';
+    });
+}
+
 function testApi(){
   var u=(document.getElementById('apiUrl').value||'').trim();
   var msg=document.getElementById('apiMsg');
@@ -2627,6 +3277,7 @@ function renderAll(){
   renderTracker();
   renderRestock();
   renderInventory();
+  renderReports();
   renderLog();
   renderSettings();
   Object.keys(FORMS).forEach(renderCheck);
