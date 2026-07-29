@@ -124,7 +124,6 @@
   }
   h2.view-title{font-family:var(--font-display);font-weight:var(--display-wt);font-size:34px;letter-spacing:-.025em;margin:0 0 6px;line-height:1.15}
   h2.view-title em{font-style:italic;color:var(--brand)}
-  .view-sub{color:var(--ink-mute);font-size:15px;margin:0 0 26px;max-width:64ch}
   /* The hamburger only exists on narrow screens; on desktop the sidebar is always
      there and a menu button would be a control that does nothing. */
   .navtoggle{display:none;flex:0 0 auto;width:38px;height:38px;padding:0;margin-right:2px;
@@ -354,7 +353,7 @@
      phone camera in a dim bike room. */
   @media print{
     body{background:#fff!important;background-image:none!important}
-    .topbar,.sidebar,.banner,.view-sub,.noprint,.sharenote{display:none!important}
+    .topbar,.sidebar,.banner,.noprint,.sharenote{display:none!important}
     #app{display:block}
     main{padding:0;max-width:none}
     .card{border:1px solid #999;box-shadow:none;break-inside:avoid;page-break-inside:avoid}
@@ -643,6 +642,10 @@
   .repgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:16px 0}
   .repstat{border:1px solid var(--rule);border-radius:var(--r-md);background:var(--card);padding:15px 17px;
     box-shadow:var(--shadow-sm)}
+  .dashstat{cursor:pointer;text-align:left;font:inherit;width:100%;display:block;
+    transition:border-color .16s var(--ease),transform .16s var(--ease)}
+  .dashstat:hover{border-color:var(--brand);transform:translateY(-1px)}
+  .dashstat:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
   .repstat .rs-n{font-family:var(--font-display);font-size:26px;font-weight:700;line-height:1;color:var(--brand)}
   .repstat .rs-l{font-size:11.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-faint);margin-top:6px}
   .periodbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
@@ -767,6 +770,7 @@
         </div>
       </div>
 
+      <div id="dashHost"></div>
       <div class="rolegrid" id="roleCards"></div>
     </section>
 
@@ -2148,6 +2152,7 @@ function go(v,fromHash){
   if(v==='log') renderLog();
   if(v==='readiness') renderReadiness();
   if(v==='toget') renderToGet();
+  if(v==='home') renderDash();
 
   closeNav();
   window.scrollTo(0,0);
@@ -2901,6 +2906,53 @@ function reopenIssue(id){
 /* ============================================================================
    VIEW RENDERERS
    ========================================================================== */
+
+/* ---- the manager dashboard ----
+   Start here is manager-only, so it shows the numbers that belong to whoever is
+   signed in rather than the same four tiles for everybody. Each figure links to
+   the view that acts on it — a count you cannot act on is decoration. */
+function renderDash(){
+  var host=document.getElementById('dashHost'); if(!host) return;
+  if(!can('mgr')){ host.innerHTML=''; return; }
+
+  var openIssues=(DB.issues||[]).filter(function(i){return i.open;});
+  var byArea=function(a){ return openIssues.filter(function(i){return i.area===a;}).length; };
+  var toGet=(DB.toGet||[]).filter(function(t){return !t.done;});
+  var flagged=(DB.bagUnits||[]).filter(function(u){
+    return u.active && u.ready!==false && unitStatus(u.id).cls!=='ok'; });
+  var expired=openIssues.filter(function(i){return /expired/i.test(i.what);}).length;
+  var since=periodStart('week');
+  var roomsDone={};
+  (DB.issues||[]).forEach(function(i){ if(i.area==='Office'&&i.where) roomsDone[i.where]=1; });
+
+  var tiles=[];
+  if(can('equipment')) tiles.push(
+    {n:toGet.length, l:'to get', v:'toget'},
+    {n:flagged.length, l:'bags flagged', v:'readiness'},
+    {n:expired, l:'expired', v:'log'},
+    {n:byArea('Equipment'), l:'equipment concerns', v:'log'});
+  if(can('office')) tiles.push(
+    {n:byArea('Office'), l:'office concerns', v:'log'},
+    {n:(DB.officeSupplies||[]).length, l:'supplies tracked', v:'restock'},
+    {n:(DB.rooms||[]).length, l:'rooms on the tracker', v:'tracker'});
+
+  var h='<div class="repgrid">'+tiles.map(function(t){
+    return '<button type="button" class="repstat dashstat" onclick="go(\''+jsq(t.v)+'\')">'+
+      '<div class="rs-n">'+t.n+'</div><div class="rs-l">'+esc(t.l)+'</div></button>';
+  }).join('')+'</div>';
+
+  // The one thing that should not wait: anything blocking.
+  var blocking=openIssues.filter(function(i){return i.urgency==='Blocking';});
+  if(blocking.length){
+    h+='<div class="card mt"><h3>Blocking</h3><ul class="isslist">'+
+      blocking.slice(0,6).map(function(i){
+        return '<li><span class="tag crit">'+esc(i.urgency)+'</span><b>'+esc(i.what)+'</b>'+
+          (i.where?' <span style="color:var(--ink-faint)">— '+esc(i.where)+'</span>':'')+'</li>';
+      }).join('')+'</ul></div>';
+  }
+  host.innerHTML=h;
+  applyGates(host);
+}
 
 /* ---- home: one card per role ---- */
 function renderRoleCards(){
@@ -4052,6 +4104,7 @@ function closeLightbox(){
    BOOT
    ========================================================================== */
 function renderAll(){
+  renderDash();
   renderRoleCards();
   renderRooms();
   renderBags();
