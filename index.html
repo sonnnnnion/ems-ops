@@ -1650,17 +1650,17 @@ var DEFAULTS={
     {id:'jk-c', name:'Jumpkit C', type:'jumpkit', active:true},
     {id:'jk-d', name:'Jumpkit D', type:'jumpkit', active:true},
     {id:'jk-e', name:'Jumpkit E', type:'jumpkit', active:true},
-    {id:'jk-sup', name:'Personal Jumpkit', type:'jumpkit', active:true},
+    {id:'jk-sup', ready:false, name:'Personal Jumpkit', type:'jumpkit', active:true},
     {id:'ev-1', name:'Event Bag 1', type:'event', active:true},
     {id:'ev-2', name:'Event Bag 2', type:'event', active:true},
     {id:'ev-3', name:'Event Bag 3', type:'event', active:true},
     {id:'u-blue', name:'Blue Bag', type:'blue', active:true},
-    {id:'u-ccpod', name:'Crew Chief Pod', type:'ccpod', active:true},
+    {id:'u-ccpod', ready:false, name:'Crew Chief Pod', type:'ccpod', active:true},
     {id:'u-o2', name:'Oxygen Bag', type:'other', active:true},
     // Only the Equipment Manager checks these two — they are stock, not a bag
     // somebody takes on a shift.
-    {id:'u-trailer', name:'Trailer / Trailer Cart', type:'other', active:true, need:'equipment'},
-    {id:'u-room', name:'Equipment Room shelf', type:'other', active:true, need:'equipment'}
+    {id:'u-trailer', ready:false, name:'Trailer / Trailer Cart', type:'other', active:true, need:'equipment'},
+    {id:'u-room', ready:false, name:'Equipment Room shelf', type:'other', active:true, need:'equipment'}
   ],
 
   /* ---------- consumables -----------------------------------------------
@@ -1924,7 +1924,9 @@ var MANAGER_VIEWS={
 
    Fill this in from the Google Cloud console (see SETUP-BACKEND.md). Until it is
    set, sign-in says so plainly rather than failing silently. */
-var GOOGLE_CLIENT_ID='';
+// Shared with the Bike Ops site on purpose: both are served from
+// sonnnnnion.github.io, which is the only origin the credential authorises.
+var GOOGLE_CLIENT_ID='649290078556-l1p8l9qr5stjldgrs08c8eo0od6c727e.apps.googleusercontent.com';
 var googleIdToken='';
 
 function normEmail(e){ return String(e||'').trim().toLowerCase(); }
@@ -3161,7 +3163,11 @@ function unitStatus(id){
 
 function renderReadiness(){
   var host=document.getElementById('readinessHost'); if(!host) return;
-  var units=(DB.bagUnits||[]).filter(function(u){return u.active;});
+  // `ready:false` keeps a unit out of the board without taking it out of
+  // service: the personal jumpkit, the crew chief pod, the trailer and the
+  // equipment room shelf are situational, so a green tile for them is noise on
+  // a screen whose only job is "which bag do I grab".
+  var units=(DB.bagUnits||[]).filter(function(u){return u.active && u.ready!==false;});
   if(!units.length){ host.innerHTML='<div class="card"><p class="hint" style="margin:0">'+
     'No bags in service.</p></div>'; return; }
 
