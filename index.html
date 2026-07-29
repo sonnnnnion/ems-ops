@@ -66,8 +66,8 @@
   .hint{font-size:12px;color:var(--ink-faint);margin-top:10px}
   .fieldmsg{font-size:12.5px;margin-top:6px;min-height:1px}
   .fieldmsg.bad{color:var(--oos);font-weight:600}
-  .field{margin-bottom:14px}
-  .field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .field{margin-bottom:20px}
+  .field-row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
   @media(max-width:640px){.field-row{grid-template-columns:1fr}}
 
   /* ---------- shell ---------- */
@@ -174,8 +174,8 @@
     .sidebar,.navscrim,.bars span{transition:none}
   }
 
-  .card{border:1px solid var(--rule);border-radius:var(--r-md);background:var(--card);box-shadow:var(--shadow-md);padding:22px}
-  .card h3{margin:0 0 10px;font-size:17px;font-weight:600;font-family:var(--font-display);letter-spacing:-.01em}
+  .card{border:1px solid var(--rule);border-radius:var(--r-md);background:var(--card);box-shadow:var(--shadow-md);padding:22px 24px}
+  .card h3{margin:0 0 16px;font-size:17px;font-weight:600;font-family:var(--font-display);letter-spacing:-.01em}
   .card.soft{box-shadow:var(--shadow-sm)}
   .card.brandtop{border-top:3px solid var(--brand)}/* wrap the pill onto its own line rather than letting a long bike name break */
   .bike-head b{font-family:var(--font-display);font-size:20px;font-weight:600;letter-spacing:-.015em}
@@ -227,7 +227,7 @@
   th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--rule-soft)}
   th{font-family:var(--font-mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-faint);border-bottom:1.5px solid var(--rule)}
 
-  .checkline{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px dashed var(--rule-soft)}
+  .checkline{display:flex;align-items:flex-start;gap:12px;padding:11px 2px;border-bottom:1px dashed var(--rule-soft)}
   .checkline input[type=checkbox]{margin-top:3px;width:16px;height:16px;accent-color:var(--brand);flex:0 0 auto}
   .checkline .lbl{flex:1;font-size:14px}
   .checkline .lbl small{display:block;color:var(--ink-faint);font-size:12px}
@@ -254,7 +254,7 @@
   .placeholder{border:1px solid var(--rule-strong);border-radius:var(--r-sm);background:var(--card-2);color:var(--ink-mute);font-size:13px;padding:9px 12px;margin-top:10px}
   .draftnote{border:1px solid #E8D3A8;border-radius:var(--r-sm);background:var(--warn-wash);color:#7a4d00;font-size:12.5px;padding:8px 11px;margin-bottom:14px}
   .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-  .mt{margin-top:14px}/* ---------- expiry badges ---------- */
+  .mt{margin-top:20px}/* ---------- expiry badges ---------- */
   .exprow input[type=date]{max-width:190px}/* ---------- grounded / disabled form ---------- *//* ---------- form builder (manager mode) ---------- */
   .builder h4{margin:0 0 4px;font-size:14px;font-weight:700;color:var(--brand)}
   .bsection .bhead input{font-weight:700}
@@ -263,7 +263,8 @@
   @media(max-width:640px){.bitem{grid-template-columns:1fr;gap:5px}}
 
   /* ---------- collapsible (bylaws) ---------- */
-  .acc{border:1.5px solid var(--rule);background:var(--card);margin-bottom:10px;box-shadow:var(--shadow-sm)}
+  .acc{border:1.5px solid var(--rule);background:var(--card);margin-bottom:14px;
+    border-radius:var(--r-md);overflow:hidden;box-shadow:var(--shadow-sm)}
   /* `.acchead` is a <button>, and a button does not stretch just because it is
      display:flex — its UA width is shrink-to-fit. Without these resets the
      header rendered as a small floating box instead of a full-width bar. Same
@@ -356,7 +357,7 @@
     .topbar,.sidebar,.banner,.noprint,.sharenote{display:none!important}
     #app{display:block}
     main{padding:0;max-width:none}
-    .card{border:1px solid #999;box-shadow:none;break-inside:avoid;page-break-inside:avoid}
+    .card{padding:22px 24px;border:1px solid #999;box-shadow:none;break-inside:avoid;page-break-inside:avoid}
     .card.brandtop{margin:0 0 18px}
     .qrsvg{width:46mm;height:46mm}
   }
@@ -511,7 +512,7 @@
   .sb-item.sb-ext:hover .ext-mark{color:var(--ink)}
 
   /* ---------- photo galleries ---------- */
-  .photogrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px;margin-top:16px}
+  .photogrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:16px;margin-top:20px}
   .photo{border:1px solid var(--rule);border-radius:var(--r-md);overflow:hidden;background:var(--card);
     box-shadow:var(--shadow-sm);cursor:zoom-in;padding:0;font:inherit;text-align:left;width:100%;display:block}
   .photo:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
@@ -562,7 +563,7 @@
   .notice li{margin:3px 0}
 
   /* ---------- the room picker ---------- */
-  .roomgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(152px,1fr));gap:9px;margin-top:6px}
+  .roomgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(152px,1fr));gap:11px;margin-top:10px}
   .roompick{padding:12px 13px;border-radius:var(--radius);border:1.5px solid var(--rule-strong);background:var(--card);
     cursor:pointer;font:inherit;font-size:14px;font-weight:600;text-align:left;color:var(--ink-soft);
     transition:border-color .16s var(--ease),background .16s var(--ease),color .16s var(--ease)}
@@ -1376,6 +1377,9 @@ var DEFAULTS={
   // Locked to the Operations Officer until there is something worth showing.
   videos:[],
   lectures:[],
+  // From the checkout form. 'Other' opens a text box.
+  radioIds:['P1','P2','Tech 1','Tech 2'],
+
   // Off until there is something worth opening. Flipped in Site Settings.
   learnPublic:false,
 
@@ -1434,9 +1438,9 @@ var DEFAULTS={
      were both marked "form to be written during O-Week" in the Ops to-do, so
      they start inactive with a first-draft list rather than a blank one. */
   bags:[
-    {id:'jumpkit', name:'Jumpkit', active:true, where:'Duty room rack',
+    {id:'specialty', name:'Specialty Bag', active:false, where:'Duty room rack',
      photos:['jumpkit-closed','jumpkit-open','jumpkit-closed-alt'],
-     note:'The response bag. There is more than one — check the one you actually carried.',
+     note:'',
      sections:[
        {name:'Airway & breathing', items:[
          {id:'jk-opa', label:'OPA set', qty:'1 set'},
@@ -1472,6 +1476,13 @@ var DEFAULTS={
          {id:'jk-paper', label:'Patient care paperwork', qty:'—'}]}
      ]},
 
+    {id:'jumpkit', name:'Jumpkit', active:true, where:'Duty room rack', photos:[],
+     note:'Main compartment is from the checkout form. The rest still needs adding.',
+     sections:[
+       {name:'Main compartment', items:[
+         {id:'jk2-clip', label:'Clipboard \u2014 4 refusal, 4 alcohol refusal, 3 PEMS transfer of care, 1 pen', qty:'1'},
+         {id:'jk2-stetho', label:'Stethoscope', qty:'1'}]}
+     ]},
     {id:'event', name:'Event Bag', active:true, where:'Equipment room',
      photos:['eventbag-top','eventbag-lid','eventbag-pouches','eventbag-main'],
      note:'The green backpacks taken to standbys and events.',
@@ -1549,8 +1560,8 @@ var DEFAULTS={
      ]},
 
     {id:'trauma', name:'Trauma Bag', active:false, where:'Equipment room',
-     photos:['jumpkit-closed-alt'],
-     note:'Contents not yet agreed. This list is a starting point for the Equipment Manager, not a standard.',
+     photos:[],
+     note:'No photo yet, contents not confirmed.',
      sections:[
        {name:'Bleeding control', items:[
          {id:'tr-tq', label:'Tourniquets', qty:'2'},
@@ -1637,10 +1648,14 @@ var DEFAULTS={
     {id:'jk-c', name:'Jumpkit C', type:'jumpkit', active:true},
     {id:'jk-d', name:'Jumpkit D', type:'jumpkit', active:true},
     {id:'jk-e', name:'Jumpkit E', type:'jumpkit', active:true},
-    {id:'jk-sup', ready:false, name:'Personal Jumpkit', type:'jumpkit', active:true},
+    {id:'jk-f', name:'Jumpkit F', type:'jumpkit', active:true},
+    {id:'jk-bike', ready:false, name:'Bike Jumpkit', type:'jumpkit', active:true},
+    {id:'jk-personal', ready:false, name:'Personal Jumpkit', type:'jumpkit', active:true},
     {id:'ev-1', name:'Event Bag 1', type:'event', active:true},
     {id:'ev-2', name:'Event Bag 2', type:'event', active:true},
     {id:'ev-3', name:'Event Bag 3', type:'event', active:true},
+    {id:'ev-4', name:'Event Bag 4', type:'event', active:true},
+    {id:'ev-5', name:'Event Bag 5', type:'event', active:true},
     {id:'u-blue', name:'Blue Bag', type:'blue', active:true},
     {id:'u-ccpod', ready:false, name:'Crew Chief Pod', type:'ccpod', active:true}
   ],
@@ -2179,7 +2194,7 @@ var FORMS={
      whole point — a bag going out short is what the managers need to hear about. */
   'checkout':{
     host:'checkoutHost', tab:'Checkouts',
-    who:{callsign:true,name:true,andrew:true},
+    who:{callsign:true,name:true,andrew:true,radio:true},
     pick:{key:'unit', label:'Which one are you taking?', from:'units'},
     extras:[{id:'detail', label:'Anything damaged or not working?'}]
   },
@@ -2292,6 +2307,16 @@ function renderCheck(fid){
        '<input type="text" id="'+fid+'-aid" maxlength="8" autocapitalize="none" autocorrect="off" '+
        'spellcheck="false" inputmode="text" oninput="onFormInput(\''+fid+'\')">'+
        '<div id="'+fid+'-aidmsg" class="fieldmsg"></div></div>';
+  }
+  if(c.who.radio){
+    var rid=(DB.radioIds||[]);
+    h+='<div class="field"><label for="'+fid+'-radio">Radio</label>'+
+       '<select id="'+fid+'-radio" onchange="onFormInput(\''+fid+'\')">'+
+       '<option value="">\u2014 pick one \u2014</option>'+
+       rid.map(function(r){return '<option value="'+esc(r)+'">'+esc(r)+'</option>';}).join('')+
+       '<option value="__other">Other \u2014 type it</option></select>'+
+       '<input type="text" id="'+fid+'-radioother" placeholder="Which radio?" hidden '+
+       'oninput="onFormInput(\''+fid+'\')"></div>';
   }
   h+='</div>';
 
@@ -2501,6 +2526,12 @@ function readCheck(fid){
   if(!host) return out;
   var g=function(s){var e=document.getElementById(fid+'-'+s);return e?e.value.trim():'';};
   out.callsign=g('cs'); out.first=g('fn'); out.last=g('ln'); out.andrew=g('aid');
+  var rsel=document.getElementById(fid+'-radio');
+  var roth=document.getElementById(fid+'-radioother');
+  if(rsel){
+    if(roth) roth.hidden = rsel.value!=='__other';
+    out.radio = rsel.value==='__other' ? (roth?roth.value.trim():'') : rsel.value;
+  }
   var boxes=host.querySelectorAll('[data-item]');
   for(var i=0;i<boxes.length;i++){
     var lbl=boxes[i].getAttribute('data-label');
@@ -2626,10 +2657,11 @@ function saveDraft(fid){
   var boxes=host.querySelectorAll('[data-item]');
   for(var i=0;i<boxes.length;i++) if(boxes[i].checked) ticked.push(boxes[i].getAttribute('data-item'));
   var rows=(c.usage?usageComplete(fid):[]);
-  var any = s.callsign||s.first||s.last||s.andrew||ticked.length||s.pick||rows.length||
+  var any = s.callsign||s.first||s.last||s.andrew||s.radio||ticked.length||s.pick||rows.length||
             Object.keys(s.radios).length||Object.keys(s.extras).some(function(k){return s.extras[k];});
   if(!any){ delete d[fid]; writeDrafts(d); renderDraftNote(fid); return; }
   d[fid]={at:Date.now(),callsign:s.callsign,first:s.first,last:s.last,andrew:s.andrew,
+          radio:s.radio,
           pick:s.pick,ticked:ticked,radios:s.radios,extras:s.extras,
           usage:rows.map(function(r){return {item:r.item,qty:r.qty,from:r.from,other:r.other||''};})};
   writeDrafts(d);
@@ -2641,6 +2673,15 @@ function restoreDraft(fid){
   var d=readDrafts()[fid]; if(!d) return;
   var set=function(s,v){var e=document.getElementById(fid+'-'+s); if(e&&v) e.value=v;};
   set('cs',d.callsign); set('fn',d.first); set('ln',d.last); set('aid',d.andrew);
+  if(d.radio){
+    var rs=document.getElementById(fid+'-radio');
+    if(rs){
+      var known=(DB.radioIds||[]).indexOf(d.radio)>=0;
+      rs.value = known ? d.radio : '__other';
+      var ro=document.getElementById(fid+'-radioother');
+      if(ro && !known){ ro.hidden=false; ro.value=d.radio; }
+    }
+  }
   if(d.pick && !formPick[fid]){ formPick[fid]=d.pick;
     var body=document.getElementById(fid+'-body'); if(body) body.innerHTML=checkBody(fid);
     var host=document.getElementById(fcfg(fid).host);
@@ -2698,6 +2739,7 @@ function submitCheck(fid){
   var c=fcfg(fid), s=readCheck(fid), missing=[];
   if(c.who.callsign && !s.callsign) missing.push('your call sign');
   if(c.who.name && !(s.first&&s.last)) missing.push('your name');
+  if(c.who.radio && !s.radio) missing.push('which radio you have');
   if(c.pick && !s.pick) missing.push(
     c.pick.from==='rooms' ? 'which room you took'
     : c.pick.from==='units' ? 'which bag you are taking'
@@ -2741,6 +2783,7 @@ function doSubmit(fid,s){
     // a retry does not become two rows.
     sid:uid('s')+'-'+Date.now(),
     callsign:s.callsign, name:(s.first+' '+s.last).trim(), andrew:s.andrew,
+    radio:s.radio||'',
     subject:s.pickName, done:s.done.join(' | '), missing:s.missing.join(' | '),
     doneCount:s.done.length, missingCount:s.missing.length,
     expired:(s.expired||[]).join(' | '), expiringSoon:(s.soon||[]).join(' | ')

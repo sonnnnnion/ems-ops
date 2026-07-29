@@ -4,8 +4,8 @@ Every form on the site works without this, but nothing is stored anywhere except
 the phone that filled it in. This is how you fix that. Twenty minutes, once.
 
 You end up with **one spreadsheet** holding **one tab per form** — Room Checks,
-Checkouts, Bag Checks, Post-Call and Reports — plus a **Restock** tab the script
-keeps up to date for you.
+Checkouts, Bag Checks, Post-Call and Reports — plus an **Items** tab with one row per item
+and a **Restock** tab the script keeps up to date for you.
 
 **Nothing is emailed.** Sending mail from Apps Script needs a permission scope
 that makes Google show a warning to whoever deploys it, and the same information
@@ -137,15 +137,15 @@ var SHEETS = {
   },
   'Checkouts': {
     name: 'Checkouts', freeze: 3,
-    keys:    ['date','time','name','andrew','subject','result','missingCount','missing','expired','expiringSoon','detail','sid'],
-    headers: ['Date','Time','Name','Andrew ID','Bag','Result','Missing','What Was Missing','Expired','Expiring Soon','Damaged','Submission ID'],
-    widths:  [95, 70, 150, 100, 160, 150, 80, 380, 220, 220, 260, 120]
+    keys:    ['date','time','name','andrew','radio','subject','result','missingCount','expired','expiringSoon','detail','sid'],
+    headers: ['Date','Time','Name','Andrew ID','Radio','Bag','Result','Missing','Expired','Expiring Soon','Damaged','Submission ID'],
+    widths:  [95, 70, 150, 100, 90, 160, 150, 80, 220, 220, 260, 120]
   },
   'Bag Checks': {
     name: 'Bag Checks', freeze: 3,
-    keys:    ['date','time','name','andrew','subject','result','missingCount','missing','expired','expiringSoon','seal','sid'],
-    headers: ['Date','Time','Name','Andrew ID','Bag','Result','Missing','What Was Missing','Expired','Expiring Soon','Seal','Submission ID'],
-    widths:  [95, 70, 150, 100, 150, 150, 80, 380, 220, 220, 100, 120]
+    keys:    ['date','time','name','andrew','subject','result','missingCount','expired','expiringSoon','seal','sid'],
+    headers: ['Date','Time','Name','Andrew ID','Bag','Result','Missing','Expired','Expiring Soon','Seal','Submission ID'],
+    widths:  [95, 70, 150, 100, 150, 150, 80, 220, 220, 100, 120]
   },
   'Post-Call': {
     name: 'Post-Call', freeze: 3,
@@ -159,6 +159,15 @@ var SHEETS = {
     headers: ['Date','Time','Name','Area','Urgency','What Is Wrong','Where','Submission ID'],
     widths:  [95, 70, 150, 120, 110, 380, 180, 120]
   }
+};
+
+// One row per item per submission. This is what replaces a cell with 24 items
+// pipe-joined into it: filter by Bag, or by Present = FALSE, and you have the
+// worklist for that bag.
+var ITEMS = {
+  name: 'Items',
+  headers: ['Date','Time','Form','Bag','Item','Present','Who','Submission ID'],
+  widths:  [95, 70, 110, 160, 320, 80, 150, 120]
 };
 
 var RESTOCK = {
@@ -261,6 +270,7 @@ function doPost(e) {
     var soon = !bad && (p.condition === 'Missing' || !!p.maint || !!p.restock);
     styleRow(sh, row, conf, bad, soon);
 
+    writeItems(p);
     addToRestock(p);
     return json({ result: 'saved' });
   } catch (err) {
@@ -280,6 +290,47 @@ function doPost(e) {
 // its counter, quantity and last-reported date rather than adding a duplicate,
 // so the length of this list is the length of the actual job. Ticking Got greys
 // the row out; if it is reported again afterwards the row reopens.
+function ensureItems() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(ITEMS.name);
+  if (sh) return sh;
+  sh = ss.insertSheet(ITEMS.name);
+  sh.appendRow(ITEMS.headers);
+  sh.getRange(1, 1, 1, ITEMS.headers.length)
+    .setFontWeight('bold').setBackground(BRAND).setFontColor('#ffffff')
+    .setVerticalAlignment('middle');
+  sh.setFrozenRows(1);
+  sh.setRowHeight(1, 34);
+  ITEMS.widths.forEach(function (w, i) { sh.setColumnWidth(i + 1, w); });
+  sh.getRange(1, 1, sh.getMaxRows(), ITEMS.headers.length).createFilter();
+  return sh;
+}
+
+// Every ticked and unticked item, one row each, so nothing is buried in a cell.
+function writeItems(p) {
+  var present = p.done ? String(p.done).split(' | ') : [];
+  var absent  = p.missing ? String(p.missing).split(' | ') : [];
+  if (!present.length && !absent.length) return;
+  var sh = ensureItems();
+  var rows = [];
+  var push = function (item, ok) {
+    if (!item) return;
+    rows.push([p.date, p.time, p.form, p.subject || '', item, ok, p.name || '', p.sid || '']);
+  };
+  present.forEach(function (i) { push(i, true); });
+  absent.forEach(function (i) { push(i, false); });
+  if (!rows.length) return;
+  var start = sh.getLastRow() + 1;
+  sh.getRange(start, 1, rows.length, ITEMS.headers.length).setValues(rows);
+  // Red only where something is actually missing.
+  for (var i = 0; i < rows.length; i++) {
+    if (rows[i][5] === false) {
+      sh.getRange(start + i, 1, 1, ITEMS.headers.length).setBackground('#fce8e6');
+    }
+  }
+  sh.getRange(start, 6, rows.length, 1).setHorizontalAlignment('center');
+}
+
 function ensureRestock() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sh = ss.getSheetByName(RESTOCK.name);
@@ -536,6 +587,12 @@ function doGet(e) {
 // Run by hand (Run ▸ tidyUp) after pasting an updated script: reformats every
 // tab that already exists and repaints the restock list.
 function tidyUp() {
+  var it = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(ITEMS.name);
+  if (it) {
+    it.getRange(1, 1, 1, ITEMS.headers.length)
+      .setFontWeight('bold').setBackground(BRAND).setFontColor('#ffffff');
+    ITEMS.widths.forEach(function (w, i) { it.setColumnWidth(i + 1, w); });
+  }
   Object.keys(SHEETS).forEach(function (nm) {
     var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(nm);
     if (sh) formatSheet(sh, SHEETS[nm]);
