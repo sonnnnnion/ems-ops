@@ -1356,6 +1356,13 @@ function qrSVG(text,px){
 var DEFAULTS={
   version:1,
 
+  /* Bump this whenever the shipped content below changes in a way everyone must
+     pick up. loadDB() re-seeds the content keys when a browser is holding an
+     older seed, so a corrected bag list actually reaches people instead of
+     sitting behind whatever they cached weeks ago. Their own data — submissions,
+     the To Get list, the spreadsheet link, who has access — is never touched. */
+  seed:2,
+
   // ONE Apps Script Web App in front of ONE spreadsheet. Every form writes to
   // its own tab in that file, so Equipment and Office data sit side by side and
   // can be cross-referenced with a formula. `form` in the payload picks the tab.
@@ -1438,179 +1445,135 @@ var DEFAULTS={
      were both marked "form to be written during O-Week" in the Ops to-do, so
      they start inactive with a first-draft list rather than a blank one. */
   bags:[
-    {id:'specialty', name:'Specialty Bag', active:false, where:'Duty room rack',
-     photos:['jumpkit-closed','jumpkit-open','jumpkit-closed-alt'],
+    /* ---- Jumpkit: transcribed from the Jumpkit Checkout Form, section 2 ----
+       No photo: the red Iron Duck pictures are the Specialty Bag, not this. */
+    {id:'jumpkit', name:'Jumpkit', active:true, where:'Duty room rack', photos:[],
      note:'',
      sections:[
-       {name:'Airway & breathing', items:[
-         {id:'jk-opa', label:'OPA set', qty:'1 set'},
-         {id:'jk-npa', label:'NPA set', qty:'1 set'},
-         {id:'jk-bvm', label:'Bag-valve mask', qty:'1'},
-         {id:'jk-nrb', label:'Non-rebreather masks', qty:'2'},
-         {id:'jk-nc', label:'Nasal cannulae', qty:'2'},
-         {id:'jk-o2', label:'Oxygen cylinder — pressure adequate, regulator fitted', qty:'1', exp:true},
-         {id:'jk-suction', label:'Manual suction', qty:'1'}]},
-       {name:'Bleeding & trauma', items:[
-         {id:'jk-gauze', label:'Sterile gauze pads (4x4)', qty:'10'},
-         {id:'jk-gauze2', label:'Sterile gauze pads (2x2)', qty:'10'},
-         {id:'jk-roller', label:'Roller bandages', qty:'4'},
-         {id:'jk-trauma', label:'Trauma dressings', qty:'2'},
-         {id:'jk-tq', label:'Tourniquet', qty:'1'},
-         {id:'jk-tape', label:'Medical tape', qty:'2'},
-         {id:'jk-sam', label:'SAM splint', qty:'1'},
-         {id:'jk-shears', label:'Trauma shears', qty:'1'}]},
-       {name:'Assessment', items:[
-         {id:'jk-bp', label:'BP cuff', qty:'1'},
-         {id:'jk-stetho', label:'Stethoscope', qty:'1'},
-         {id:'jk-pulseox', label:'Pulse oximeter', qty:'1'},
-         {id:'jk-penlight', label:'Penlight', qty:'1'},
-         {id:'jk-glucometer', label:'Glucometer with strips and lancets', qty:'1'}]},
-       {name:'PPE & sundries', items:[
-         {id:'jk-gloves', label:'Gloves — all sizes present', qty:'—'},
-         {id:'jk-masks', label:'Face masks', qty:'4'},
-         {id:'jk-eye', label:'Eye protection', qty:'2'},
-         {id:'jk-hotcold', label:'Instant hot / cold packs', qty:'2 each'},
-         {id:'jk-emesis', label:'Emesis bags', qty:'2'},
-         {id:'jk-blanket', label:'Emergency blanket', qty:'1'},
-         {id:'jk-sharps', label:'Sharps container — not full', qty:'1'},
-         {id:'jk-paper', label:'Patient care paperwork', qty:'—'}]}
+       {name:'Main compartment', items:[
+         {id:'jk-clip', label:'Clipboard with (4) refusal forms, (4) alcohol refusal forms, (3) PEMS transfer of care forms, (1) pen'},
+         {id:'jk-stetho', label:'(1) stethoscope'},
+         {id:'jk-bvm', label:'(1) adult BVM'},
+         {id:'jk-bluepouch', label:'(1) blue pouch with (6) 1x3 bandaids, (6) VioNex wipes (for equipment), and (6) BZK wipes (for people)'},
+         {id:'jk-blackpouch', label:'(1) black pouch with (3) 2" rolled gauze and (2) 4" rolled gauze'},
+         {id:'jk-redpouch', label:'(1) red pouch with (10) 2x2 gauze, (4) 4x4 gauze, (2) 5x9 combine pads, and (2) petroleum gauze pads', exp:true},
+         {id:'jk-glasses', label:'(1) pair of safety glasses'},
+         {id:'jk-cat', label:'(1) combat application tourniquet'},
+         {id:'jk-hot', label:'(1) hot pack'},
+         {id:'jk-cold', label:'(2) cold packs'},
+         {id:'jk-press', label:'(1) 6" pressure dressing'},
+         {id:'jk-glucose', label:'(1) glucose packet', exp:true},
+         {id:'jk-tongue', label:'(3) tongue depressors'},
+         {id:'jk-shears', label:'(1) pair of trauma shears'},
+         {id:'jk-penlight', label:'(1) pen light'}]},
+       {name:'Zippered lid pocket', items:[
+         {id:'jk-n95', label:'(2) N-95 masks'},
+         {id:'jk-surgical', label:'(3) surgical masks'},
+         {id:'jk-biohazard', label:'(1) biohazard bag'},
+         {id:'jk-trash', label:'(1) trash bag'},
+         {id:'jk-emesis', label:'(1) emesis bag'}]},
+       {name:'Front pocket', items:[
+         {id:'jk-npa', label:'(1) NPA set — should contain at least (9) NPAs'},
+         {id:'jk-surgilube', label:'(2) packets of surgilube'},
+         {id:'jk-opa', label:'(1) OPA kit — should contain at least (6) OPAs'}]},
+       {name:'Left pocket', items:[
+         {id:'jk-tri', label:'(2) triangular bandages'},
+         {id:'jk-tape', label:'(1) roll of medical tape'},
+         {id:'jk-coban', label:'(1) roll of coban'},
+         {id:'jk-tissue', label:'(1) tissue packet'},
+         {id:'jk-eyewash', label:'(1) small bottle of eyewash'},
+         {id:'jk-ace4', label:'(2) 4" ace bandage'},
+         {id:'jk-ace2', label:'(2) 2" ace bandage'},
+         {id:'jk-splinter', label:'(1) splinter kit box'}]},
+       {name:'Right pocket', items:[
+         {id:'jk-bp', label:'(1) adult BP cuff'},
+         {id:'jk-pulseox', label:'(1) pulse ox'},
+         {id:'jk-tested', label:'Stethoscope, BP cuff and pulse ox all tested and working'}]}
      ]},
 
-    {id:'jumpkit', name:'Jumpkit', active:true, where:'Duty room rack', photos:[],
-     note:'Main compartment is from the checkout form. The rest still needs adding.',
+    /* ---- Med Pod: Jumpkit Checkout Form, section 4 ---- */
+    {id:'medpod', name:'Med Pod', active:true, where:'With the crew chief',
+     photos:['medkit-open'], note:'',
      sections:[
        {name:'Main compartment', items:[
-         {id:'jk2-clip', label:'Clipboard \u2014 4 refusal, 4 alcohol refusal, 3 PEMS transfer of care, 1 pen', qty:'1'},
-         {id:'jk2-stetho', label:'Stethoscope', qty:'1'}]}
+         {id:'mp-aspirin', label:'(1) Aspirin', exp:true},
+         {id:'mp-epi-adult', label:'(2) Adult Epi-Pens', exp:true},
+         {id:'mp-epi-jr', label:'(2) Jr. Epi-Pens', exp:true},
+         {id:'mp-naloxone', label:'(2) Naloxone', exp:true},
+         {id:'mp-mad', label:'(2) MADs'},
+         {id:'mp-glucometer', label:'(1) glucometer'},
+         {id:'mp-strips', label:'(1) pack of glucose test strips', exp:true},
+         {id:'mp-lancets', label:'(6) glucose lancets'},
+         {id:'mp-gauze', label:'(6) 2x2 gauze'},
+         {id:'mp-bandaids', label:'(6) 1x3 bandaids'},
+         {id:'mp-bzk', label:'(6) BZK'}]},
+       {name:'Verified', items:[
+         {id:'mp-noexpired', label:'No medications are expired'},
+         {id:'mp-glucwork', label:'Glucometer tested — strip inserted, blood droplet shows on screen'}]}
      ]},
+
+    /* ---- Event Bag: Event Bag Checkout Form, section 2 ---- */
     {id:'event', name:'Event Bag', active:true, where:'Equipment room',
      photos:['eventbag-top','eventbag-lid','eventbag-pouches','eventbag-main'],
-     note:'The green backpacks taken to standbys and events.',
+     note:'',
      sections:[
        {name:'Top compartment', items:[
-         {id:'ev-bp', label:'BP cuff', qty:'1'},
-         {id:'ev-stetho', label:'Stethoscope', qty:'1'},
-         {id:'ev-clipboard', label:'Clipboard and paperwork', qty:'1'},
-         {id:'ev-gloves', label:'Gloves — all sizes present', qty:'—'}]},
-       {name:'Lid pockets', items:[
-         {id:'ev-tape', label:'Tape and self-adhering wrap', qty:'—'},
-         {id:'ev-gauzeroll', label:'Gauze rolls', qty:'4'},
-         {id:'ev-tq', label:'Tourniquets', qty:'2'},
-         {id:'ev-abd', label:'ABD pads', qty:'4'}]},
-       {name:'Front pouches', items:[
-         {id:'ev-bandaid', label:'Adhesive bandage pouch (blue)', qty:'1 pouch'},
-         {id:'ev-preps', label:'Alcohol / prep pouch (black)', qty:'1 pouch'},
-         {id:'ev-paperwork', label:'Paperwork pouch (red)', qty:'1 pouch'}]},
+         {id:'ev-clip', label:'Full clipboard — 4 x (refusals, transfer of care, alcohol checklist) + pen'},
+         {id:'ev-gloves', label:'(3 ea.) gloves — S, M, L, XL'},
+         {id:'ev-ppe', label:'(2) PPE kits'},
+         {id:'ev-pulseox', label:'Pulse ox'},
+         {id:'ev-stetho', label:'Stethoscope'},
+         {id:'ev-mylar', label:'Mylar blanket'},
+         {id:'ev-n95', label:'(3) N-95 masks'},
+         {id:'ev-surgical', label:'(3) surgical masks'},
+         {id:'ev-bp', label:'Blood pressure cuff'}]},
        {name:'Main compartment', items:[
-         {id:'ev-o2', label:'Oxygen cylinder — pressure adequate, regulator fitted', qty:'1', exp:true},
-         {id:'ev-nrb', label:'Non-rebreather masks', qty:'2'},
-         {id:'ev-airway', label:'Airway roll (OPA / NPA)', qty:'1'},
-         {id:'ev-sam', label:'SAM splints', qty:'2'},
-         {id:'ev-hotpack', label:'Instant hot packs', qty:'2'},
-         {id:'ev-coldpack', label:'Instant cold packs', qty:'2'},
-         {id:'ev-suction', label:'Manual suction', qty:'1'}]}
+         {id:'ev-o2', label:'O2 cylinder w/ wrench'},
+         {id:'ev-hot', label:'(4) hot packs'},
+         {id:'ev-cold', label:'(4) cold packs'},
+         {id:'ev-ccollar', label:'(2) adult C-collars'},
+         {id:'ev-bvm', label:'Adult BVM'},
+         {id:'ev-burn', label:'Burn sheet'},
+         {id:'ev-multitrauma', label:'(2) multi-trauma dressings'},
+         {id:'ev-sam', label:'(4) SAM splints'},
+         {id:'ev-spacer', label:'Inhaler spacer'},
+         {id:'ev-suction', label:'Manual suction setup'},
+         {id:'ev-airway', label:'Full set — OPAs and NPAs'},
+         {id:'ev-eyewash', label:'Small eye wash'},
+         {id:'ev-o2masks', label:'(3 ea.) adult nasal cannula + adult non-rebreather'}]},
+       {name:'Left side compartment', items:[
+         {id:'ev-tape', label:'Roll medical tape'},
+         {id:'ev-coban', label:'Roll coban'},
+         {id:'ev-tq', label:'(2) tourniquets'},
+         {id:'ev-ace', label:'(2 ea.) 2", 4" ace bandages'},
+         {id:'ev-tri', label:'(5) triangular bandages'}]},
+       {name:'Right side compartment', items:[
+         {id:'ev-petro', label:'(2) 4x4 petroleum gauze', exp:true},
+         {id:'ev-gauze', label:'Plenty of 2x2 and 4x4 gauze'},
+         {id:'ev-combine', label:'(5) combine pads'},
+         {id:'ev-redpouch', label:'Red pouch — PAWS'},
+         {id:'ev-bluepouch', label:'Blue pouch — 1x3 bandages'},
+         {id:'ev-blackpouch', label:'Black pouch — BZK'}]}
      ]},
 
-    {id:'blue', name:'Blue Bag', active:true, where:'Equipment room',
+    /* ---- Specialty Bag: the red Iron Duck in the photos. Contents not
+           documented anywhere yet. ---- */
+    {id:'specialty', name:'Specialty Bag', active:false, where:'Duty room rack',
+     photos:['jumpkit-closed','jumpkit-open','jumpkit-closed-alt'],
+     note:'Contents not documented yet.', sections:[]},
+
+    {id:'blue', name:'Blue Bag', active:false, where:'Equipment room',
      photos:['bluebag-aed','bluebag-open'],
-     note:'Carries the AED, suction and the blue-bag medication kit.',
-     sections:[
-       {name:'Devices', items:[
-         {id:'bl-aed', label:'AED — status light green, pads sealed and in date', qty:'1', exp:true},
-         {id:'bl-pads', label:'Spare AED pads', qty:'1 set'},
-         {id:'bl-suction', label:'LCSU suction unit — charged', qty:'1'},
-         {id:'bl-catheter', label:'Suction catheters', qty:'2'}]},
-       {name:'Airway', items:[
-         {id:'bl-opa', label:'OPA set', qty:'1 set'},
-         {id:'bl-npa', label:'NPA set', qty:'1 set'},
-         {id:'bl-bvm', label:'Bag-valve mask', qty:'1'},
-         {id:'bl-lube', label:'Lubricating jelly', qty:'2'}]},
-       {name:'Medication kit', items:[
-         {id:'bl-epi3', label:'Epinephrine auto-injector 0.3 mg', qty:'1', exp:true},
-         {id:'bl-epi15', label:'Epinephrine auto-injector 0.15 mg', qty:'1', exp:true},
-         {id:'bl-aspirin', label:'Aspirin, 36-tablet bottle', qty:'1', exp:true},
-         {id:'bl-naloxone', label:'Naloxone syringes 2 mg / 2 mL', qty:'2', exp:true},
-         {id:'bl-mad', label:'Intranasal atomiser (MAD)', qty:'2'},
-         {id:'bl-strips', label:'Blood glucose test strips', qty:'100', exp:true},
-         {id:'bl-lancets', label:'Blood glucose lancets', qty:'100'},
-         {id:'bl-meter', label:'Blood glucose meter', qty:'1'}]}
-     ]},
-
-    {id:'ccpod', name:'Crew Chief Pod', active:true, where:'With the crew chief',
-     photos:['medkit-open'],
-     note:'The medication pod the crew chief carries.',
-     sections:[
-       {name:'Medication', items:[
-         {id:'cc-epi3', label:'Epinephrine auto-injector 0.3 mg', qty:'2', exp:true},
-         {id:'cc-epi15', label:'Epinephrine auto-injector 0.15 mg', qty:'1', exp:true},
-         {id:'cc-aspirin', label:'Aspirin, 36-tablet bottle', qty:'1', exp:true},
-         {id:'cc-naloxone', label:'Naloxone syringes 2 mg / 2 mL', qty:'2', exp:true},
-         {id:'cc-mad', label:'Intranasal atomiser (MAD)', qty:'2'}]},
-       {name:'Dressings & testing', items:[
-         {id:'cc-quikclot', label:'QuikClot EMS 4x4 dressing', qty:'1', exp:true},
-         {id:'cc-petrolatum', label:'Petrolatum dressings', qty:'5'},
-         {id:'cc-strips', label:'Blood glucose test strips', qty:'100', exp:true},
-         {id:'cc-lancets', label:'Blood glucose lancets', qty:'100'},
-         {id:'cc-gauze', label:'2x2 sterile gauze', qty:'4'},
-         {id:'cc-alcohol', label:'Alcohol wipes', qty:'10'},
-         {id:'cc-bandaid', label:'Adhesive bandages', qty:'10'}]},
-       {name:'Paperwork', items:[
-         {id:'cc-naloxdoc', label:'Naloxone administration documentation', qty:'2'},
-         {id:'cc-narcanform', label:'Narcan kit restock request form', qty:'2'}]}
-     ]},
+     note:'Contents not documented yet.', sections:[]},
 
     {id:'trauma', name:'Trauma Bag', active:false, where:'Equipment room',
-     photos:[],
-     note:'No photo yet, contents not confirmed.',
-     sections:[
-       {name:'Bleeding control', items:[
-         {id:'tr-tq', label:'Tourniquets', qty:'2'},
-         {id:'tr-israeli', label:'Pressure dressings', qty:'4'},
-         {id:'tr-quikclot', label:'Haemostatic gauze', qty:'2'},
-         {id:'tr-chest', label:'Chest seals', qty:'2'},
-         {id:'tr-abd', label:'ABD pads', qty:'6'},
-         {id:'tr-roller', label:'Roller bandages', qty:'6'}]},
-       {name:'Splinting & packaging', items:[
-         {id:'tr-sam', label:'SAM splints', qty:'2'},
-         {id:'tr-cervical', label:'Cervical collar', qty:'1'},
-         {id:'tr-triangular', label:'Triangular bandages', qty:'4'},
-         {id:'tr-blanket', label:'Emergency blanket', qty:'2'},
-         {id:'tr-shears', label:'Trauma shears', qty:'1'}]}
-     ]},
+     photos:[], note:'Contents not documented yet.', sections:[]},
 
     {id:'squad', name:'Squad Car Kit', active:false, where:'Police vehicles',
-     photos:[],
-     note:'Contents not yet agreed. Checked in the vehicle; the seal is the point of the check.',
-     sections:[
-       {name:'Seal & access', items:[
-         {id:'sq-present', label:'Kit present in the vehicle', qty:'1'},
-         {id:'sq-seal', label:'Seal intact — record the number below', qty:'1'},
-         {id:'sq-access', label:'Kit reachable without moving other equipment', qty:'—'}]},
-       {name:'Contents', items:[
-         {id:'sq-aed', label:'AED — status light green, pads in date', qty:'1', exp:true},
-         {id:'sq-gloves', label:'Gloves', qty:'—'},
-         {id:'sq-tq', label:'Tourniquet', qty:'1'},
-         {id:'sq-dressing', label:'Trauma dressings', qty:'2'},
-         {id:'sq-cpr', label:'CPR barrier mask', qty:'1'},
-         {id:'sq-blanket', label:'Emergency blanket', qty:'1'}]}
-     ]},
+     photos:[], note:'Contents not documented yet.', sections:[]},
 
     {id:'mci', name:'MCI Kit', active:false, where:'Equipment room',
-     photos:['mci-kit'],
-     note:'Regional MCI kit. Checked on a longer cycle than the response bags.',
-     sections:[
-       {name:'Triage', items:[
-         {id:'mci-tags', label:'Triage tag pack', qty:'1'},
-         {id:'mci-tape', label:'Triage ribbon — all four colours', qty:'1 set'},
-         {id:'mci-vests', label:'Role vests (Triage / Operations)', qty:'2'},
-         {id:'mci-glow', label:'Glow sticks — all colours', qty:'1 set'}]},
-       {name:'Scene', items:[
-         {id:'mci-barrier', label:'Barrier tape', qty:'2'},
-         {id:'mci-duct', label:'Duct tape', qty:'1'},
-         {id:'mci-marker', label:'Markers and pencils', qty:'—'},
-         {id:'mci-paint', label:'Marking paint', qty:'1'},
-         {id:'mci-notes', label:'Note pads', qty:'1'}]}
-     ]}
+     photos:['mci-kit'], note:'Contents not documented yet.', sections:[]}
   ],
 
   /* ---------- post-call --------------------------------------------------
@@ -1649,15 +1612,16 @@ var DEFAULTS={
     {id:'jk-d', name:'Jumpkit D', type:'jumpkit', active:true},
     {id:'jk-e', name:'Jumpkit E', type:'jumpkit', active:true},
     {id:'jk-f', name:'Jumpkit F', type:'jumpkit', active:true},
-    {id:'jk-bike', ready:false, name:'Bike Jumpkit', type:'jumpkit', active:true},
     {id:'jk-personal', ready:false, name:'Personal Jumpkit', type:'jumpkit', active:true},
+    // Checked on the Bike Ops site, but the form lists them here too.
+    {id:'bk-3', ready:false, name:'Bike Bag 3', type:'jumpkit', active:true},
+    {id:'bk-4', ready:false, name:'Bike Bag 4', type:'jumpkit', active:true},
     {id:'ev-1', name:'Event Bag 1', type:'event', active:true},
     {id:'ev-2', name:'Event Bag 2', type:'event', active:true},
     {id:'ev-3', name:'Event Bag 3', type:'event', active:true},
     {id:'ev-4', name:'Event Bag 4', type:'event', active:true},
     {id:'ev-5', name:'Event Bag 5', type:'event', active:true},
-    {id:'u-blue', name:'Blue Bag', type:'blue', active:true},
-    {id:'u-ccpod', ready:false, name:'Crew Chief Pod', type:'ccpod', active:true}
+    {id:'u-medpod', ready:false, name:'Med Pod', type:'medpod', active:true}
   ],
 
   /* ---------- consumables -----------------------------------------------
@@ -1847,10 +1811,20 @@ var LS_DB='emsops_db_v1', LS_DRAFT='emsops_draft_v1', LS_ROLE='emsops_role_v1',
     LS_EMAIL='emsops_email_v1';
 var DB={};
 
+// Content that ships with the site, as opposed to data this deployment created.
+// Only these are replaced when the seed is bumped.
+var SEEDED=['rooms','bags','bagUnits','consumables','postCall','officeSupplies',
+            'inventory','roles','otherSpaces','radioIds'];
+
 function loadDB(){
   var raw=null;
   try{ raw=JSON.parse(localStorage.getItem(LS_DB)||'null'); }catch(e){ raw=null; }
+  var stale = !raw || (Number(raw.seed)||0) < DEFAULTS.seed;
   Object.keys(DEFAULTS).forEach(function(k){
+    if(stale && SEEDED.indexOf(k)>=0){
+      DB[k]=JSON.parse(JSON.stringify(DEFAULTS[k]));
+      return;
+    }
     var v = raw && Object.prototype.hasOwnProperty.call(raw,k) ? raw[k] : null;
     // A stored value of the wrong shape is worse than no stored value: it blanks
     // whole views with no error. Fall back per key rather than per object.
@@ -1858,6 +1832,8 @@ function loadDB(){
     DB[k] = (v!=null && Object.prototype.toString.call(v)===want) ? v
           : JSON.parse(JSON.stringify(DEFAULTS[k]));
   });
+  DB.seed=DEFAULTS.seed;
+  if(stale) saveDB();
 }
 function saveDB(){
   markContentDirty();
@@ -2049,7 +2025,7 @@ function openRolePicker(){
    deliberately NOT synced: publishing replaces, and two managers would clobber
    each other. The spreadsheet is the record for those.
    ========================================================================== */
-var NO_SYNC={api:1, issues:1, usage:1, toGet:1, expiry:1, version:1};
+var NO_SYNC={api:1, issues:1, usage:1, toGet:1, expiry:1, version:1, seed:1};
 var contentState={loaded:false, dirty:false, at:0};
 
 function contentPayload(){
