@@ -624,6 +624,21 @@
     .bigqr h3{font-size:28px}
   }
 
+  /* ---------- expiry ---------- */
+  .exprow{display:flex;align-items:center;gap:10px;padding:6px 0 10px 30px;flex-wrap:wrap}
+  .exprow label{margin:0;font-size:10.5px}
+  .exprow input[type=date]{width:auto;min-width:150px;padding:7px 10px;font-size:14px}
+  .expbadge{font-family:var(--font-mono);font-size:11px;padding:3px 8px;border-radius:999px;
+    background:var(--bg-2);color:var(--ink-faint)}
+  .expbadge.good{background:var(--ok-wash);color:var(--ok)}
+  .expbadge.soon{background:var(--warn-wash);color:var(--warn)}
+  .expbadge.bad{background:var(--oos-wash);color:var(--oos);font-weight:700}
+
+  /* typed usage item: the text box takes the row under the select */
+  .urow.typed{grid-template-columns:1fr 110px 1fr 36px}
+  .urow .uother{grid-column:1/-1}
+  @media(max-width:640px){ .urow.typed .uother{grid-column:1/-1} }
+
   /* ---------- reports ---------- */
   .repgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:16px 0}
   .repstat{border:1px solid var(--rule);border-radius:var(--r-md);background:var(--card);padding:15px 17px;
@@ -783,13 +798,14 @@
       <div id="roomCheckHost"></div>
     </section>
 
-    <!-- ===== CHECK OUT A BAG (member) =======================================
-         The light one. A member taking a bag out answers two questions: which
-         one, and was anything already missing. Twenty seconds. The item-by-item
-         audit is a different form, and it belongs to the Equipment Manager. -->
+    <!-- ===== CHECK OUT A BAG ================================================
+         Anyone taking a bag out checks its contents first. Anything unticked is
+         reported missing, flags that bag on the readiness board and lands on the
+         restock list — a bag going out short is the thing managers need to hear
+         about. -->
     <section class="view" data-view="checkout">
       <h2 class="view-title">Check out a <em>bag</em></h2>
-      <p class="view-sub">Two questions.</p>
+      <p class="view-sub">Check it before you take it.</p>
       <div id="checkoutHost"></div>
     </section>
 
@@ -1441,7 +1457,7 @@ var DEFAULTS={
          {id:'jk-bvm', label:'Bag-valve mask', qty:'1'},
          {id:'jk-nrb', label:'Non-rebreather masks', qty:'2'},
          {id:'jk-nc', label:'Nasal cannulae', qty:'2'},
-         {id:'jk-o2', label:'Oxygen cylinder — pressure adequate, regulator fitted', qty:'1'},
+         {id:'jk-o2', label:'Oxygen cylinder — pressure adequate, regulator fitted', qty:'1', exp:true},
          {id:'jk-suction', label:'Manual suction', qty:'1'}]},
        {name:'Bleeding & trauma', items:[
          {id:'jk-gauze', label:'Sterile gauze pads (4x4)', qty:'10'},
@@ -1488,7 +1504,7 @@ var DEFAULTS={
          {id:'ev-preps', label:'Alcohol / prep pouch (black)', qty:'1 pouch'},
          {id:'ev-paperwork', label:'Paperwork pouch (red)', qty:'1 pouch'}]},
        {name:'Main compartment', items:[
-         {id:'ev-o2', label:'Oxygen cylinder — pressure adequate, regulator fitted', qty:'1'},
+         {id:'ev-o2', label:'Oxygen cylinder — pressure adequate, regulator fitted', qty:'1', exp:true},
          {id:'ev-nrb', label:'Non-rebreather masks', qty:'2'},
          {id:'ev-airway', label:'Airway roll (OPA / NPA)', qty:'1'},
          {id:'ev-sam', label:'SAM splints', qty:'2'},
@@ -1502,7 +1518,7 @@ var DEFAULTS={
      note:'Carries the AED, suction and the blue-bag medication kit.',
      sections:[
        {name:'Devices', items:[
-         {id:'bl-aed', label:'AED — status light green, pads sealed and in date', qty:'1'},
+         {id:'bl-aed', label:'AED — status light green, pads sealed and in date', qty:'1', exp:true},
          {id:'bl-pads', label:'Spare AED pads', qty:'1 set'},
          {id:'bl-suction', label:'LCSU suction unit — charged', qty:'1'},
          {id:'bl-catheter', label:'Suction catheters', qty:'2'}]},
@@ -1512,12 +1528,12 @@ var DEFAULTS={
          {id:'bl-bvm', label:'Bag-valve mask', qty:'1'},
          {id:'bl-lube', label:'Lubricating jelly', qty:'2'}]},
        {name:'Medication kit', items:[
-         {id:'bl-epi3', label:'Epinephrine auto-injector 0.3 mg', qty:'1'},
-         {id:'bl-epi15', label:'Epinephrine auto-injector 0.15 mg', qty:'1'},
-         {id:'bl-aspirin', label:'Aspirin, 36-tablet bottle', qty:'1'},
-         {id:'bl-naloxone', label:'Naloxone syringes 2 mg / 2 mL', qty:'2'},
+         {id:'bl-epi3', label:'Epinephrine auto-injector 0.3 mg', qty:'1', exp:true},
+         {id:'bl-epi15', label:'Epinephrine auto-injector 0.15 mg', qty:'1', exp:true},
+         {id:'bl-aspirin', label:'Aspirin, 36-tablet bottle', qty:'1', exp:true},
+         {id:'bl-naloxone', label:'Naloxone syringes 2 mg / 2 mL', qty:'2', exp:true},
          {id:'bl-mad', label:'Intranasal atomiser (MAD)', qty:'2'},
-         {id:'bl-strips', label:'Blood glucose test strips', qty:'100'},
+         {id:'bl-strips', label:'Blood glucose test strips', qty:'100', exp:true},
          {id:'bl-lancets', label:'Blood glucose lancets', qty:'100'},
          {id:'bl-meter', label:'Blood glucose meter', qty:'1'}]}
      ]},
@@ -1527,15 +1543,15 @@ var DEFAULTS={
      note:'The medication pod the crew chief carries.',
      sections:[
        {name:'Medication', items:[
-         {id:'cc-epi3', label:'Epinephrine auto-injector 0.3 mg', qty:'2'},
-         {id:'cc-epi15', label:'Epinephrine auto-injector 0.15 mg', qty:'1'},
-         {id:'cc-aspirin', label:'Aspirin, 36-tablet bottle', qty:'1'},
-         {id:'cc-naloxone', label:'Naloxone syringes 2 mg / 2 mL', qty:'2'},
+         {id:'cc-epi3', label:'Epinephrine auto-injector 0.3 mg', qty:'2', exp:true},
+         {id:'cc-epi15', label:'Epinephrine auto-injector 0.15 mg', qty:'1', exp:true},
+         {id:'cc-aspirin', label:'Aspirin, 36-tablet bottle', qty:'1', exp:true},
+         {id:'cc-naloxone', label:'Naloxone syringes 2 mg / 2 mL', qty:'2', exp:true},
          {id:'cc-mad', label:'Intranasal atomiser (MAD)', qty:'2'}]},
        {name:'Dressings & testing', items:[
-         {id:'cc-quikclot', label:'QuikClot EMS 4x4 dressing', qty:'1'},
+         {id:'cc-quikclot', label:'QuikClot EMS 4x4 dressing', qty:'1', exp:true},
          {id:'cc-petrolatum', label:'Petrolatum dressings', qty:'5'},
-         {id:'cc-strips', label:'Blood glucose test strips', qty:'100'},
+         {id:'cc-strips', label:'Blood glucose test strips', qty:'100', exp:true},
          {id:'cc-lancets', label:'Blood glucose lancets', qty:'100'},
          {id:'cc-gauze', label:'2x2 sterile gauze', qty:'4'},
          {id:'cc-alcohol', label:'Alcohol wipes', qty:'10'},
@@ -1573,7 +1589,7 @@ var DEFAULTS={
          {id:'sq-seal', label:'Seal intact — record the number below', qty:'1'},
          {id:'sq-access', label:'Kit reachable without moving other equipment', qty:'—'}]},
        {name:'Contents', items:[
-         {id:'sq-aed', label:'AED — status light green, pads in date', qty:'1'},
+         {id:'sq-aed', label:'AED — status light green, pads in date', qty:'1', exp:true},
          {id:'sq-gloves', label:'Gloves', qty:'—'},
          {id:'sq-tq', label:'Tourniquet', qty:'1'},
          {id:'sq-dressing', label:'Trauma dressings', qty:'2'},
@@ -1610,8 +1626,6 @@ var DEFAULTS={
       {id:'pc-sharps', label:'Sharps in a sharps container'},
       {id:'pc-biohazard', label:'Biohazard waste bagged and in the right bin'},
       {id:'pc-back', label:'Kit back where it belongs'}]},
-    {name:'Recorded', items:[
-      {id:'pc-logged', label:'Call submitted on PONS'}]}
   ],
 
   /* ---------- physical units in service ---------------------------------
@@ -1636,15 +1650,17 @@ var DEFAULTS={
     {id:'jk-c', name:'Jumpkit C', type:'jumpkit', active:true},
     {id:'jk-d', name:'Jumpkit D', type:'jumpkit', active:true},
     {id:'jk-e', name:'Jumpkit E', type:'jumpkit', active:true},
-    {id:'jk-sup', name:'Supervisor Jumpkit', type:'jumpkit', active:true},
+    {id:'jk-sup', name:'Personal Jumpkit', type:'jumpkit', active:true},
     {id:'ev-1', name:'Event Bag 1', type:'event', active:true},
     {id:'ev-2', name:'Event Bag 2', type:'event', active:true},
     {id:'ev-3', name:'Event Bag 3', type:'event', active:true},
     {id:'u-blue', name:'Blue Bag', type:'blue', active:true},
     {id:'u-ccpod', name:'Crew Chief Pod', type:'ccpod', active:true},
     {id:'u-o2', name:'Oxygen Bag', type:'other', active:true},
-    {id:'u-trailer', name:'Trailer / Trailer Cart', type:'other', active:true},
-    {id:'u-room', name:'Equipment Room shelf', type:'other', active:true}
+    // Only the Equipment Manager checks these two — they are stock, not a bag
+    // somebody takes on a shift.
+    {id:'u-trailer', name:'Trailer / Trailer Cart', type:'other', active:true, need:'equipment'},
+    {id:'u-room', name:'Equipment Room shelf', type:'other', active:true, need:'equipment'}
   ],
 
   /* ---------- consumables -----------------------------------------------
@@ -1815,6 +1831,8 @@ var DEFAULTS={
      ]}
   ],
 
+  // itemId -> yyyy-mm-dd, so an expiry is typed once rather than every check.
+  expiry:{},
   issues:[],
   // The shopping list. One entry per ITEM, not per report — asking again bumps
   // the count instead of adding a duplicate line.
@@ -1845,6 +1863,7 @@ function loadDB(){
   });
 }
 function saveDB(){
+  markContentDirty();
   try{ localStorage.setItem(LS_DB,JSON.stringify(DB)); }
   catch(e){ /* private mode / quota — the site still works, edits just don't persist */ }
 }
@@ -2010,6 +2029,91 @@ function openRolePicker(){
 }
 
 /* ============================================================================
+   SHARED CONTENT
+   Until now everything a manager edited lived in localStorage — visible to
+   exactly one browser. A member opened the site and saw the shipped defaults,
+   and the manager was the one person who would never notice.
+
+   Content is stored in the spreadsheet's script (PropertiesService) and read by
+   everyone on load. Writes carry the Google ID token from sign-in; the script
+   verifies that token WITH GOOGLE and checks the address before accepting
+   anything. That check is server-side, which is what makes it a boundary rather
+   than a hidden button.
+
+   Reads are public and unauthenticated. That is correct — it is the text of a
+   public website. Operational data (issues, usage, the To Get list, drafts) is
+   deliberately NOT synced: publishing replaces, and two managers would clobber
+   each other. The spreadsheet is the record for those.
+   ========================================================================== */
+var NO_SYNC={api:1, issues:1, usage:1, toGet:1, expiry:1, version:1};
+var contentState={loaded:false, dirty:false, at:0};
+
+function contentPayload(){
+  var out={};
+  Object.keys(DEFAULTS).forEach(function(k){ if(!NO_SYNC[k]) out[k]=DB[k]; });
+  return out;
+}
+
+function applyContent(obj){
+  if(!obj||typeof obj!=='object') return false;
+  var n=0;
+  Object.keys(DEFAULTS).forEach(function(k){
+    if(NO_SYNC[k] || !Object.prototype.hasOwnProperty.call(obj,k)) return;
+    // Same per-key type check as loadDB: a wrong shape from the server must not
+    // blank a view.
+    if(Object.prototype.toString.call(obj[k])===Object.prototype.toString.call(DEFAULTS[k])){
+      DB[k]=obj[k]; n++;
+    }
+  });
+  if(n) saveDB();
+  return n>0;
+}
+
+function markContentDirty(){
+  contentState.dirty=true;
+  var b=document.getElementById('pubState');
+  if(b) b.textContent='Unpublished changes on this device.';
+}
+
+function pullContent(){
+  var url=(DB.api&&DB.api.url)||'';
+  if(!url) return Promise.resolve(false);
+  return fetch(url+(url.indexOf('?')<0?'?':'&')+'content=1')
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if(!j||!j.content) return false;
+      var ok=applyContent(j.content);
+      contentState.loaded=true; contentState.at=j.at||0;
+      if(ok){ contentState.dirty=false; renderAll(); }
+      return ok;
+    })
+    .catch(function(){ return false; });
+}
+
+function publishContent(){
+  var msg=document.getElementById('pubState');
+  var url=(DB.api&&DB.api.url)||'';
+  if(!url){ if(msg) msg.textContent='Connect a spreadsheet first.'; return; }
+  if(!googleIdToken){
+    uiAlert('Sign in with Google first — publishing is verified against your account.',
+            'Sign in needed');
+    return;
+  }
+  if(msg) msg.textContent='Publishing…';
+  fetch(url,{method:'POST', mode:'no-cors',
+    headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body:JSON.stringify({form:'__content', idToken:googleIdToken,
+                         content:contentPayload()})});
+  // no-cors again: the reply is unreadable, so confirm by pulling it back.
+  setTimeout(function(){
+    pullContent().then(function(){
+      if(msg) msg.textContent='Published. Everyone sees this on their next load.';
+      contentState.dirty=false;
+    });
+  },1200);
+}
+
+/* ============================================================================
    NAVIGATION
    ========================================================================== */
 var HOME='home';
@@ -2078,29 +2182,25 @@ var FORMS={
        hint:'Pipes, furniture, damage, anything that needs someone with tools.'}
     ]
   },
-  // The member-facing one. Which unit, and was anything already missing —
-  // the "was anything missing" field is what the Ops to-do asked for.
+  /* A checkout IS the contents check. Picking the bag pulls up what should be
+     inside it; anything left unticked is filed as missing, raises a flag against
+     that bag on the readiness board, and lands on the restock list. That is the
+     whole point — a bag going out short is what the managers need to hear about. */
   'checkout':{
     host:'checkoutHost', tab:'Checkouts',
-    lead:'Filed when you take a bag out. Two questions, then you are done.',
-    who:{callsign:true,name:true,andrew:false},
+    lead:'Tick what is actually in the bag. Anything you leave unticked is reported as missing.',
+    who:{callsign:true,name:true,andrew:true},
     pick:{key:'unit', label:'Which one are you taking?', from:'units'},
-    freeform:{
-      condition:{label:'Was anything missing or wrong when you picked it up?', options:[
-        {v:'Complete', t:'No — it looked complete and sealed'},
-        {v:'Missing', t:'Yes — something is missing or used up'},
-        {v:'Broken', t:'Yes — something is damaged or not working'}]}
-    },
-    extras:[{id:'detail', label:'If something was wrong, what?',
-             hint:'Leave blank if it was fine. Anything written here goes straight to the Equipment Manager.'}]
+    extras:[{id:'detail', label:'Anything damaged or not working?',
+             hint:'Leave blank if it is all fine.'}]
   },
-  // The manager one. Same engine, but the item-by-item list.
+  // The deeper audit: same engine, picks a kit TYPE and adds the seal field.
   'bag-check':{
     host:'bagCheckHost', tab:'Bag Checks',
-    lead:'Check every item. Anything you leave unticked is filed as missing.',
+    lead:'Full audit by kit type.',
     who:{callsign:true,name:true,andrew:true},
-    pick:{key:'bag', label:'Which bag or kit?', from:'bags'},
-    extras:[{id:'seal', label:'Seal number, if this kit is sealed', hint:'Squad car kits only. Leave blank otherwise.'}]
+    pick:{key:'bag', label:'Which kit?', from:'bags'},
+    extras:[{id:'seal', label:'Seal number, if this kit is sealed', hint:'Squad car kits only.'}]
   },
   'post-call':{
     host:'postCallHost', tab:'Post-Call',
@@ -2146,7 +2246,10 @@ function pickList(from){
     return {id:r.id,name:r.name,sub:r.slots+' slots'}; });
   // 'units' is the physical objects on the rack; 'bags' is the kit types and
   // their contents lists. A checkout picks a unit, a contents check picks a type.
-  if(from==='units') return (DB.bagUnits||[]).filter(function(u){return u.active;})
+  // A unit can carry its own `need`: the trailer and the equipment room shelf are
+  // stock the Equipment Manager checks, not a bag anyone takes on a shift.
+  if(from==='units') return (DB.bagUnits||[])
+    .filter(function(u){ return u.active && (!u.need || can(u.need)); })
     .map(function(u){ return {id:u.id,name:u.name,sub:''}; });
   return DB.bags.filter(function(b){return b.active;}).map(function(b){
     return {id:b.id,name:b.name,sub:b.where}; });
@@ -2155,7 +2258,14 @@ function pickSections(fid,id){
   var c=fcfg(fid);
   if(c.fixed) return DB[c.fixed];
   if(!c.pick) return [];
-  if(c.pick.from==='units') return [];        // a checkout has no checklist
+  if(c.pick.from==='units'){
+    // A unit is a physical bag; what should be inside it is described by its
+    // TYPE, so the checkout shows that type's contents list.
+    var u=(DB.bagUnits||[]).filter(function(x){return x.id===id;})[0];
+    if(!u) return [];
+    var t=DB.bags.filter(function(b){return b.id===u.type;})[0];
+    return t?t.sections:[];
+  }
   if(c.pick.from==='rooms'){
     var r=DB.rooms.filter(function(x){return x.id===id;})[0];
     if(!r) return [];
@@ -2258,7 +2368,7 @@ function renderCheck(fid){
        '</div>';
   });
 
-  h+='<div id="'+fid+'-verdict"></div>'+
+  h+='<div id="'+fid+'-expiry"></div><div id="'+fid+'-verdict"></div>'+
      '<div class="row mt"><button class="btn solid" onclick="submitCheck(\''+fid+'\')">Submit</button>'+
      '<button class="btn ghost" onclick="discardCheck(\''+fid+'\')">Clear</button>'+
      '<span id="'+fid+'-savemsg" style="font-size:12.5px;color:var(--ink-faint)"></span></div>';
@@ -2290,13 +2400,18 @@ function renderUsage(fid){
   host.innerHTML=rows.map(function(r,i){
     var itemOpts='<option value="">— pick an item —</option>'+items.map(function(c){
       return '<option value="'+esc(c.id)+'"'+(r.item===c.id?' selected':'')+'>'+esc(c.name)+'</option>';
-    }).join('');
+    }).join('')+'<option value="__other"'+(r.item==='__other'?' selected':'')+
+      '>Something else — type it</option>';
     var unitOpts='<option value="">— from where? —</option>'+units.map(function(u){
       return '<option value="'+esc(u.id)+'"'+(r.from===u.id?' selected':'')+'>'+esc(u.name)+'</option>';
     }).join('');
     var unitName=(items.filter(function(c){return c.id===r.item;})[0]||{}).unit||'';
-    return '<div class="urow">'+
+    var typed = r.item==='__other';
+    return '<div class="urow'+(typed?' typed':'')+'">'+
       '<select aria-label="Item" onchange="setUsage(\''+fid+'\','+i+',\'item\',this.value)">'+itemOpts+'</select>'+
+      (typed?'<input type="text" class="uother" placeholder="What was it?" value="'+
+        esc(r.other||'')+'" aria-label="Item name" '+
+        'oninput="setUsage(\''+fid+'\','+i+',\'other\',this.value)">':'')+
       '<div class="uqty"><input type="number" min="1" max="'+USAGE_MAX+'" step="1" '+
         'inputmode="numeric" value="'+esc(String(r.qty||1))+'" '+
         'aria-label="How many" onchange="setUsage(\''+fid+'\','+i+',\'qty\',this.value)">'+
@@ -2316,7 +2431,9 @@ function setUsage(fid,i,k,v){
   var rows=usageState(fid);
   if(!rows[i]) return;
   rows[i][k] = (k==='qty') ? Math.min(USAGE_MAX,Math.max(1,parseInt(v,10)||1)) : v;
-  if(k==='item') renderUsage(fid);       // the unit label depends on the item
+  // Re-render on item change (the unit label depends on it) but NOT while
+  // someone is typing a custom name, or the field loses focus each keystroke.
+  if(k==='item') renderUsage(fid);
   onFormInput(fid);
 }
 function addUsageRow(fid){ usageState(fid).push({item:'',qty:1,from:''}); renderUsage(fid); onFormInput(fid); }
@@ -2328,7 +2445,11 @@ function delUsageRow(fid,i){
 }
 // Only complete rows count — a half-filled row is someone mid-thought, not data.
 function usageComplete(fid){
-  return (usageRows[fid]||[]).filter(function(r){ return r.item && r.from; });
+  return (usageRows[fid]||[]).filter(function(r){
+    if(!r.from) return false;
+    if(r.item==='__other') return !!(r.other||'').trim();
+    return !!r.item;
+  });
 }
 
 function checkBody(fid){
@@ -2361,6 +2482,15 @@ function checkBody(fid){
          'data-label="'+esc(it.label)+'" onchange="onFormInput(\''+fid+'\')">'+
          '<span class="lbl">'+esc(it.label)+'</span>'+
          (it.qty?'<span class="qty">'+esc(it.qty)+'</span>':'')+'</label>';
+      if(it.exp){
+        // Entered once and remembered, so a check is not 12 date pickers every
+        // time — only the ones that changed since last time.
+        var known=(DB.expiry||{})[it.id]||'';
+        h+='<div class="exprow"><label for="x-'+esc(it.id)+'">Expires</label>'+
+           '<input type="date" id="x-'+esc(it.id)+'" data-exp="'+esc(it.id)+'" value="'+esc(known)+'" '+
+           'onchange="setExpiry(\''+jsq(it.id)+'\',this.value);onFormInput(\''+fid+'\')">'+
+           '<span class="expbadge" data-expbadge="'+esc(it.id)+'"></span></div>';
+      }
     });
     h+='</div>';
   });
@@ -2401,9 +2531,16 @@ function readCheck(fid){
   });
   var picked=(c.pick?pickList(c.pick.from).filter(function(o){return o.id===out.pick;})[0]:null);
   out.pickName=picked?picked.name:'';
+  var exs=paintExpiry(fid); out.expired=(exs&&exs.expired)||[]; out.soon=(exs&&exs.soon)||[];
   if(c.usage) out.usage=usageComplete(fid).map(function(r){
-    var it=(DB.consumables||[]).filter(function(x){return x.id===r.item;})[0]||{};
     var un=(DB.bagUnits||[]).filter(function(x){return x.id===r.from;})[0]||{};
+    if(r.item==='__other'){
+      var txt=(r.other||'').trim();
+      // Keyed by the text itself, so two people typing the same thing still sum.
+      return {item:'free:'+txt.toLowerCase(), itemName:txt, qty:r.qty||1,
+              unit:'', from:r.from, fromName:un.name||r.from};
+    }
+    var it=(DB.consumables||[]).filter(function(x){return x.id===r.item;})[0]||{};
     return {item:r.item, itemName:it.name||r.item, qty:r.qty||1,
             unit:it.unit||'', from:r.from, fromName:un.name||r.from};
   });
@@ -2413,6 +2550,14 @@ function readCheck(fid){
 function calcCheck(fid){
   var c=fcfg(fid), s=readCheck(fid), box=document.getElementById(fid+'-verdict');
   if(!box) return;
+  var ex=paintExpiry(fid);
+  if(ex && (ex.expired.length||ex.soon.length)){
+    var eb=document.getElementById(fid+'-expiry');
+    if(eb) eb.innerHTML='<div class="notice '+(ex.expired.length?'stop':'warn')+'">'+
+      (ex.expired.length?'<b>'+ex.expired.length+' expired</b><p>'+esc(ex.expired.join(', '))+
+        '</p>':'')+
+      (ex.soon.length?'<p><b>Expiring soon:</b> '+esc(ex.soon.join(', '))+'</p>':'')+'</div>';
+  } else { var eb2=document.getElementById(fid+'-expiry'); if(eb2) eb2.innerHTML=''; }
   if(c.usage){
     var rows=s.usage||[];
     var n=rows.reduce(function(a,r){return a+r.qty;},0);
@@ -2458,7 +2603,33 @@ function renderAndrewMsg(fid){
   el.style.borderColor=st.msg?'var(--oos)':'';
 }
 
-function onFormInput(fid){ renderAndrewMsg(fid); calcCheck(fid); saveDraft(fid); }
+function setExpiry(id,v){ DB.expiry=DB.expiry||{}; if(v) DB.expiry[id]=v; else delete DB.expiry[id]; saveDB(); }
+function daysUntil(iso){
+  if(!iso) return null;
+  var p=String(iso).split('-'); if(p.length!==3) return null;
+  var d=new Date(+p[0],+p[1]-1,+p[2]); if(isNaN(d)) return null;
+  var t=new Date(); t.setHours(0,0,0,0);
+  return Math.round((d-t)/86400000);
+}
+function paintExpiry(fid){
+  var host=document.getElementById(fcfg(fid).host); if(!host) return;
+  var out={expired:[],soon:[]};
+  host.querySelectorAll('[data-exp]').forEach(function(el){
+    var id=el.getAttribute('data-exp');
+    var badge=host.querySelector('[data-expbadge="'+id+'"]');
+    var n=daysUntil(el.value);
+    var lbl=(host.querySelector('[data-item="'+id+'"]')||{}).getAttribute
+      ? host.querySelector('[data-item="'+id+'"]').getAttribute('data-label') : id;
+    if(!badge) return;
+    if(n===null){ badge.textContent=''; badge.className='expbadge'; return; }
+    if(n<0){ badge.textContent='Expired'; badge.className='expbadge bad'; out.expired.push(lbl); }
+    else if(n<=60){ badge.textContent=n+'d'; badge.className='expbadge soon'; out.soon.push(lbl); }
+    else { badge.textContent='OK'; badge.className='expbadge good'; }
+  });
+  return out;
+}
+
+function onFormInput(fid){ renderAndrewMsg(fid); paintExpiry(fid); calcCheck(fid); saveDraft(fid); }
 
 /* ---- drafts ----
    Kept out of DB on purpose: a half-finished form is one person's device state,
@@ -2477,7 +2648,7 @@ function saveDraft(fid){
   if(!any){ delete d[fid]; writeDrafts(d); renderDraftNote(fid); return; }
   d[fid]={at:Date.now(),callsign:s.callsign,first:s.first,last:s.last,andrew:s.andrew,
           pick:s.pick,ticked:ticked,radios:s.radios,extras:s.extras,
-          usage:rows.map(function(r){return {item:r.item,qty:r.qty,from:r.from};})};
+          usage:rows.map(function(r){return {item:r.item,qty:r.qty,from:r.from,other:r.other||''};})};
   writeDrafts(d);
   var m=document.getElementById(fid+'-savemsg'); if(m) m.textContent='Saved on this device';
   renderDraftNote(fid);
@@ -2509,9 +2680,10 @@ function restoreDraft(fid){
     var items={}, units={};
     (DB.consumables||[]).forEach(function(c){ items[c.id]=1; });
     (DB.bagUnits||[]).forEach(function(u){ units[u.id]=1; });
-    var kept=d.usage.filter(function(r){ return items[r.item] && units[r.from]; });
+    var kept=d.usage.filter(function(r){
+      return units[r.from] && (items[r.item] || r.item==='__other'); });
     if(kept.length){ usageRows[fid]=kept.map(function(r){
-      return {item:r.item,qty:r.qty||1,from:r.from}; }); renderUsage(fid); }
+      return {item:r.item,qty:r.qty||1,from:r.from,other:r.other||''}; }); renderUsage(fid); }
   }
   renderDraftNote(fid);
 }
@@ -2587,7 +2759,8 @@ function doSubmit(fid,s){
     sid:uid('s')+'-'+Date.now(),
     callsign:s.callsign, name:(s.first+' '+s.last).trim(), andrew:s.andrew,
     subject:s.pickName, done:s.done.join(' | '), missing:s.missing.join(' | '),
-    doneCount:s.done.length, missingCount:s.missing.length
+    doneCount:s.done.length, missingCount:s.missing.length,
+    expired:(s.expired||[]).join(' | '), expiringSoon:(s.soon||[]).join(' | ')
   };
   Object.keys(s.radios).forEach(function(k){ payload[k]=s.radios[k]; });
   Object.keys(s.extras).forEach(function(k){ payload[k]=s.extras[k]; });
@@ -2612,7 +2785,7 @@ function doSubmit(fid,s){
     if(DB.usage.length>2000) DB.usage.length=2000;
     // Anything used is something to replace, so it goes straight on the list.
     s.usage.forEach(function(r){
-      wantItem({item:r.item, qty:r.qty, unit:r.unit, cat:'Equipment',
+      wantItem({item:r.item, name:r.itemName, qty:r.qty, unit:r.unit, cat:'Equipment',
         where:r.fromName, by:(s.first+' '+s.last).trim()||s.callsign||''});
     });
     saveDB();
@@ -2638,7 +2811,14 @@ function doSubmit(fid,s){
   if(c.tab==='Reports'){
     addIssue({area:s.radios.area||'Other', urgency:s.radios.urgency||'Whenever',
       what:s.extras.what||'', where:s.extras.where||'', by:openedBy});
-  }else if(c.tab==='Checkouts'){
+  }
+  // Expired stock is a blocking problem wherever it is found.
+  (s.expired||[]).forEach(function(m){
+    addIssue({area:'Equipment', urgency:'Blocking', what:m+' is expired',
+      where:s.pickName, unit:(c.pick&&c.pick.from==='units')?s.pick:'', by:openedBy});
+    wantItem({name:m, cat:'Equipment', where:s.pickName, by:openedBy});
+  });
+  if(false){
     // A checkout only raises a problem when the member says there is one.
     if(s.radios.condition && s.radios.condition!=='Complete'){
       addIssue({area:'Equipment',
@@ -2668,7 +2848,7 @@ function doSubmit(fid,s){
         addIssue({area:area, urgency:'Soon', what:m, where:s.pickName, by:openedBy});
         // Something missing from a bag is something to buy, so it joins the list
         // rather than only sitting in the problem log.
-        if(c.tab==='Bag Checks')
+        if(c.tab==='Bag Checks'||c.tab==='Checkouts')
           wantItem({name:m, cat:'Equipment', where:s.pickName, by:openedBy});
       });
     }
@@ -2835,9 +3015,10 @@ function renderBags(){
     if(b.photos&&b.photos.length){
       h+='<div class="photogrid">';
       b.photos.forEach(function(p){
-        h+='<button type="button" class="photo" onclick="openLightbox(\'assets/bags/'+jsq(p)+
-           '.jpg\',\''+jsq(b.name)+'\')">'+
-           '<img src="assets/bags/'+esc(p)+'.jpg" alt="'+esc(b.name)+'" loading="lazy">'+
+        var src=/^https?:\/\//.test(p)?p:('assets/bags/'+p+'.jpg');
+        h+='<button type="button" class="photo" onclick="openLightbox(\''+jsq(src)+
+           '\',\''+jsq(b.name)+'\')">'+
+           '<img src="'+esc(src)+'" alt="'+esc(b.name)+'" loading="lazy">'+
            '<div class="pcap">'+esc(b.name)+'<small>'+esc(p.replace(/-/g,' '))+'</small></div></button>';
       });
       h+='</div>';
@@ -2855,12 +3036,81 @@ function renderBags(){
     });
     h+='</div></div>';
     h+='<div class="row mt" data-need="equipment">'+
-       '<button class="btn xs" onclick="toggleBagActive(\''+esc(b.id)+'\')">'+
-       (b.active?'Take this check out of use':'Put this check into use')+'</button></div>';
+       '<button class="btn xs" onclick="editBagContents(\''+jsq(b.id)+'\')">Edit contents</button>'+
+       '<button class="btn xs" onclick="editBagPhotos(\''+jsq(b.id)+'\')">Edit photos</button>'+
+       '<button class="btn xs" onclick="editBagNote(\''+jsq(b.id)+'\')">Rename</button>'+
+       '<button class="btn xs" onclick="toggleBagActive(\''+jsq(b.id)+'\')">'+
+       (b.active?'Take out of use':'Put into use')+'</button></div>';
     h+='</div>';
   });
   host.innerHTML=h;
   applyGates(host);
+}
+
+/* Contents are edited as text: one section per "== Heading", one item per line,
+   an optional "x 2" quantity, and a trailing "*" to ask for an expiry date. A
+   form builder with add/remove buttons per row is a lot of UI for something
+   someone will paste from a list they already have. */
+function bagToText(b){
+  return (b.sections||[]).map(function(sec){
+    return '== '+sec.name+'\n'+(sec.items||[]).map(function(it){
+      return it.label+(it.qty&&it.qty!=='—'?' x '+it.qty:'')+(it.exp?' *':'');
+    }).join('\n');
+  }).join('\n\n');
+}
+function textToBag(txt,bagId){
+  var secs=[], cur=null, n=0;
+  String(txt).split('\n').forEach(function(line){
+    line=line.trim();
+    if(!line) return;
+    if(line.indexOf('==')===0){
+      cur={name:line.replace(/^==\s*/,'')||'Items', items:[]}; secs.push(cur); return;
+    }
+    if(!cur){ cur={name:'Items', items:[]}; secs.push(cur); }
+    var exp=/\*\s*$/.test(line);
+    line=line.replace(/\*\s*$/,'').trim();
+    var qty='', m=line.match(/^(.*?)\s+x\s+(.+)$/i);
+    if(m){ line=m[1].trim(); qty=m[2].trim(); }
+    var it={id:bagId+'-'+(n++), label:line};
+    if(qty) it.qty=qty;
+    if(exp) it.exp=true;
+    cur.items.push(it);
+  });
+  return secs;
+}
+function editBagContents(id){
+  var b=DB.bags.filter(function(x){return x.id===id;})[0]; if(!b) return;
+  uiPrompt('One item per line. "== Heading" starts a section, "x 2" sets a quantity, '+
+           'a "*" at the end asks for an expiry date.',
+           bagToText(b), 'Contents — '+b.name, {rows:16, okText:'Save'})
+    .then(function(v){
+      if(v==null) return;
+      b.sections=textToBag(v,b.id);
+      saveDB(); renderBags(); Object.keys(FORMS).forEach(renderCheck);
+    });
+}
+function editBagPhotos(id){
+  var b=DB.bags.filter(function(x){return x.id===id;})[0]; if(!b) return;
+  uiPrompt('One photo per line. Use a file name from assets/bags/ (without .jpg) '+
+           'or a full https:// link.',
+           (b.photos||[]).join('\n'), 'Photos — '+b.name, {rows:8, okText:'Save'})
+    .then(function(v){
+      if(v==null) return;
+      b.photos=String(v).split('\n').map(function(x){return x.trim();}).filter(Boolean);
+      saveDB(); renderBags();
+    });
+}
+function editBagNote(id){
+  var b=DB.bags.filter(function(x){return x.id===id;})[0]; if(!b) return;
+  uiForm('Rename — '+b.name,'',
+    [{key:'name',label:'Name',type:'text',value:b.name,required:true},
+     {key:'where',label:'Lives in',type:'text',value:b.where||''},
+     {key:'note',label:'Note',type:'text',value:b.note||''}],{okText:'Save'})
+   .then(function(v){
+     if(!v||!v.name) return;
+     b.name=v.name.trim(); b.where=(v.where||'').trim(); b.note=(v.note||'').trim();
+     saveDB(); renderAll();
+   });
 }
 
 function toggleBagActive(id){
@@ -2976,6 +3226,7 @@ function wantItem(o){
 }
 
 function toGetName(t){
+  if(t.item && t.item.indexOf('free:')===0) return t.name||t.item.slice(5);
   if(t.item){
     var c=(DB.consumables||[]).filter(function(x){return x.id===t.item;})[0];
     if(c) return c.name;
@@ -3134,8 +3385,6 @@ function renderPeople(){
   }
   h+='<div class="row mt"><button class="btn ghost sm" onclick="addPerson()">Add someone</button></div></div>';
 
-  h+='<div class="notice"><b>This is not a login.</b>'+
-     '<p>Anyone can type any address. It decides which buttons show, nothing more.</p></div>';
   host.innerHTML=h;
 }
 function saveOfficer(){
@@ -3672,15 +3921,22 @@ function renderSettings(){
     '<button class="btn ghost" onclick="pushNames()">Send item names</button>'+
     '<span id="apiMsg" style="font-size:13px"></span></div></div>';
 
+  h+='<div class="card mt" data-need="mgr"><h3>Publish to everyone</h3>'+
+    '<p style="font-size:13.5px;color:var(--ink-mute);margin:0 0 10px">'+
+    'Sends the content on this device — rooms, bags, contents, photos, inventory, '+
+    'people — to everyone else. Replaces the shared copy, so press Get latest first '+
+    'if someone else may have edited.</p>'+
+    '<div class="row"><button class="btn solid" onclick="publishContent()">Publish</button>'+
+    '<button class="btn ghost" onclick="pullContent()">Get latest</button>'+
+    '<span id="pubState" style="font-size:13px;color:var(--ink-faint)">'+
+    (contentState.dirty?'Unpublished changes on this device.':'')+'</span></div></div>';
+
   h+='<div class="card mt"><h3>This device</h3>'+
     '<p style="font-size:13.5px;color:var(--ink-mute);margin:0 0 10px">'+
     'Edits are saved in this browser only.</p>'+
     '<div class="row"><button class="btn ghost" onclick="exportDB()">Export a copy</button>'+
     '<button class="btn danger" onclick="confirmReset()">Reset to defaults</button></div></div>';
 
-  h+='<div class="notice"><b>Not a login.</b>'+
-    '<p>Signing in hides buttons. It protects nothing — keep names, medication counts '+
-    'and door codes off this site.</p></div>';
   host.innerHTML=h;
 }
 
@@ -3820,6 +4076,9 @@ function init(){
 
   renderAll();
   go(location.hash.slice(1)||HOME,true);
+  // Shared content arrives after first paint: the page is usable immediately
+  // and updates in place rather than blocking on the network.
+  pullContent();
 }
 
 if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init);
