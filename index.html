@@ -584,6 +584,30 @@
     .urow .btn{grid-area:x}
   }
 
+  /* ---------- what's ready ---------- */
+  .readygrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;margin-top:14px}
+  .readycard{border:1px solid var(--rule);border-left:5px solid var(--ok);border-radius:var(--r-md);
+    background:var(--card);padding:14px 16px;box-shadow:var(--shadow-sm)}
+  .readycard.warn{border-left-color:var(--warn)}
+  .readycard.oos{border-left-color:var(--oos)}
+  .readycard .rc-top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+  .readycard .rc-top b{font-size:15.5px}
+  .readycard .rc-iss{margin:9px 0 0;padding-left:18px;font-size:12.5px;color:var(--ink-mute)}
+  .readycard .rc-iss li{margin:2px 0}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:6px}
+  .legend .item{font-size:12px;color:var(--ink-mute)}
+
+  /* ---------- one big printable code ---------- */
+  .bigqr{text-align:center;border:1px solid var(--rule);border-radius:var(--r-md);
+    background:var(--card);padding:26px;margin-top:16px}
+  .bigqr h3{margin:0 0 4px;font-size:22px}
+  .bigqr .bq-sub{font-size:13px;color:var(--ink-mute);margin-bottom:16px}
+  .bigqr .qrsvg{max-width:100%;height:auto}
+  @media print{
+    .bigqr{border:0;padding:0;page-break-after:always}
+    .bigqr h3{font-size:28px}
+  }
+
   /* ---------- reports ---------- */
   .repgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:16px 0}
   .repstat{border:1px solid var(--rule);border-radius:var(--r-md);background:var(--card);padding:15px 17px;
@@ -663,13 +687,15 @@
     <div class="sb-label">On duty</div>
     <button type="button" class="sb-item active" data-view="home"><span class="ic">◈</span>Start here</button>
     <button type="button" class="sb-item" data-view="checkout"><span class="ic">▸</span>Check Out a Bag</button>
+    <button type="button" class="sb-item" data-view="readiness"><span class="ic">◉</span>What's Ready</button>
     <button type="button" class="sb-item" data-view="room-check"><span class="ic">✔</span>Room Check</button>
-    <button type="button" class="sb-item" data-view="post-call"><span class="ic">↻</span>Post-Call Restock</button>
+    <button type="button" class="sb-item" data-view="post-call"><span class="ic">↻</span>After a Call</button>
     <button type="button" class="sb-item" data-view="post-shift"><span class="ic">⇥</span>End of Shift</button>
     <button type="button" class="sb-item" data-view="report"><span class="ic">⚑</span>Report a Problem</button>
 
     <div class="sb-label">Reference</div>
     <button type="button" class="sb-item" data-view="bags"><span class="ic">▩</span>What's in each bag</button>
+    <button type="button" class="sb-item" onclick="openExternal('https://sonnnnnion.github.io/bike-ops/','Bike Ops')"><span class="ic">⚙</span>Bike Ops ↗</button>
 
     <div class="sb-label" data-need="mgr">Manage</div>
     <button type="button" class="sb-item" data-need="mgr" data-view="reports"><span class="ic">▤</span>Reports</button>
@@ -679,8 +705,10 @@
     <button type="button" class="sb-item" data-need="office" data-view="rooms"><span class="ic">▦</span>Rooms &amp; Standards</button>
     <button type="button" class="sb-item" data-need="office" data-view="restock"><span class="ic">▤</span>Office Restock List</button>
     <button type="button" class="sb-item" data-need="mgr" data-view="log"><span class="ic">⚑</span>Reported Problems</button>
-    <button type="button" class="sb-item" data-need="mgr" data-view="roles"><span class="ic">§</span>The Ops Roles</button>
+    <button type="button" class="sb-item" data-need="mgr" data-view="roles"><span class="ic">§</span>Role Checklists</button>
     <button type="button" class="sb-item" data-need="mgr" data-view="qr"><span class="ic">▤</span>QR Codes</button>
+    <button type="button" class="sb-item" data-need="ops" data-view="learn"><span class="ic">▶</span>Videos &amp; Lectures</button>
+    <button type="button" class="sb-item" data-need="ops" data-view="people"><span class="ic">◈</span>People</button>
     <button type="button" class="sb-item" data-need="mgr" data-view="settings"><span class="ic">⚙</span>Site Settings</button>
   </nav>
 
@@ -692,37 +720,50 @@
          truth per role. -->
     <section class="view active" data-view="home">
       <h2 class="view-title">CMU EMS <em>Operations</em></h2>
-      <p class="view-sub">Checks, forms and reference for the Operations team.</p>
+      <p class="view-sub">Checks and forms.</p>
 
       <div class="card brandtop mt">
-        <h3>What do you need to do?</h3>
         <div class="quick">
           <button type="button" onclick="go('checkout')"><span class="ic">▸</span>Take a bag out</button>
-          <button type="button" onclick="go('room-check')"><span class="ic">✔</span>Complete a room check</button>
-          <button type="button" onclick="go('post-call')"><span class="ic">↻</span>Restock after a call</button>
-          <button type="button" onclick="go('post-shift')"><span class="ic">⇥</span>Close out my shift</button>
-          <button type="button" onclick="go('report')"><span class="ic">⚑</span>Report something broken</button>
-          <button type="button" onclick="go('bags')"><span class="ic">▩</span>See what's in a bag</button>
-          <button type="button" data-need="mgr" onclick="go('reports')"><span class="ic">▤</span>Pull an ops report</button>
+          <button type="button" onclick="go('readiness')"><span class="ic">◉</span>What's ready</button>
+          <button type="button" onclick="go('room-check')"><span class="ic">✔</span>Room check</button>
+          <button type="button" onclick="go('post-call')"><span class="ic">↻</span>After a call</button>
+          <button type="button" onclick="go('post-shift')"><span class="ic">⇥</span>End of shift</button>
+          <button type="button" onclick="go('report')"><span class="ic">⚑</span>Report a problem</button>
+          <button type="button" onclick="go('bags')"><span class="ic">▩</span>What's in each bag</button>
+          <button type="button" data-need="mgr" onclick="go('reports')"><span class="ic">▤</span>Reports</button>
           <button type="button" data-need="equipment" onclick="go('bag-check')"><span class="ic">✚</span>Full contents check</button>
         </div>
       </div>
 
-      <h3 class="mt-lg" style="font-family:var(--font-display);font-size:19px;margin-bottom:0">The Operations team</h3>
       <div class="rolegrid" id="roleCards"></div>
+    </section>
 
-      <div class="notice">
-        <b>One duty period, one task.</b>
-        <p>Every technician and probationary member completes one operational task per
-        duty period. Pick any open slot on the printed tracker, do that room's
-        checklist, then file it through the Room Check form here.</p>
-      </div>
+    <!-- ===== WHAT'S READY ==================================================== -->
+    <section class="view" data-view="readiness">
+      <h2 class="view-title">What's <em>ready</em></h2>
+      <p class="view-sub">Take a green one.</p>
+      <div id="readinessHost"></div>
+    </section>
+
+    <!-- ===== VIDEOS & LECTURES (Operations Officer) ========================== -->
+    <section class="view" data-view="learn">
+      <h2 class="view-title">Videos &amp; <em>lectures</em></h2>
+      <p class="view-sub">Locked until there is something here worth opening.</p>
+      <div id="learnHost"></div>
+    </section>
+
+    <!-- ===== PEOPLE (Operations Officer) ===================================== -->
+    <section class="view" data-view="people">
+      <h2 class="view-title"><em>People</em></h2>
+      <p class="view-sub">Who signs in, and as what.</p>
+      <div id="peopleHost"></div>
     </section>
 
     <!-- ===== ROOM CHECK ====================================================== -->
     <section class="view" data-view="room-check">
       <h2 class="view-title">Room <em>check</em></h2>
-      <p class="view-sub">Pick the room you took, work the list, submit. Takes a few minutes.</p>
+      <p class="view-sub">Pick your room, work the list, submit.</p>
       <div id="roomCheckHost"></div>
     </section>
 
@@ -732,84 +773,84 @@
          audit is a different form, and it belongs to the Equipment Manager. -->
     <section class="view" data-view="checkout">
       <h2 class="view-title">Check out a <em>bag</em></h2>
-      <p class="view-sub">Taking a jumpkit or event bag out. Quick — two questions.</p>
+      <p class="view-sub">Two questions.</p>
       <div id="checkoutHost"></div>
     </section>
 
     <!-- ===== FULL CONTENTS CHECK (Equipment Manager) ======================== -->
     <section class="view" data-view="bag-check">
       <h2 class="view-title">Full contents <em>check</em></h2>
-      <p class="view-sub">The item-by-item audit. Slower than a checkout, and not something to ask of every member.</p>
+      <p class="view-sub">Item by item.</p>
       <div id="bagCheckHost"></div>
     </section>
 
     <!-- ===== POST-CALL ======================================================= -->
     <section class="view" data-view="post-call">
-      <h2 class="view-title">Post-call <em>restock</em></h2>
-      <p class="view-sub">After a call, before the kit goes back on the rack.</p>
+      <h2 class="view-title">After a <em>call</em></h2>
+      <p class="view-sub">Before the kit goes back. Log what you used — the Equipment Manager restocks it.</p>
       <div id="postCallHost"></div>
     </section>
 
     <!-- ===== POST-SHIFT ====================================================== -->
     <section class="view" data-view="post-shift">
       <h2 class="view-title">End of <em>shift</em></h2>
-      <p class="view-sub">The handful of things that have to be back where they belong.</p>
+      <p class="view-sub">Put it all back.</p>
       <div id="postShiftHost"></div>
     </section>
 
     <!-- ===== REPORT A PROBLEM ================================================ -->
     <section class="view" data-view="report">
       <h2 class="view-title">Report a <em>problem</em></h2>
-      <p class="view-sub">Broken, missing, expired, low, or just not right. Anyone can file this.</p>
+      <p class="view-sub">Broken, missing, expired or low.</p>
       <div id="reportHost"></div>
     </section>
 
     <!-- ===== ROOMS & STANDARDS =============================================== -->
     <section class="view" data-view="rooms">
       <h2 class="view-title">Rooms &amp; <em>standards</em></h2>
-      <p class="view-sub">What each room should look like, and what its check covers.</p>
+      <p class="view-sub">Reference photos and per-room lists.</p>
       <div id="roomsHost"></div>
     </section>
 
     <!-- ===== BAG CONTENTS ==================================================== -->
     <section class="view" data-view="bags">
       <h2 class="view-title">What's in each <em>bag</em></h2>
-      <p class="view-sub">Reference photos, so a bag gets packed back the way it came.</p>
+      <p class="view-sub">Reference photos.</p>
       <div id="bagsHost"></div>
     </section>
 
     <!-- ===== ROLES =========================================================== -->
     <section class="view" data-view="roles">
-      <h2 class="view-title">The Ops <em>roles</em></h2>
-      <p class="view-sub">What each manager is responsible for.</p>
+      <h2 class="view-title">Role <em>checklists</em></h2>
+      <p class="view-sub">Working checklists per role.</p>
       <div id="rolesHost"></div>
     </section>
 
     <!-- ===== QR CODES ======================================================== -->
     <section class="view" data-view="qr">
       <h2 class="view-title">QR <em>codes</em></h2>
-      <p class="view-sub">Print these and put them where the task happens.</p>
+      <p class="view-sub">Print and post where the task happens.</p>
       <div id="qrHost"></div>
     </section>
 
     <!-- ===== DUTY-PERIOD TRACKER (Office Manager) ============================ -->
     <section class="view" data-view="tracker">
       <h2 class="view-title">Duty-period <em>tracker</em></h2>
-      <p class="view-sub">The sheet that goes on the board at the start of each duty period.</p>
+      <p class="view-sub">Print one per duty period.</p>
       <div id="trackerHost"></div>
     </section>
 
     <!-- ===== OFFICE RESTOCK (Office Manager) ================================= -->
     <section class="view" data-view="restock">
       <h2 class="view-title">Office <em>restock</em></h2>
-      <p class="view-sub">Non-medical supplies to reorder before they run out.</p>
+      <p class="view-sub">Non-medical supplies.</p>
       <div id="restockHost"></div>
     </section>
 
     <!-- ===== EQUIPMENT INVENTORY (Equipment Manager) ========================= -->
     <section class="view" data-view="inventory">
       <h2 class="view-title">Equipment <em>inventory</em></h2>
-      <p class="view-sub">Par levels and where each item lives. Live counts come from the spreadsheet.</p>
+      <p class="view-sub">Par levels and homes. Counts live in the spreadsheet.</p>
       <div id="inventoryHost"></div>
     </section>
 
@@ -819,21 +860,21 @@
          it is not running on Fridays — that trigger lives in the Apps Script. -->
     <section class="view" data-view="reports">
       <h2 class="view-title">Ops <em>reports</em></h2>
-      <p class="view-sub">Equipment to buy and concerns raised, by week, month or year to date.</p>
+      <p class="view-sub">What to buy, and what people flagged.</p>
       <div id="reportsHost"></div>
     </section>
 
     <!-- ===== REPORTED PROBLEMS ============================================== -->
     <section class="view" data-view="log">
       <h2 class="view-title">Reported <em>problems</em></h2>
-      <p class="view-sub">Everything filed from a check or a problem report.</p>
+      <p class="view-sub">Filed from checks and problem reports.</p>
       <div id="logHost"></div>
     </section>
 
     <!-- ===== SETTINGS ======================================================== -->
     <section class="view" data-view="settings">
       <h2 class="view-title">Site <em>settings</em></h2>
-      <p class="view-sub">Where submissions go, and who can edit this site.</p>
+      <p class="view-sub">Spreadsheet link and site content.</p>
       <div id="settingsHost"></div>
     </section>
 
@@ -1301,9 +1342,22 @@ var DEFAULTS={
   // can be cross-referenced with a formula. `form` in the payload picks the tab.
   api:{url:''},
 
-  // Google accounts allowed to publish content edits. Verified server-side by
-  // the Apps Script; the list here only decides what the UI offers.
-  managers:{equipment:[],office:[],ops:[]},
+  /* ---------- who gets in -----------------------------------------------
+     `officer` is the shared operations account. Everything else is assigned by
+     the Operations Officer under People, so a manager signs in with their own
+     address and lands in their own role rather than picking one from a menu.
+
+     This is a convenience gate, not authentication — nothing stops someone
+     typing an address that is not theirs. It decides which buttons are on
+     screen; it does not protect data. The Apps Script is what does that. */
+  access:{
+    officer:'bikecmuems@gmail.com',
+    people:[]                      // [{email, role:'equipment'|'office'|'ops'}]
+  },
+
+  // Locked to the Operations Officer until there is something worth showing.
+  videos:[],
+  lectures:[],
 
   /* ---------- rooms ------------------------------------------------------
      `slots` is how many members may claim the room in one duty period: three
@@ -1529,25 +1583,22 @@ var DEFAULTS={
   ],
 
   /* ---------- post-call / post-shift ------------------------------------
-     Both transcribed near-verbatim from the Operations to-do, which is the only
-     place either list has been written down. */
+     Restocking is the Equipment Manager's job, not the member's. So nothing
+     here asks a member to replace stock — reporting what was used IS the
+     handover, and the usage rows are what the Equipment Manager restocks from. */
   postCall:[
     {name:'Before the kit goes back', items:[
-      {id:'pc-wipe', label:'Anything used has been wiped down'},
-      {id:'pc-dirty', label:'Anything needing deeper cleaning is in the to-sanitise spot, not back in the bag'},
-      {id:'pc-refill', label:'Everything used has been replaced from stock'},
-      {id:'pc-gloves', label:'Fresh gloves in the bag'},
-      {id:'pc-paperwork', label:'Refill paperwork replaced'},
-      {id:'pc-sharps', label:'Sharps disposed of properly'},
-      {id:'pc-biohazard', label:'Any biohazard waste bagged and in the right bin'}]},
+      {id:'pc-wipe', label:'Wiped down anything used'},
+      {id:'pc-dirty', label:'Anything needing a deeper clean is in the to-sanitise spot, not back in the bag'},
+      {id:'pc-sharps', label:'Sharps in a sharps container'},
+      {id:'pc-biohazard', label:'Biohazard waste bagged and in the right bin'},
+      {id:'pc-back', label:'Kit back where it belongs'}]},
     {name:'Recorded', items:[
-      {id:'pc-logged', label:'Call logged'},
-      {id:'pc-shortage', label:'Anything I could not replace is written below'}]}
+      {id:'pc-logged', label:'Call submitted on PONS'}]}
   ],
   postShift:[
     {name:'Back where it belongs', items:[
       {id:'ps-jumpkit', label:'Jumpkit back in the radio room'},
-      {id:'ps-restock', label:'Jumpkit fully restocked'},
       {id:'ps-radio', label:'Radio back in the radio room'},
       {id:'ps-battery', label:'Radio battery back on the charger'},
       {id:'ps-shoes', label:'Shoes tucked back in their cubby'},
@@ -1696,8 +1747,7 @@ var DEFAULTS={
      Condensed from the three role descriptions. Deliberately no names: the site
      is public and a role outlives the person holding it. */
   roles:[
-    {id:'equipment', title:'Equipment Manager', time:'~1 hour / week',
-     summary:'Keeps equipment stocked, stored in the right place, working, and in date.',
+    {id:'equipment', title:'Equipment Manager',
      duties:[
        {h:'Equipment organisation', items:[
          'Keep the equipment room organised, labelled, and restock bins weekly',
@@ -1725,8 +1775,7 @@ var DEFAULTS={
          'Clearer labels for equipment closets and the station cabinet',
          'Better forms for jumpkit checkout, event bag checkout and car bag checks']}
      ]},
-    {id:'office', title:'Office Manager', time:'~45 min / week',
-     summary:'Keeps the office working: shared spaces, the chore system, and non-medical restock.',
+    {id:'office', title:'Office Manager',
      duties:[
        {h:'Cleaning support', items:[
          'Prepare and print the weekly room check tracker',
@@ -1749,13 +1798,11 @@ var DEFAULTS={
          'Better storage for blankets, bedding kits, personal items and hygiene supplies',
          'Identify maintenance concerns: pipes, broken furniture, damaged areas']}
      ]},
-    {id:'bike', title:'Bike Manager', time:'~1 hour / week',
-     summary:'Bike readiness, pre-ride and jumpkit checks, repairs and the out-of-service call.',
+    {id:'bike', title:'Bike Manager',
      external:'https://sonnnnnion.github.io/bike-ops/',
      duties:[
-       {h:'Where this lives', items:[
-         'The Bike Manager role has its own site with its own checks, QR codes and inventory',
-         'Nothing about bikes is duplicated here — follow the link so there is one source of truth']}
+       {h:'Bikes have their own site', items:[
+         'Pre-ride checks, bike jumpkit checks, repairs and out-of-service — all on Bike Ops']}
      ]}
   ],
 
@@ -1770,7 +1817,8 @@ var DEFAULTS={
    key later is safe for anyone with data already in localStorage: the new key
    falls back to its default instead of coming back undefined.
    ========================================================================== */
-var LS_DB='emsops_db_v1', LS_DRAFT='emsops_draft_v1', LS_ROLE='emsops_role_v1';
+var LS_DB='emsops_db_v1', LS_DRAFT='emsops_draft_v1', LS_ROLE='emsops_role_v1',
+    LS_EMAIL='emsops_email_v1';
 var DB={};
 
 function loadDB(){
@@ -1836,8 +1884,23 @@ function applyGates(root){
 var MANAGER_VIEWS={
   tracker:'office', restock:'office', rooms:'office',
   inventory:'equipment', 'bag-check':'equipment',
-  reports:'mgr', log:'mgr', roles:'mgr', qr:'mgr', settings:'mgr'
+  reports:'mgr', log:'mgr', roles:'mgr', qr:'mgr', settings:'mgr',
+  learn:'ops', people:'ops'
 };
+
+/* Sign-in is by address, not by menu. The Operations Officer holds the shared
+   account; everyone else is assigned a role under People and signs in with
+   their own address, so nobody picks a role they were not given. */
+function normEmail(e){ return String(e||'').trim().toLowerCase(); }
+
+function roleForEmail(email){
+  var e=normEmail(email);
+  if(!e) return null;
+  if(e===normEmail(DB.access&&DB.access.officer)) return 'ops';
+  var hit=((DB.access&&DB.access.people)||[]).filter(function(p){
+    return normEmail(p.email)===e; })[0];
+  return hit?hit.role:null;
+}
 
 function setRole(r,quiet){
   ROLE = ROLE_LABEL[r] ? r : 'member';
@@ -1856,9 +1919,13 @@ function setRole(r,quiet){
 
 function openRolePicker(){
   if(ROLE!=='member'){
-    uiConfirm('You are signed in as '+ROLE_LABEL[ROLE]+'. Sign out?','Manager access',
+    uiConfirm('Signed in as '+ROLE_LABEL[ROLE]+'. Sign out?','Sign out',
               {okText:'Sign out',cancelText:'Stay signed in'})
-      .then(function(y){ if(y) setRole('member'); });
+      .then(function(y){
+        if(!y) return;
+        try{ localStorage.removeItem(LS_EMAIL); }catch(e){}
+        setRole('member');
+      });
     return;
   }
   // NOTE: the dialog helpers take `key` (not `id`) on a field, and `okText`
@@ -1866,15 +1933,20 @@ function openRolePicker(){
   // the dialog opens, and the result object comes back keyed `undefined`, so
   // the caller's `v.role` is undefined and nothing happens. That shipped once
   // and made manager sign-in a no-op.
-  uiForm('Manager access',
-    'Pick your role. This unlocks that role\'s tools on this device — it does not '+
-    'protect anything, so keep anything sensitive off this site.',
-    [{key:'role',label:'Role',type:'select',required:true,value:'office',options:[
-        {v:'office',t:'Office Manager'},
-        {v:'equipment',t:'Equipment Manager'},
-        {v:'ops',t:'Operations Officer (both)'}]}],
-    {okText:'Unlock'})
-   .then(function(v){ if(v&&v.role) setRole(v.role); });
+  uiForm('Sign in','Hides tools. Does not protect data.',
+    [{key:'email',label:'Your email',type:'text',required:true}],
+    {okText:'Sign in'})
+   .then(function(v){
+     if(!v||!v.email) return;
+     var r=roleForEmail(v.email);
+     if(!r){
+       uiAlert('That address has no role yet. The Operations Officer adds it under People.',
+               'Not on the list');
+       return;
+     }
+     try{ localStorage.setItem(LS_EMAIL,normEmail(v.email)); }catch(e){}
+     setRole(r);
+   });
 }
 
 /* ============================================================================
@@ -1915,8 +1987,13 @@ function go(v,fromHash){
   // but nothing told the reports view its numbers had changed — so it showed
   // whatever was true when the page loaded, which for a report is worse than
   // showing nothing.
+  // Views whose content is derived from other data have to be rebuilt on
+  // arrival. A checkout that reports a broken bag writes an issue and re-renders
+  // the checkout form — nothing tells the readiness board its status changed, so
+  // it kept showing every bag as ready until something else triggered a render.
   if(v==='reports') renderReports();
   if(v==='log') renderLog();
+  if(v==='readiness') renderReadiness();
 
   closeNav();
   window.scrollTo(0,0);
@@ -2470,7 +2547,7 @@ function doSubmit(fid,s){
       addIssue({area:'Equipment',
         urgency:s.radios.condition==='Broken'?'Blocking':'Soon',
         what:s.extras.detail||('Reported '+s.radios.condition.toLowerCase()+' at checkout'),
-        where:s.pickName, by:openedBy});
+        where:s.pickName, unit:s.pick, by:openedBy});
     }
   }else{
     /* An unticked box only becomes a reported problem on the forms where it
@@ -2540,9 +2617,11 @@ function startAgain(fid){ formDone[fid]=false; renderCheck(fid); }
    PROBLEM LOG
    ========================================================================== */
 function addIssue(o){
+  // `unit` is the bag-unit id when the problem is about a specific bag. That id
+  // is what the readiness board keys on, so status follows a rename.
   DB.issues.unshift({id:uid('iss'),at:Date.now(),open:true,
     area:o.area||'Other', urgency:o.urgency||'Whenever',
-    what:o.what||'', where:o.where||'', by:o.by||''});
+    what:o.what||'', where:o.where||'', unit:o.unit||'', by:o.by||''});
   if(DB.issues.length>500) DB.issues.length=500;
   saveDB();
 }
@@ -2571,8 +2650,7 @@ function renderRoleCards(){
           :'onclick="go(\'roles\')"')+'>'+
       '<span class="rc-ic">'+(ICON[r.id]||'◈')+'</span>'+
       '<b>'+esc(r.title)+'</b>'+
-      '<p>'+esc(r.summary)+'</p>'+
-      '<span class="rc-go">'+(ext?'Open the bike site':'What this covers')+'</span></button>';
+      '<span class="rc-go">'+(ext?'Open Bike Ops':'Checklist')+'</span></button>';
   }).join('');
 }
 
@@ -2586,11 +2664,7 @@ function openExternal(url,title){
 /* ---- rooms & standards ---- */
 function renderRooms(){
   var host=document.getElementById('roomsHost'); if(!host) return;
-  var h='<div class="notice"><b>Three slots or two.</b>'+
-    '<p>The five highest-traffic rooms take three members per duty period; the rest take two. '+
-    'Pick any open slot on the printed tracker.</p></div>';
-
-  h+='<div class="photogrid">';
+  var h='<div class="photogrid">';
   DB.rooms.forEach(function(r){
     if(!r.photo) return;
     h+='<button type="button" class="photo" onclick="openLightbox(\'assets/rooms/'+jsq(r.photo)+
@@ -2599,14 +2673,12 @@ function renderRooms(){
        '<div class="pcap">'+esc(r.name)+'<small>'+r.slots+' slots per duty period</small></div></button>';
   });
   h+='</div>';
-  h+='<p class="hint">Photos are the reference standard for "clean" — this is what the room '+
-     'should look like when the check is done. Rooms without a photo have not been shot yet.</p>';
+  h+='<p class="hint">This is what the room should look like when you are done.</p>';
 
   if(DB.otherSpaces && DB.otherSpaces.length){
     h+='<h3 class="mt-lg" style="font-family:var(--font-display);font-size:19px">'+
        'Other spaces</h3>'+
-       '<p style="font-size:13.5px;color:var(--ink-mute);margin:4px 0 0">Not on the tracker, so '+
-       'not claimable as a duty-period task — still the Office Manager\'s to keep an eye on.</p>'+
+       '<p style="font-size:13.5px;color:var(--ink-mute);margin:4px 0 0">Not claimable as a duty-period task.</p>'+
        '<div class="photogrid">';
     DB.otherSpaces.forEach(function(s){
       h+='<button type="button" class="photo" onclick="openLightbox(\'assets/rooms/'+jsq(s.photo)+
@@ -2650,9 +2722,7 @@ function editRoomTasks(id){
 function renderBags(){
   var host=document.getElementById('bagsHost'); if(!host) return;
   var h='<div class="notice"><b>Names need confirming.</b>'+
-    '<p>These photos came from the equipment folder without labels. Which physical bag is '+
-    'called what was inferred from the photos and the inventory sheet, so the Equipment '+
-    'Manager should confirm every name before any of these QR codes get printed.</p></div>';
+    '<p>Confirm every name before printing bag QR codes.</p></div>';
 
   DB.bags.forEach(function(b){
     h+='<div class="card mt"><h3>'+esc(b.name)+
@@ -2706,13 +2776,10 @@ function renderRoles(){
   var host=document.getElementById('rolesHost'); if(!host) return;
   var h='';
   DB.roles.forEach(function(r){
-    h+='<div class="card mt"><h3>'+esc(r.title)+'</h3>'+
-       '<p style="font-size:12px;color:var(--ink-faint);margin:0 0 6px;text-transform:uppercase;'+
-       'letter-spacing:.08em">'+esc(r.time||'')+'</p>'+
-       '<p style="font-size:14.5px;color:var(--ink-soft);margin:0 0 12px">'+esc(r.summary)+'</p>';
+    h+='<div class="card mt"><h3>'+esc(r.title)+'</h3>';
     if(r.external){
       h+='<button class="btn solid sm" onclick="openExternal(\''+jsq(r.external)+'\',\''+
-         jsq(r.title)+'\')">Open the Bike Ops site</button>';
+         jsq(r.title)+'\')">Open Bike Ops ↗</button>';
     }
     (r.duties||[]).forEach(function(d){
       h+='<div class="acc"><button type="button" class="acchead" onclick="toggleAcc(this)">'+
@@ -2723,6 +2790,155 @@ function renderRoles(){
     h+='</div>';
   });
   host.innerHTML=h;
+}
+
+/* ---- what's ready ----
+   Status is derived, never hand-set: a bag is flagged the moment somebody says
+   something is wrong with it at checkout or files a problem against it, and it
+   clears when that problem is marked resolved. Nothing to keep up to date. */
+function unitStatus(id){
+  var open=(DB.issues||[]).filter(function(i){
+    return i.open && i.unit===id; });
+  if(!open.length) return {cls:'ok', label:'Ready', issues:[]};
+  var blocking=open.filter(function(i){return i.urgency==='Blocking';});
+  return blocking.length
+    ? {cls:'oos', label:'Do not take', issues:open}
+    : {cls:'warn', label:'Check first', issues:open};
+}
+
+function renderReadiness(){
+  var host=document.getElementById('readinessHost'); if(!host) return;
+  var units=(DB.bagUnits||[]).filter(function(u){return u.active;});
+  if(!units.length){ host.innerHTML='<div class="card"><p class="hint" style="margin:0">'+
+    'No bags in service.</p></div>'; return; }
+
+  var h='<div class="legend"><span class="item"><span class="tag ok">Ready</span></span>'+
+        '<span class="item"><span class="tag warn">Check first</span></span>'+
+        '<span class="item"><span class="tag crit">Do not take</span></span></div>';
+  h+='<div class="readygrid">';
+  units.forEach(function(u){
+    var st=unitStatus(u.id);
+    h+='<div class="readycard '+st.cls+'"><div class="rc-top">'+
+       '<b>'+esc(u.name)+'</b>'+
+       '<span class="tag '+(st.cls==='ok'?'ok':st.cls==='oos'?'crit':'warn')+'">'+st.label+'</span></div>';
+    if(st.issues.length){
+      h+='<ul class="rc-iss">'+st.issues.slice(0,3).map(function(i){
+        return '<li>'+esc(i.what)+'</li>'; }).join('')+
+        (st.issues.length>3?'<li>+'+(st.issues.length-3)+' more</li>':'')+'</ul>';
+      h+='<div class="row" data-need="equipment" style="margin-top:8px">'+
+         '<button class="btn xs" onclick="clearUnit(\''+jsq(u.id)+'\')">Mark fixed</button></div>';
+    }
+    h+='</div>';
+  });
+  h+='</div>';
+  host.innerHTML=h;
+  applyGates(host);
+}
+
+function clearUnit(id){
+  var u=(DB.bagUnits||[]).filter(function(x){return x.id===id;})[0];
+  uiConfirm('Clear every open problem on '+(u?u.name:'this bag')+'?','Mark fixed',
+            {okText:'Clear',cancelText:'Cancel'})
+    .then(function(y){
+      if(!y) return;
+      (DB.issues||[]).forEach(function(i){ if(i.unit===id) i.open=false; });
+      saveDB(); renderReadiness(); renderLog();
+    });
+}
+
+/* ---- videos & lectures ---- */
+function renderLearn(){
+  var host=document.getElementById('learnHost'); if(!host) return;
+  var vids=DB.videos||[], lecs=DB.lectures||[];
+  var h='';
+  if(!vids.length && !lecs.length){
+    h+='<div class="card"><p class="hint" style="margin:0">Nothing added yet.</p></div>';
+  }
+  if(vids.length){
+    h+='<div class="card mt"><h3>Videos</h3><ul class="isslist">'+vids.map(function(v,i){
+      return '<li><b>'+esc(v.title)+'</b>'+
+        (v.url?' <a href="'+esc(v.url)+'" target="_blank" rel="noopener">open ↗</a>':'')+
+        '<button class="issx" onclick="delLearn(\'videos\','+i+')">Remove</button></li>';
+    }).join('')+'</ul></div>';
+  }
+  if(lecs.length){
+    h+='<div class="card mt"><h3>Lectures</h3><ul class="isslist">'+lecs.map(function(v,i){
+      return '<li><b>'+esc(v.title)+'</b>'+
+        (v.url?' <a href="'+esc(v.url)+'" target="_blank" rel="noopener">open ↗</a>':'')+
+        '<button class="issx" onclick="delLearn(\'lectures\','+i+')">Remove</button></li>';
+    }).join('')+'</ul></div>';
+  }
+  h+='<div class="row mt"><button class="btn ghost sm" onclick="addLearn(\'videos\')">Add a video</button>'+
+     '<button class="btn ghost sm" onclick="addLearn(\'lectures\')">Add a lecture</button></div>';
+  h+='<div class="notice"><b>Members cannot see this yet.</b>'+
+     '<p>Open it up in Site Settings once there is something here.</p></div>';
+  host.innerHTML=h;
+}
+function addLearn(kind){
+  uiForm(kind==='videos'?'Add a video':'Add a lecture','',
+    [{key:'title',label:'Title',type:'text',required:true},
+     {key:'url',label:'Link',type:'url'}],{okText:'Add'})
+   .then(function(v){
+     if(!v||!v.title) return;
+     DB[kind].push({title:v.title.trim(),url:(v.url||'').trim()});
+     saveDB(); renderLearn();
+   });
+}
+function delLearn(kind,i){
+  DB[kind].splice(i,1); saveDB(); renderLearn();
+}
+
+/* ---- people ---- */
+function renderPeople(){
+  var host=document.getElementById('peopleHost'); if(!host) return;
+  var a=DB.access||{officer:'',people:[]};
+  var h='<div class="card brandtop"><h3>Operations Officer</h3>'+
+    '<div class="field"><label for="officerEmail">Email</label>'+
+    '<input type="text" id="officerEmail" value="'+esc(a.officer||'')+'"></div>'+
+    '<div class="row"><button class="btn solid sm" onclick="saveOfficer()">Save</button>'+
+    '<span id="officerMsg" style="font-size:13px;color:var(--ink-faint)"></span></div></div>';
+
+  h+='<div class="card mt"><h3>Managers</h3>';
+  if(!(a.people||[]).length){
+    h+='<p class="hint" style="margin:0 0 10px">Nobody added yet.</p>';
+  }else{
+    h+='<div class="invwrap"><table class="invtable"><thead><tr>'+
+       '<th>Email</th><th>Role</th><th></th></tr></thead><tbody>';
+    a.people.forEach(function(p,i){
+      h+='<tr><td>'+esc(p.email)+'</td><td>'+esc(ROLE_LABEL[p.role]||p.role)+'</td>'+
+         '<td><button class="btn xs" onclick="delPerson('+i+')">Remove</button></td></tr>';
+    });
+    h+='</tbody></table></div>';
+  }
+  h+='<div class="row mt"><button class="btn ghost sm" onclick="addPerson()">Add someone</button></div></div>';
+
+  h+='<div class="notice"><b>This is not a login.</b>'+
+     '<p>Anyone can type any address. It decides which buttons show, nothing more.</p></div>';
+  host.innerHTML=h;
+}
+function saveOfficer(){
+  var v=normEmail(document.getElementById('officerEmail').value);
+  if(!v){ document.getElementById('officerMsg').textContent='Needs an address.'; return; }
+  DB.access.officer=v; saveDB();
+  document.getElementById('officerMsg').textContent='Saved.';
+}
+function addPerson(){
+  uiForm('Add someone','',
+    [{key:'email',label:'Email',type:'text',required:true},
+     {key:'role',label:'Role',type:'select',value:'equipment',options:[
+       {v:'equipment',t:'Equipment Manager'},
+       {v:'office',t:'Office Manager'},
+       {v:'ops',t:'Operations Officer'}]}],{okText:'Add'})
+   .then(function(v){
+     if(!v||!v.email) return;
+     var e=normEmail(v.email);
+     DB.access.people=(DB.access.people||[]).filter(function(p){return normEmail(p.email)!==e;});
+     DB.access.people.push({email:e,role:v.role||'equipment'});
+     saveDB(); renderPeople();
+   });
+}
+function delPerson(i){
+  DB.access.people.splice(i,1); saveDB(); renderPeople();
 }
 
 /* ---- QR codes ----
@@ -2746,10 +2962,20 @@ function renderQR(){
   var base=publicBase();
   var h='';
   if(isLocalPreview()){
-    h+='<div class="notice"><b>Preview note.</b><p>You are on localhost, so these codes '+
-       'deliberately encode the live address rather than <span class="mono">localhost</span> — '+
-       'printing from here still produces stickers that work on a phone.</p></div>';
+    h+='<div class="notice"><b>Preview note.</b><p>On localhost these encode the live '+
+       'address, so printing from here still works on a phone.</p></div>';
   }
+
+  // The one that goes on the rack, big enough to scan from arm's length.
+  h+='<div class="row noprint" style="margin-bottom:4px">'+
+     '<button class="btn solid" onclick="printOne(\'checkout\')">Print the checkout code</button>'+
+     '<button class="btn ghost" onclick="window.print()">Print the whole sheet</button></div>';
+  h+='<div class="bigqr" id="bigCheckout"><h3>Check out a bag</h3>'+
+     '<div class="bq-sub">Scan before you take a jumpkit or event bag</div>'+
+     qrSVG(base+'#checkout',300)+
+     '<div class="qrlink">'+esc(base+'#checkout')+'</div></div>';
+
+  h+='<h3 class="mt-lg noprint" style="font-family:var(--font-display);font-size:19px">Everything else</h3>';
   h+='<div class="qrsheet">';
   QR_TARGETS.forEach(function(t){
     var url=base+'#'+t.view;
@@ -2759,11 +2985,23 @@ function renderQR(){
        '<div class="qrlink">'+esc(url)+'</div></div>';
   });
   h+='</div>';
-  h+='<div class="row mt noprint"><button class="btn solid" onclick="window.print()">Print this sheet</button></div>';
-  h+='<p class="hint noprint">Scan each one with a phone before printing a batch. '+
-     'If the repository is ever renamed, update <span class="mono">PUBLIC_BASE</span> or every '+
-     'printed code goes to a dead address.</p>';
+  h+='<p class="hint noprint">Scan one with a phone before printing a batch.</p>';
   host.innerHTML=h;
+}
+
+/* Print a single code without the rest of the sheet: hide everything, print,
+   put it back. Simpler and more reliable than a print-only stylesheet that has
+   to know about every element on the page. */
+function printOne(view){
+  var keep=document.getElementById('bigCheckout');
+  if(!keep) { window.print(); return; }
+  var sheet=document.querySelector('#qrHost .qrsheet');
+  var heads=document.querySelectorAll('#qrHost h3, #qrHost .notice, #qrHost .hint');
+  var hidden=[];
+  if(sheet){ sheet.style.display='none'; hidden.push(sheet); }
+  heads.forEach(function(e){ if(!keep.contains(e)){ e.style.display='none'; hidden.push(e); } });
+  window.print();
+  setTimeout(function(){ hidden.forEach(function(e){ e.style.display=''; }); },300);
 }
 
 /* ---- duty-period tracker (printable) ---- */
@@ -2771,9 +3009,7 @@ function renderTracker(){
   var host=document.getElementById('trackerHost'); if(!host) return;
   var maxSlots=0; DB.rooms.forEach(function(r){ if(r.slots>maxSlots) maxSlots=r.slots; });
   var h='<div class="notice noprint"><b>How this works.</b>'+
-    '<p>Print one of these per duty period and put it on the board with the Room Check QR code. '+
-    'A member writes their call sign in an open slot, does that room\'s list, then files the form. '+
-    'The paper sheet is the quick visual; the form responses are the record.</p></div>';
+    '<p>Post it with the Room Check QR code. Write your call sign in an open slot, do that room, file the form.</p></div>';
 
   h+='<div class="row noprint"><button class="btn solid" onclick="window.print()">Print tracker</button>'+
      '<button class="btn ghost" onclick="go(\'qr\')">Get the QR code</button></div>';
@@ -2801,10 +3037,7 @@ function renderTracker(){
 /* ---- office restock ---- */
 function renderRestock(){
   var host=document.getElementById('restockHost'); if(!host) return;
-  var h='<div class="notice"><b>Non-medical only.</b>'+
-    '<p>Medical stock is tracked in the equipment inventory, not here. This list exists so '+
-    'supplies get reordered before they run out rather than after.</p></div>';
-  h+='<div class="invwrap"><table class="invtable"><thead><tr>'+
+  var h='<div class="invwrap"><table class="invtable"><thead><tr>'+
      '<th>Item</th><th>Where it lives</th><th>Keep on hand</th><th></th></tr></thead><tbody>';
   DB.officeSupplies.forEach(function(s){
     h+='<tr><td>'+esc(s.item)+'</td><td>'+esc(s.where)+'</td><td class="num">'+esc(s.par)+'</td>'+
@@ -2838,10 +3071,7 @@ function addSupply(){
 function renderInventory(){
   var host=document.getElementById('inventoryHost'); if(!host) return;
   var h='<div class="notice warn"><b>Counts are not stored on this page, on purpose.</b>'+
-    '<p>This site is public. A public page listing exactly how much of each medication is '+
-    'held and where is not something to put up without deciding to. What lives here is the '+
-    'schema — what should exist, where it belongs, and how many. Live counts and expiry dates '+
-    'stay in the Operations spreadsheet, which is only shared with the people who need it.</p></div>';
+    '<p>Public site. Counts and expiry dates stay in the spreadsheet.</p></div>';
 
   var groups={};
   DB.inventory.forEach(function(i){ (groups[i.loc]=groups[i.loc]||[]).push(i); });
@@ -2858,8 +3088,7 @@ function renderInventory(){
 
   h+='<div class="row mt"><button class="btn ghost sm" onclick="openSheet()">Open the spreadsheet</button>'+
      '<button class="btn ghost sm" onclick="addInvItem()">Add an item</button></div>';
-  h+='<p class="hint">Par is the number that should be there after a restock — it is what a '+
-     'check compares against, not what is there now.</p>';
+  h+='<p class="hint">Par is the number that should be there after a restock.</p>';
 
   /* ---- the physical units ----
      This list is what members pick from when they check a bag out and when they
@@ -2868,10 +3097,7 @@ function renderInventory(){
      Equipment Exhausted sheet, with the gaps in the lettering guessed. */
   h+='<h3 class="mt-lg" style="font-family:var(--font-display);font-size:19px">Bags in service</h3>'+
      '<div class="notice warn"><b>Check this list first.</b>'+
-     '<p>Jumpkits B, C and E appear in the old equipment sheet, so a lettered scheme was '+
-     'assumed and A and D were added on that basis. Nobody has confirmed they exist. '+
-     'Delete what is not real and add what is missing — every checkout and every usage '+
-     'row is filed against a name from this list.</p></div>';
+     '<p>B, C and E came from the old equipment sheet; A and D were guessed. Delete what is not real.</p></div>';
   h+='<div class="invwrap"><table class="invtable"><thead><tr>'+
      '<th>Name</th><th>Type</th><th>In service</th><th></th></tr></thead><tbody>';
   (DB.bagUnits||[]).forEach(function(u){
@@ -3082,8 +3308,7 @@ function renderReports(){
     h+='<p class="hint" style="margin:0">Nothing has been logged as used in this period. '+
        'If that looks wrong, it means post-call forms are not being filled in.</p>';
   }else{
-    h+='<p style="font-size:13px;color:var(--ink-mute);margin:0 0 8px">'+
-       'Summed from post-call forms. Quantities are what members reported using.</p>';
+    h+=''+
     d.buy.forEach(function(b){
       var froms=Object.keys(b.from).sort(function(x,y){return b.from[y]-b.from[x];});
       var u=unitLabel(b.unit,b.qty);
@@ -3116,8 +3341,7 @@ function renderReports(){
   var units=Object.keys(d.byUnit).sort(function(a,b){return d.byUnit[b]-d.byUnit[a];});
   if(units.length){
     h+='<div class="card mt"><h3>Where it is going</h3>'+
-       '<p style="font-size:13px;color:var(--ink-mute);margin:0 0 8px">'+
-       'Units used, by bag. A bag well above the others is either busier or leaking.</p>';
+       ''+
     units.forEach(function(u){
       h+='<div class="buyrow"><span class="bq">'+d.byUnit[u]+'</span><span class="bn">'+esc(u)+'</span></div>';
     });
@@ -3207,11 +3431,19 @@ function renderLog(){
 /* ---- settings ---- */
 function renderSettings(){
   var host=document.getElementById('settingsHost'); if(!host) return;
-  var h='<div class="card brandtop"><h3>Where submissions go</h3>'+
-    '<p style="font-size:13.5px;color:var(--ink-mute);margin:0 0 12px">'+
-    'One Apps Script Web App in front of one spreadsheet. Every form writes to its own tab in '+
-    'that file, so Equipment and Office data sit side by side. Setup steps are in '+
-    '<span class="mono">SETUP-BACKEND.md</span>.</p>'+
+  var h='<div class="card brandtop"><h3>Link a spreadsheet</h3>'+
+    '<ol style="font-size:13.5px;color:var(--ink-soft);margin:0 0 12px;padding-left:20px;line-height:1.7">'+
+    '<li>Open the spreadsheet ▸ <b>Extensions ▸ Apps Script</b>.</li>'+
+    '<li>Paste the script, <b>Save</b>.</li>'+
+    '<li><b>Deploy ▸ New deployment ▸ Web app</b>. Execute as <b>Me</b>, access <b>Anyone</b>.</li>'+
+    '<li>Copy the <span class="mono">/exec</span> URL into the first box below.</li>'+
+    '<li><b>Save</b>, then <b>Test connection</b>, then <b>Send item names</b>.</li></ol>'+
+    '<p style="font-size:13px;color:var(--ink-mute);margin:0 0 12px">'+
+    'Tabs are created automatically on the first submission of each type: '+
+    '<span class="mono">Room Checks</span>, <span class="mono">Checkouts</span>, '+
+    '<span class="mono">Bag Checks</span>, <span class="mono">Post-Call</span>, '+
+    '<span class="mono">Post-Shift</span>, <span class="mono">Reports</span>. '+
+    'Do not rename them.</p>'+
     '<div class="field"><label for="apiUrl">Apps Script Web App URL</label>'+
     '<input type="url" id="apiUrl" placeholder="https://script.google.com/macros/s/…/exec" '+
     'value="'+esc((DB.api&&DB.api.url)||'')+'"></div>'+
@@ -3225,17 +3457,13 @@ function renderSettings(){
 
   h+='<div class="card mt"><h3>This device</h3>'+
     '<p style="font-size:13.5px;color:var(--ink-mute);margin:0 0 10px">'+
-    'Edits made in manager mode are saved in this browser. They do not reach anyone else '+
-    'until the publish step described in the setup document is wired up.</p>'+
+    'Edits are saved in this browser only.</p>'+
     '<div class="row"><button class="btn ghost" onclick="exportDB()">Export a copy</button>'+
     '<button class="btn danger" onclick="confirmReset()">Reset to defaults</button></div></div>';
 
-  h+='<div class="card mt"><h3>What this site is not</h3>'+
-    '<p style="font-size:13.5px;color:var(--ink-soft);margin:0">'+
-    'Manager mode hides tools from casual visitors. It is not a login and it does not protect '+
-    'anything — the page source is public and the role can be set from a browser console. '+
-    'Keep member names, medication counts, door codes and anything else you would not put on '+
-    'a poster off this site.</p></div>';
+  h+='<div class="notice"><b>Not a login.</b>'+
+    '<p>Signing in hides buttons. It protects nothing — keep names, medication counts '+
+    'and door codes off this site.</p></div>';
   host.innerHTML=h;
 }
 
@@ -3336,6 +3564,9 @@ function renderAll(){
   renderTracker();
   renderRestock();
   renderInventory();
+  renderReadiness();
+  renderLearn();
+  renderPeople();
   renderReports();
   renderLog();
   renderSettings();
@@ -3346,8 +3577,14 @@ function renderAll(){
 function init(){
   loadDB();
 
+  // Re-derive the role from the saved address on every load rather than trusting
+  // a stored role. If the Operations Officer removes someone under People, the
+  // next load drops them back to member instead of leaving the old role stuck.
   var saved='member';
-  try{ saved=localStorage.getItem(LS_ROLE)||'member'; }catch(e){}
+  try{
+    var e=localStorage.getItem(LS_EMAIL);
+    saved=(e && roleForEmail(e)) || 'member';
+  }catch(err){ saved='member'; }
   setRole(saved,true);
 
   document.getElementById('nav').addEventListener('click',function(e){
