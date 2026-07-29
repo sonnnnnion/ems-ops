@@ -137,15 +137,15 @@ var SHEETS = {
   },
   'Checkouts': {
     name: 'Checkouts', freeze: 3,
-    keys:    ['date','time','name','subject','condition','detail','sid'],
-    headers: ['Date','Time','Name','Bag','Condition At Pickup','Detail','Submission ID'],
-    widths:  [95, 70, 150, 160, 150, 340, 120]
+    keys:    ['date','time','name','andrew','subject','result','missingCount','missing','expired','expiringSoon','detail','sid'],
+    headers: ['Date','Time','Name','Andrew ID','Bag','Result','Missing','What Was Missing','Expired','Expiring Soon','Damaged','Submission ID'],
+    widths:  [95, 70, 150, 100, 160, 150, 80, 380, 220, 220, 260, 120]
   },
   'Bag Checks': {
     name: 'Bag Checks', freeze: 3,
-    keys:    ['date','time','name','andrew','subject','result','missingCount','missing','seal','sid'],
-    headers: ['Date','Time','Name','Andrew ID','Bag','Result','Missing','What Was Missing','Seal','Submission ID'],
-    widths:  [95, 70, 150, 100, 150, 150, 80, 380, 100, 120]
+    keys:    ['date','time','name','andrew','subject','result','missingCount','missing','expired','expiringSoon','seal','sid'],
+    headers: ['Date','Time','Name','Andrew ID','Bag','Result','Missing','What Was Missing','Expired','Expiring Soon','Seal','Submission ID'],
+    widths:  [95, 70, 150, 100, 150, 150, 80, 380, 220, 220, 100, 120]
   },
   'Post-Call': {
     name: 'Post-Call', freeze: 3,
@@ -233,6 +233,7 @@ function alreadySeen(sh, conf, sid) {
 function doPost(e) {
   try {
     var p = JSON.parse(e.postData.contents);
+    if (p.form === '__content') return saveContent(p);
     var conf = SHEETS[p.form] || SHEETS['Reports'];
     var sh = ensureSheet(conf);
     if (alreadySeen(sh, conf, p.sid)) return json({ result: 'duplicate ignored' });
@@ -244,7 +245,7 @@ function doPost(e) {
 
     var missingCount = Number(p.missingCount) || 0;
     if (!p.result) {
-      if (conf.name === 'Checkouts') p.result = p.condition || '';
+      if (p.expired) p.result = 'Expired stock';
       else if (conf.name === 'Post-Call') p.result = p.short ? 'Could not replace' : 'Complete';
       else p.result = missingCount > 0 ? (missingCount + ' missing') : 'Complete';
     }
@@ -307,11 +308,14 @@ function wantsFrom(p) {
       out.push({ item: names[u.i] || u.i, qty: Number(u.q) || 1, cat: 'Equipment' });
     });
   }
-  if (p.form === 'Bag Checks' && p.missing) {
+  if ((p.form === 'Bag Checks' || p.form === 'Checkouts') && p.missing) {
     String(p.missing).split(' | ').forEach(function (m) {
       if (m) out.push({ item: m, qty: 1, cat: 'Equipment' });
     });
   }
+  if (p.expired) String(p.expired).split(' | ').forEach(function (m) {
+    if (m) out.push({ item: m + ' (expired)', qty: 1, cat: 'Equipment' });
+  });
   if (p.restock) out.push({ item: String(p.restock), qty: 1, cat: 'Office' });
   if (p.short)   out.push({ item: String(p.short),   qty: 1, cat: 'Equipment' });
   return out;
@@ -379,6 +383,121 @@ function paintRestock(sh) {
 
 // Display names live in the site, so the sheet stays the record and the site
 // stays the vocabulary. The site pushes these with Settings ▸ Send item names.
+// ---- shared content ---------------------------------------------------------
+// Anyone may READ the content: it is the text of a public website. Writing needs
+// a Google ID token, and the token is verified WITH GOOGLE here rather than
+// trusted from the browser — a forged one is refused. This is the one real
+// permission boundary in the whole system.
+var MANAGER_EMAILS = ['bikecmuems@gmail.com'];
+
+function verifiedEmail(idToken, clientId) {
+  if (!idToken) return '';
+  try {
+    var r = UrlFetchApp.fetch(
+      'https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(idToken),
+      { muteHttpExceptions: true });
+    if (r.getResponseCode() !== 200) return '';
+    var c = JSON.parse(r.getContentText());
+    if (clientId && c.aud !== clientId) return '';        // token for another app
+    if (String(c.email_verified) !== 'true') return '';
+    return String(c.email || '').toLowerCase();
+  } catch (err) { return ''; }
+}
+
+function saveContent(p) {
+  var props = PropertiesService.getScriptProperties();
+  var who = verifiedEmail(p.idToken, props.getProperty('CLIENT_ID'));
+  var allowed = MANAGER_EMAILS.map(function (e) { return e.toLowerCase(); });
+  // Anyone the site has been told is a manager may publish; the officer address
+  // and the People list travel inside the content itself.
+  var stored = props.getProperty('CONTENT');
+  if (stored) {
+    try {
+      var c = JSON.parse(stored).access || {};
+      if (c.officer) allowed.push(String(c.officer).toLowerCase());
+      (c.people || []).forEach(function (x) { allowed.push(String(x.email).toLowerCase()); });
+    } catch (err) {}
+  }
+  if (!who || allowed.indexOf(who) < 0) return json({ ok: false, error: 'not allowed' });
+  props.setProperty('CONTENT', JSON.stringify({ at: Date.now(), by: who, content: p.content }));
+  return json({ ok: true, saved: true });
+}
+
+// ---- reports ----------------------------------------------------------------
+// Sums the machine-readable usage column, never the prose one: the sheet this
+// replaces recorded one item as "glucose stuff", "glucose strip" and
+// "glucometer strips", which is why no buy-list could be produced from it.
+function periodStartMs(period) {
+  var d = new Date();
+  d.setHours(0, 0, 0, 0);
+  if (period === 'week') { d.setDate(d.getDate() - ((d.getDay() + 1) % 7)); }
+  else if (period === 'month') { d.setDate(1); }
+  else {
+    var y = d.getFullYear(), aug = new Date(y, 7, 1);
+    d = (d >= aug) ? aug : new Date(y - 1, 7, 1);
+  }
+  return d.getTime();
+}
+
+function rowsSince(name, since) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(name);
+  if (!sh || sh.getLastRow() < 2) return { cols: [], rows: [] };
+  var cols = SHEETS[name].keys;
+  var vals = sh.getRange(2, 1, sh.getLastRow() - 1, cols.length).getValues();
+  var iDate = cols.indexOf('date');
+  return {
+    cols: cols,
+    rows: vals.filter(function (r) {
+      var t = new Date(r[iDate]).getTime();
+      return isNaN(t) ? true : t >= since;
+    })
+  };
+}
+
+function collectReport(period) {
+  var since = periodStartMs(period);
+  var used = {}, calls = {}, concerns = [];
+
+  var pc = rowsSince('Post-Call', since);
+  if (pc.rows.length) {
+    var iJson = pc.cols.indexOf('usageJson'), iCall = pc.cols.indexOf('callnum');
+    pc.rows.forEach(function (r) {
+      if (r[iCall]) calls[r[iCall]] = 1;
+      if (!r[iJson]) return;
+      var list;
+      try { list = JSON.parse(r[iJson]); } catch (err) { return; }
+      list.forEach(function (u) {
+        var e = used[u.i] || (used[u.i] = { qty: 0, from: {} });
+        e.qty += Number(u.q) || 0;
+        e.from[u.f] = (e.from[u.f] || 0) + (Number(u.q) || 0);
+      });
+    });
+  }
+
+  // Concerns come from wherever somebody can raise one.
+  [['Reports', 'what', 'where', 'urgency'],
+   ['Room Checks', 'maint', 'subject', null],
+   ['Bag Checks', 'expired', 'subject', null],
+   ['Checkouts', 'detail', 'subject', null],
+   ['Checkouts', 'expired', 'subject', null]].forEach(function (spec) {
+    var d = rowsSince(spec[0], since);
+    if (!d.rows.length) return;
+    var iw = d.cols.indexOf(spec[1]), il = d.cols.indexOf(spec[2]),
+        iu = spec[3] ? d.cols.indexOf(spec[3]) : -1;
+    if (iw < 0) return;
+    d.rows.forEach(function (r) {
+      if (!r[iw]) return;
+      concerns.push({ what: String(r[iw]), where: r[il] || '',
+                      urgency: iu >= 0 ? (r[iu] || 'Whenever') : 'Soon',
+                      source: spec[0] });
+    });
+  });
+
+  return { period: period, since: since, used: used,
+           concerns: concerns, calls: Object.keys(calls).length };
+}
+
 function nameMap() {
   var raw = PropertiesService.getScriptProperties().getProperty('NAMES');
   if (!raw) return { items: {}, units: {} };
@@ -389,6 +508,16 @@ function nameMap() {
 // A POST response is opaque and can never confirm anything.
 function doGet(e) {
   var p = (e && e.parameter) || {};
+  if (p.content) {
+    var raw = PropertiesService.getScriptProperties().getProperty('CONTENT');
+    if (!raw) return json({ ok: true, content: null });
+    var o;
+    try { o = JSON.parse(raw); } catch (err) { return json({ ok: true, content: null }); }
+    return json({ ok: true, content: o.content, at: o.at });
+  }
+  if (p.report) {
+    return json({ ok: true, report: collectReport(p.report) });
+  }
   if (p.names) {
     PropertiesService.getScriptProperties().setProperty('NAMES', p.names);
     return json({ ok: true, stored: true });

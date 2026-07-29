@@ -716,8 +716,8 @@
          manager detail: useful to the two managers, clutter to the eighty people
          who just took Jumpkit B out for a shift. -->
     <div class="sb-label">On duty</div>
-    <button type="button" class="sb-item active" data-view="home"><span class="ic">◈</span>Start here</button>
-    <button type="button" class="sb-item" data-view="checkout"><span class="ic">▸</span>Check Out a Bag</button>
+
+    <button type="button" class="sb-item active" data-view="checkout"><span class="ic">▸</span>Check Out a Bag</button>
     <button type="button" class="sb-item" data-view="readiness"><span class="ic">◉</span>What's Ready</button>
     <button type="button" class="sb-item" data-view="post-call"><span class="ic">↻</span>After a Call</button>
     <button type="button" class="sb-item" data-view="report"><span class="ic">⚑</span>Report a Problem</button>
@@ -727,6 +727,7 @@
     <a class="sb-item sb-ext" href="https://sonnnnnion.github.io/bike-ops/" target="_blank" rel="noopener"><span class="ic">⚙</span>Bike Ops<span class="ext-mark">↗</span></a>
 
     <div class="sb-label" data-need="mgr">Manage</div>
+    <button type="button" class="sb-item" data-need="mgr" data-view="home"><span class="ic">◈</span>Start here</button>
     <button type="button" class="sb-item" data-need="mgr" data-view="reports"><span class="ic">▤</span>Reports</button>
     <button type="button" class="sb-item" data-need="equipment" data-view="bag-check"><span class="ic">✚</span>Full Contents Check</button>
     <button type="button" class="sb-item" data-need="equipment" data-view="toget"><span class="ic">▤</span>To Get</button>
@@ -738,7 +739,7 @@
     <button type="button" class="sb-item" data-need="mgr" data-view="log"><span class="ic">⚑</span>Reported Problems</button>
     <button type="button" class="sb-item" data-need="mgr" data-view="roles"><span class="ic">§</span>Role Checklists</button>
     <button type="button" class="sb-item" data-need="mgr" data-view="qr"><span class="ic">▤</span>QR Codes</button>
-    <button type="button" class="sb-item" data-need="ops" data-view="learn"><span class="ic">▶</span>Videos &amp; Lectures</button>
+    <button type="button" class="sb-item" id="learnNav" data-need="ops" data-view="learn"><span class="ic">▶</span>Videos &amp; Lectures</button>
     <button type="button" class="sb-item" data-need="ops" data-view="people"><span class="ic">◈</span>People</button>
     <button type="button" class="sb-item" data-need="mgr" data-view="settings"><span class="ic">⚙</span>Site Settings</button>
   </nav>
@@ -751,7 +752,6 @@
          truth per role. -->
     <section class="view active" data-view="home">
       <h2 class="view-title">CMU EMS <em>Operations</em></h2>
-      <p class="view-sub">Checks and forms.</p>
 
       <div class="card brandtop mt">
         <div class="quick">
@@ -773,28 +773,24 @@
     <!-- ===== WHAT'S READY ==================================================== -->
     <section class="view" data-view="readiness">
       <h2 class="view-title">What's <em>ready</em></h2>
-      <p class="view-sub">Take a green one.</p>
       <div id="readinessHost"></div>
     </section>
 
     <!-- ===== VIDEOS & LECTURES (Operations Officer) ========================== -->
     <section class="view" data-view="learn">
       <h2 class="view-title">Videos &amp; <em>lectures</em></h2>
-      <p class="view-sub">Locked until there is something here worth opening.</p>
       <div id="learnHost"></div>
     </section>
 
     <!-- ===== PEOPLE (Operations Officer) ===================================== -->
     <section class="view" data-view="people">
       <h2 class="view-title"><em>People</em></h2>
-      <p class="view-sub">Who signs in, and as what.</p>
       <div id="peopleHost"></div>
     </section>
 
     <!-- ===== ROOM CHECK ====================================================== -->
     <section class="view" data-view="room-check">
       <h2 class="view-title">Room <em>check</em></h2>
-      <p class="view-sub">Pick your room, work the list, submit.</p>
       <div id="roomCheckHost"></div>
     </section>
 
@@ -805,21 +801,18 @@
          about. -->
     <section class="view" data-view="checkout">
       <h2 class="view-title">Check out a <em>bag</em></h2>
-      <p class="view-sub">Check it before you take it.</p>
       <div id="checkoutHost"></div>
     </section>
 
     <!-- ===== FULL CONTENTS CHECK (Equipment Manager) ======================== -->
     <section class="view" data-view="bag-check">
       <h2 class="view-title">Full contents <em>check</em></h2>
-      <p class="view-sub">Item by item.</p>
       <div id="bagCheckHost"></div>
     </section>
 
     <!-- ===== POST-CALL ======================================================= -->
     <section class="view" data-view="post-call">
       <h2 class="view-title">After a <em>call</em></h2>
-      <p class="view-sub">Before the kit goes back. Log what you used — the Equipment Manager restocks it.</p>
       <div id="postCallHost"></div>
     </section>
 
@@ -827,49 +820,42 @@
     <!-- ===== REPORT A PROBLEM ================================================ -->
     <section class="view" data-view="report">
       <h2 class="view-title">Report a <em>problem</em></h2>
-      <p class="view-sub">Broken, missing, expired or low.</p>
       <div id="reportHost"></div>
     </section>
 
     <!-- ===== ROOMS & STANDARDS =============================================== -->
     <section class="view" data-view="rooms">
       <h2 class="view-title">Rooms &amp; <em>standards</em></h2>
-      <p class="view-sub">Reference photos and per-room lists.</p>
       <div id="roomsHost"></div>
     </section>
 
     <!-- ===== BAG CONTENTS ==================================================== -->
     <section class="view" data-view="bags">
       <h2 class="view-title">What's in each <em>bag</em></h2>
-      <p class="view-sub">Reference photos.</p>
       <div id="bagsHost"></div>
     </section>
 
     <!-- ===== ROLES =========================================================== -->
     <section class="view" data-view="roles">
       <h2 class="view-title">Role <em>checklists</em></h2>
-      <p class="view-sub">Working checklists per role.</p>
       <div id="rolesHost"></div>
     </section>
 
     <!-- ===== QR CODES ======================================================== -->
     <section class="view" data-view="qr">
       <h2 class="view-title">QR <em>codes</em></h2>
-      <p class="view-sub">Print and post where the task happens.</p>
       <div id="qrHost"></div>
     </section>
 
     <!-- ===== DUTY-PERIOD TRACKER (Office Manager) ============================ -->
     <section class="view" data-view="tracker">
       <h2 class="view-title">Duty-period <em>tracker</em></h2>
-      <p class="view-sub">Print one per duty period.</p>
       <div id="trackerHost"></div>
     </section>
 
     <!-- ===== OFFICE RESTOCK (Office Manager) ================================= -->
     <section class="view" data-view="restock">
       <h2 class="view-title">Office <em>restock</em></h2>
-      <p class="view-sub">Non-medical supplies.</p>
       <div id="restockHost"></div>
     </section>
 
@@ -877,13 +863,11 @@
     <!-- ===== TO GET (shopping list) ========================================= -->
     <section class="view" data-view="toget">
       <h2 class="view-title">To <em>get</em></h2>
-      <p class="view-sub">Everything reported used or missing, still outstanding.</p>
       <div id="togetHost"></div>
     </section>
 
     <section class="view" data-view="inventory">
       <h2 class="view-title">Equipment <em>inventory</em></h2>
-      <p class="view-sub">Par levels and homes. Counts live in the spreadsheet.</p>
       <div id="inventoryHost"></div>
     </section>
 
@@ -893,21 +877,18 @@
          Restock tab, and To Get is the same list inside the site. -->
     <section class="view" data-view="reports">
       <h2 class="view-title">Ops <em>reports</em></h2>
-      <p class="view-sub">What to buy, and what people flagged.</p>
       <div id="reportsHost"></div>
     </section>
 
     <!-- ===== REPORTED PROBLEMS ============================================== -->
     <section class="view" data-view="log">
       <h2 class="view-title">Reported <em>problems</em></h2>
-      <p class="view-sub">Filed from checks and problem reports.</p>
       <div id="logHost"></div>
     </section>
 
     <!-- ===== SETTINGS ======================================================== -->
     <section class="view" data-view="settings">
       <h2 class="view-title">Site <em>settings</em></h2>
-      <p class="view-sub">Spreadsheet link and site content.</p>
       <div id="settingsHost"></div>
     </section>
 
@@ -1391,6 +1372,8 @@ var DEFAULTS={
   // Locked to the Operations Officer until there is something worth showing.
   videos:[],
   lectures:[],
+  // Off until there is something worth opening. Flipped in Site Settings.
+  learnPublic:false,
 
   /* ---------- rooms ------------------------------------------------------
      `slots` is how many members may claim the room in one duty period: three
@@ -1655,12 +1638,7 @@ var DEFAULTS={
     {id:'ev-2', name:'Event Bag 2', type:'event', active:true},
     {id:'ev-3', name:'Event Bag 3', type:'event', active:true},
     {id:'u-blue', name:'Blue Bag', type:'blue', active:true},
-    {id:'u-ccpod', ready:false, name:'Crew Chief Pod', type:'ccpod', active:true},
-    {id:'u-o2', name:'Oxygen Bag', type:'other', active:true},
-    // Only the Equipment Manager checks these two — they are stock, not a bag
-    // somebody takes on a shift.
-    {id:'u-trailer', ready:false, name:'Trailer / Trailer Cart', type:'other', active:true, need:'equipment'},
-    {id:'u-room', ready:false, name:'Equipment Room shelf', type:'other', active:true, need:'equipment'}
+    {id:'u-ccpod', ready:false, name:'Crew Chief Pod', type:'ccpod', active:true}
   ],
 
   /* ---------- consumables -----------------------------------------------
@@ -1909,13 +1887,18 @@ function can(need){
 function applyGates(root){
   var els=(root||document).querySelectorAll('[data-need]');
   for(var i=0;i<els.length;i++) els[i].hidden = !can(els[i].getAttribute('data-need'));
+  // Videos and Lectures is the one view whose audience is a setting rather than
+  // a role, so it is resolved here after the role pass.
+  var ln=document.getElementById('learnNav');
+  if(ln) ln.hidden = !(DB.learnPublic || can('ops'));
 }
+function canSeeLearn(){ return !!DB.learnPublic || can('ops'); }
 
 var MANAGER_VIEWS={
   tracker:'office', restock:'office', rooms:'office',
   inventory:'equipment', 'bag-check':'equipment', toget:'equipment',
-  reports:'mgr', log:'mgr', roles:'mgr', qr:'mgr', settings:'mgr',
-  learn:'ops', people:'ops'
+  home:'mgr', reports:'mgr', log:'mgr', roles:'mgr', qr:'mgr', settings:'mgr',
+  people:'ops'
 };
 
 /* Sign-in is Google's, so an address has to be proved rather than typed. The
@@ -1974,7 +1957,7 @@ function setRole(r,quiet){
   // A gated view reached by hash must not simply stay open when the role drops.
   var cur=document.querySelector('.view.active');
   var v=cur&&cur.getAttribute('data-view');
-  if(v && MANAGER_VIEWS[v] && !can(MANAGER_VIEWS[v])) go('home');
+  if(v && MANAGER_VIEWS[v] && !can(MANAGER_VIEWS[v])) go(homeFor());
   if(!quiet) renderAll();
 }
 
@@ -2118,7 +2101,10 @@ function publishContent(){
 /* ============================================================================
    NAVIGATION
    ========================================================================== */
+// Members open straight into the form they came for. Start here is a manager
+// dashboard, so it is gated and is not their landing page.
 var HOME='home';
+function homeFor(){ return can('mgr') ? 'home' : 'checkout'; }
 function navIsOpen(){ return document.body.classList.contains('nav-open'); }
 function navIsDrawer(){ return window.matchMedia('(max-width:820px)').matches; }
 function setNav(open){
@@ -2132,9 +2118,10 @@ function closeNav(){ if(navIsOpen()) setNav(false); }
 function go(v,fromHash){
   // Enforced here, not just by hiding the nav item — every view is
   // hash-addressable, so hiding the button alone would gate nothing.
-  if(MANAGER_VIEWS[v] && !can(MANAGER_VIEWS[v])) v=HOME;
+  if(v==='learn' && !canSeeLearn()) v=homeFor();
+  else if(MANAGER_VIEWS[v] && !can(MANAGER_VIEWS[v])) v=homeFor();
   var target=document.querySelector('.view[data-view="'+v+'"]');
-  if(!target){ v=HOME; target=document.querySelector('.view[data-view="'+HOME+'"]'); }
+  if(!target){ v=homeFor(); target=document.querySelector('.view[data-view="'+v+'"]'); }
 
   var views=document.querySelectorAll('.view');
   for(var i=0;i<views.length;i++) views[i].classList.remove('active');
@@ -2157,7 +2144,7 @@ function go(v,fromHash){
   // arrival. A checkout that reports a broken bag writes an issue and re-renders
   // the checkout form — nothing tells the readiness board its status changed, so
   // it kept showing every bag as ready until something else triggered a render.
-  if(v==='reports') renderReports();
+  if(v==='reports'){ remoteReport[REPORT_PERIOD]=null; renderReports(); }
   if(v==='log') renderLog();
   if(v==='readiness') renderReadiness();
   if(v==='toget') renderToGet();
@@ -2174,14 +2161,11 @@ function go(v,fromHash){
 var FORMS={
   'room-check':{
     host:'roomCheckHost', tab:'Room Checks',
-    lead:'One task per duty period. Pick the room you claimed on the printed tracker.',
     who:{callsign:true,name:true,andrew:true},
     pick:{key:'room', label:'Which room did you take?', from:'rooms'},
     extras:[
-      {id:'restock', label:'Anything that needs restocking?',
-       hint:'Soap, paper towels, toilet paper, PPE, office supplies.'},
-      {id:'maint', label:'Anything broken or needing maintenance?',
-       hint:'Pipes, furniture, damage, anything that needs someone with tools.'}
+      {id:'restock', label:'Anything that needs restocking?'},
+      {id:'maint', label:'Anything broken or needing maintenance?'}
     ]
   },
   /* A checkout IS the contents check. Picking the bag pulls up what should be
@@ -2190,37 +2174,30 @@ var FORMS={
      whole point — a bag going out short is what the managers need to hear about. */
   'checkout':{
     host:'checkoutHost', tab:'Checkouts',
-    lead:'Tick what is actually in the bag. Anything you leave unticked is reported as missing.',
     who:{callsign:true,name:true,andrew:true},
     pick:{key:'unit', label:'Which one are you taking?', from:'units'},
-    extras:[{id:'detail', label:'Anything damaged or not working?',
-             hint:'Leave blank if it is all fine.'}]
+    extras:[{id:'detail', label:'Anything damaged or not working?'}]
   },
   // The deeper audit: same engine, picks a kit TYPE and adds the seal field.
   'bag-check':{
     host:'bagCheckHost', tab:'Bag Checks',
-    lead:'Full audit by kit type.',
     who:{callsign:true,name:true,andrew:true},
     pick:{key:'bag', label:'Which kit?', from:'bags'},
     extras:[{id:'seal', label:'Seal number, if this kit is sealed', hint:'Squad car kits only.'}]
   },
   'post-call':{
     host:'postCallHost', tab:'Post-Call',
-    lead:'Everything here happens before the kit goes back on the rack.',
     who:{callsign:true,name:true,andrew:false},
     fixed:'postCall',
     // The structured bit. Item, how many, which unit it came out of — all
     // picked, none typed, so the buy-list can actually be summed.
-    usage:{label:'What did you use, and from where?',
-           hint:'One row per item. This is what the equipment-to-buy report adds up, '+
+    usage:{label:'What did you use, and from where?'+
                 'so a rough count is far more useful than a blank.'},
-    extras:[{id:'callnum', label:'Call number', hint:'If you have it. It is how this links to the call record.', short:true},
-            {id:'short', label:'Anything you could not replace?',
-             hint:'This is the one that matters — an unreplaced item is a gap on the next call.'}]
+    extras:[{id:'callnum', label:'Call number',  short:true},
+            {id:'short', label:'Anything you could not replace?'}]
   },
   'report':{
     host:'reportHost', tab:'Reports',
-    lead:'Anyone can file this. It goes to the manager whose area it is.',
     who:{callsign:true,name:true,andrew:false},
     freeform:{
       area:{label:'What area is this?', options:[
@@ -2233,7 +2210,7 @@ var FORMS={
         {v:'Soon', t:'Soon — it will become a problem'},
         {v:'Whenever', t:'Whenever — worth knowing about'}]}
     },
-    extras:[{id:'what', label:'What is wrong?', hint:'Be specific enough that someone can find it.', rows:4, required:true},
+    extras:[{id:'what', label:'What is wrong?',  rows:4, required:true},
             {id:'where', label:'Where is it?', hint:'Which room, which bag, which shelf.'}]
   }
 };
@@ -2285,7 +2262,6 @@ function renderCheck(fid){
   if(formDone[fid]){ host.innerHTML=donePanel(fid); applyGates(host); return; }
   var h='';
 
-  h+='<p class="view-sub" style="margin-top:0">'+esc(c.lead)+'</p>';
   h+='<div id="'+fid+'-draftnote"></div>';
 
   /* --- who --- */
@@ -2312,7 +2288,7 @@ function renderCheck(fid){
        'spellcheck="false" inputmode="text" oninput="onFormInput(\''+fid+'\')">'+
        '<div id="'+fid+'-aidmsg" class="fieldmsg"></div></div>';
   }
-  h+='<p class="hint" style="margin-top:0">The date is recorded automatically.</p></div>';
+  h+='</div>';
 
   /* --- picker --- */
   if(c.pick){
@@ -2352,7 +2328,7 @@ function renderCheck(fid){
   /* --- structured usage rows --- */
   if(c.usage){
     h+='<div class="card mt"><h3>'+esc(c.usage.label)+'</h3>'+
-       '<p style="font-size:13px;color:var(--ink-mute);margin:0 0 10px">'+esc(c.usage.hint||'')+'</p>'+
+  
        '<div id="'+fid+'-usage"></div>'+
        '<div class="row" style="margin-top:10px"><button class="btn ghost sm" type="button" '+
        'onclick="addUsageRow(\''+fid+'\')">+ Add an item</button></div></div>';
@@ -2361,7 +2337,7 @@ function renderCheck(fid){
   /* --- extras --- */
   (c.extras||[]).forEach(function(x){
     h+='<div class="card mt"><h3>'+esc(x.label)+'</h3>'+
-       (x.hint?'<p style="font-size:13px;color:var(--ink-mute);margin:0 0 10px">'+esc(x.hint)+'</p>':'')+
+
        (x.short
          ? '<input type="text" id="'+fid+'-x-'+x.id+'" placeholder="'+
            (x.required?'Required':'Optional')+'" oninput="onFormInput(\''+fid+'\')">'
@@ -2845,9 +2821,11 @@ function doSubmit(fid,s){
        spreadsheet either way. */
     var TASKLIST={'Post-Call':1};
     var area=(c.tab==='Room Checks')?'Office':'Equipment';
+    var unitId=(c.pick&&c.pick.from==='units')?s.pick:'';
     if(!TASKLIST[c.tab]){
       s.missing.forEach(function(m){
-        addIssue({area:area, urgency:'Soon', what:m, where:s.pickName, by:openedBy});
+        addIssue({area:area, urgency:'Soon', what:m+' missing', where:s.pickName,
+          unit:unitId, by:openedBy});
         // Something missing from a bag is something to buy, so it joins the list
         // rather than only sitting in the problem log.
         if(c.tab==='Bag Checks'||c.tab==='Checkouts')
@@ -2859,7 +2837,7 @@ function doSubmit(fid,s){
       var v=s.extras[pair[0]];
       if(!v) return;
       var ar=(c.tab==='Room Checks')?pair[1]:area;
-      addIssue({area:ar, urgency:'Soon', what:v, where:s.pickName, by:openedBy});
+      addIssue({area:ar, urgency:'Soon', what:v, where:s.pickName, unit:unitId, by:openedBy});
       // "restock" and "could not replace" are both requests to buy something.
       if(pair[0]!=='maint') wantItem({name:v, cat:ar, where:s.pickName, by:openedBy});
     });
@@ -2958,7 +2936,7 @@ function renderRooms(){
        '<div class="pcap">'+esc(r.name)+'<small>'+r.slots+' slots per duty period</small></div></button>';
   });
   h+='</div>';
-  h+='<p class="hint">This is what the room should look like when you are done.</p>';
+
 
   if(DB.otherSpaces && DB.otherSpaces.length){
     h+='<h3 class="mt-lg" style="font-family:var(--font-display);font-size:19px">'+
@@ -3006,8 +2984,7 @@ function editRoomTasks(id){
 /* ---- bag contents ---- */
 function renderBags(){
   var host=document.getElementById('bagsHost'); if(!host) return;
-  var h='<div class="notice"><b>Names need confirming.</b>'+
-    '<p>Confirm every name before printing bag QR codes.</p></div>';
+  var h='';
 
   DB.bags.forEach(function(b){
     h+='<div class="card mt"><h3>'+esc(b.name)+
@@ -3349,8 +3326,7 @@ function renderLearn(){
   }
   h+='<div class="row mt"><button class="btn ghost sm" onclick="addLearn(\'videos\')">Add a video</button>'+
      '<button class="btn ghost sm" onclick="addLearn(\'lectures\')">Add a lecture</button></div>';
-  h+='<div class="notice"><b>Members cannot see this yet.</b>'+
-     '<p>Open it up in Site Settings once there is something here.</p></div>';
+  
   host.innerHTML=h;
 }
 function addLearn(kind){
@@ -3404,15 +3380,12 @@ function addPerson(){
     [{key:'email',label:'Email (their Google account)',type:'text',required:true},
      {key:'role',label:'Role',type:'select',required:true,value:'equipment',options:[
        {v:'equipment',t:'Equipment Manager'},
-       {v:'office',t:'Office Manager'},
-       {v:'ops',t:'Operations Officer'}]}],{okText:'Add'})
+       {v:'office',t:'Office Manager'}]}],{okText:'Add'})
    .then(function(v){
      if(!v||!v.email) return;
      var e=normEmail(v.email);
-     // Assigning Operations Officer here grants the full role — it does not move
-     // the shared account, which stays whatever is set in the box above.
      DB.access.people=(DB.access.people||[]).filter(function(p){return normEmail(p.email)!==e;});
-     DB.access.people.push({email:e,role:v.role||'equipment'});
+     DB.access.people.push({email:e,role:(v.role==='office'?'office':'equipment')});
      saveDB(); renderPeople();
    });
 }
@@ -3437,8 +3410,7 @@ function renderQR(){
   var base=publicBase();
   var h='';
   if(isLocalPreview()){
-    h+='<div class="notice"><b>Preview note.</b><p>On localhost these encode the live '+
-       'address, so printing from here still works on a phone.</p></div>';
+    
   }
 
   // The one that goes on the rack, big enough to scan from arm's length.
@@ -3460,7 +3432,7 @@ function renderQR(){
        '<div class="qrlink">'+esc(url)+'</div></div>';
   });
   h+='</div>';
-  h+='<p class="hint noprint">Scan one with a phone before printing a batch.</p>';
+
   host.innerHTML=h;
 }
 
@@ -3483,8 +3455,7 @@ function printOne(view){
 function renderTracker(){
   var host=document.getElementById('trackerHost'); if(!host) return;
   var maxSlots=0; DB.rooms.forEach(function(r){ if(r.slots>maxSlots) maxSlots=r.slots; });
-  var h='<div class="notice noprint"><b>How this works.</b>'+
-    '<p>Post it with the Room Check QR code. Write your call sign in an open slot, do that room, file the form.</p></div>';
+  var h='';
 
   h+='<div class="row noprint"><button class="btn solid" onclick="window.print()">Print tracker</button>'+
      '<button class="btn ghost" onclick="go(\'qr\')">Get the QR code</button></div>';
@@ -3503,9 +3474,7 @@ function renderTracker(){
     h+='</tr>';
   });
   h+='</tbody></table>';
-  h+='<p style="font-size:12.5px;color:var(--ink-mute);margin-top:10px">'+
-     'After completing the Room Check form, write your call sign in the next available space. '+
-     'Each member completes one task per duty period. Shaded cells are not available for that room.</p>';
+
   host.innerHTML=h;
 }
 
@@ -3545,8 +3514,7 @@ function addSupply(){
 /* ---- equipment inventory ---- */
 function renderInventory(){
   var host=document.getElementById('inventoryHost'); if(!host) return;
-  var h='<div class="notice warn"><b>Counts are not stored on this page, on purpose.</b>'+
-    '<p>Public site. Counts and expiry dates stay in the spreadsheet.</p></div>';
+  var h='';
 
   var groups={};
   DB.inventory.forEach(function(i){ (groups[i.loc]=groups[i.loc]||[]).push(i); });
@@ -3563,7 +3531,7 @@ function renderInventory(){
 
   h+='<div class="row mt"><button class="btn ghost sm" onclick="openSheet()">Open the spreadsheet</button>'+
      '<button class="btn ghost sm" onclick="addInvItem()">Add an item</button></div>';
-  h+='<p class="hint">Par is the number that should be there after a restock.</p>';
+
 
   /* ---- the physical units ----
      This list is what members pick from when they check a bag out and when they
@@ -3571,8 +3539,7 @@ function renderInventory(){
      everywhere downstream. It is seeded from names that appear in the existing
      Equipment Exhausted sheet, with the gaps in the lettering guessed. */
   h+='<h3 class="mt-lg" style="font-family:var(--font-display);font-size:19px">Bags in service</h3>'+
-     '<div class="notice warn"><b>Check this list first.</b>'+
-     '<p>B, C and E came from the old equipment sheet; A and D were guessed. Delete what is not real.</p></div>';
+     '';
   h+='<div class="invwrap"><table class="invtable"><thead><tr>'+
      '<th>Name</th><th>Type</th><th>In service</th><th></th></tr></thead><tbody>';
   (DB.bagUnits||[]).forEach(function(u){
@@ -3687,9 +3654,56 @@ function periodLabel(p){
   var f=function(x){return x.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});};
   return f(from)+' → today';
 }
-function setPeriod(p){ REPORT_PERIOD=p; renderReports(); }
+function setPeriod(p){
+  REPORT_PERIOD=p; renderReports();
+  if(!remoteReport[p]) fetchReport(p).then(function(r){ if(r) renderReports(); });
+}
+
+// Filled by the backend when the report endpoint answers. Null means the
+// spreadsheet has not been read yet, in which case the local mirror is used.
+var remoteReport={week:null,month:null,ytd:null};
+
+function fetchReport(p){
+  var url=(DB.api&&DB.api.url)||'';
+  if(!url) return Promise.resolve(null);
+  return fetch(url+(url.indexOf('?')<0?'?':'&')+'report='+encodeURIComponent(p))
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if(!j||!j.report) return null;
+      remoteReport[p]=j.report;
+      return j.report;
+    })
+    .catch(function(){ return null; });
+}
 
 function reportData(p){
+  var r=remoteReport[p];
+  if(r){
+    // Names live here, not in the sheet, so ids are resolved on the way out.
+    var itemName=function(id){
+      var c=(DB.consumables||[]).filter(function(x){return x.id===id;})[0];
+      if(c) return c.name;
+      return String(id).indexOf('free:')===0 ? String(id).slice(5) : id;
+    };
+    var unitName=function(id){
+      var u=(DB.bagUnits||[]).filter(function(x){return x.id===id;})[0];
+      return u?u.name:id;
+    };
+    var buy=Object.keys(r.used||{}).map(function(id){
+      var e=r.used[id], from={};
+      Object.keys(e.from||{}).forEach(function(f){ from[unitName(f)]=e.from[f]; });
+      var c=(DB.consumables||[]).filter(function(x){return x.id===id;})[0];
+      return {id:id,name:itemName(id),unit:(c&&c.unit)||'',qty:e.qty,from:from};
+    }).sort(function(a,b){ return b.qty-a.qty || a.name.localeCompare(b.name); });
+    var byUnit={};
+    buy.forEach(function(b){ Object.keys(b.from).forEach(function(f){
+      byUnit[f]=(byUnit[f]||0)+b.from[f]; }); });
+    return {since:r.since, remote:true, buy:buy, byUnit:byUnit,
+            usage:[{qty:buy.reduce(function(a,x){return a+x.qty;},0)}],
+            issuesOpen:(r.concerns||[]).map(function(c){
+              return {what:c.what, where:c.where, urgency:c.urgency, open:true}; }),
+            issuesAll:(r.concerns||[]), calls:r.calls||0};
+  }
   var since=periodStart(p);
   var usage=(DB.usage||[]).filter(function(u){ return u.at>=since; });
   var issues=(DB.issues||[]).filter(function(i){ return i.at>=since; });
@@ -3748,6 +3762,7 @@ function renderReports(){
   var host=document.getElementById('reportsHost'); if(!host) return;
   var p=REPORT_PERIOD, d=reportData(p);
   var live=!!(DB.api&&DB.api.url);
+  if(live && !remoteReport[p]) fetchReport(p).then(function(r){ if(r) renderReports(); });
 
   var h='<div class="periodbar">'+
     [['week','This week'],['month','This month'],['ytd','Year to date']].map(function(o){
@@ -3756,15 +3771,12 @@ function renderReports(){
     }).join('')+'</div>'+
     '<p class="hint" style="margin-top:8px">'+esc(periodLabel(p))+'</p>';
 
-  // Be honest about where the numbers come from. A manager reading a buy-list
-  // needs to know whether it covers the whole team or just their own phone.
-  h+= live
-    ? '<div class="notice"><b>These numbers are from this browser.</b>'+
-      '<p>Every submission is being stored. This page sums what was filed on this '+
-      'device; the spreadsheet Restock tab sums everything.</p></div>'
-    : '<div class="notice warn"><b>No spreadsheet connected.</b>'+
-      '<p>Nothing is being stored centrally yet, so this report covers only what was filed on '+
-      'this device. Finish Site Settings and the report becomes real.</p></div>';
+  // One quiet line, not a banner: a manager reading a buy-list still needs to
+  // know whether it covers the whole team or only this phone.
+  h+='<p class="hint" style="margin-top:2px">'+
+     (d.remote ? 'From the spreadsheet.'
+      : live ? 'Reading the spreadsheet…'
+      : 'From this device.')+'</p>';
 
   h+='<div class="repgrid">'+
      '<div class="repstat"><div class="rs-n">'+d.buy.length+'</div><div class="rs-l">items to restock</div></div>'+
@@ -3780,7 +3792,6 @@ function renderReports(){
     h+='<p class="hint" style="margin:0">Nothing has been logged as used in this period. '+
        'If that looks wrong, it means post-call forms are not being filled in.</p>';
   }else{
-    h+=''+
     d.buy.forEach(function(b){
       var froms=Object.keys(b.from).sort(function(x,y){return b.from[y]-b.from[x];});
       var u=unitLabel(b.unit,b.qty);
@@ -3812,8 +3823,7 @@ function renderReports(){
   /* ---- which units are consuming most ---- */
   var units=Object.keys(d.byUnit).sort(function(a,b){return d.byUnit[b]-d.byUnit[a];});
   if(units.length){
-    h+='<div class="card mt"><h3>Where it is going</h3>'+
-       ''+
+    h+='<div class="card mt"><h3>Where it is going</h3>';
     units.forEach(function(u){
       h+='<div class="buyrow"><span class="bq">'+d.byUnit[u]+'</span><span class="bn">'+esc(u)+'</span></div>';
     });
@@ -3927,23 +3937,30 @@ function renderSettings(){
     '<button class="btn ghost" onclick="pushNames()">Send item names</button>'+
     '<span id="apiMsg" style="font-size:13px"></span></div></div>';
 
+  h+='<div class="card mt" data-need="ops"><h3>Videos &amp; lectures</h3>'+
+    '<label class="checkline"><input type="checkbox" id="learnPublic"'+
+    (DB.learnPublic?' checked':'')+' onchange="setLearnPublic(this.checked)">'+
+    '<span class="lbl">Everyone can see them</span></label></div>';
+
   h+='<div class="card mt" data-need="mgr"><h3>Publish to everyone</h3>'+
-    '<p style="font-size:13.5px;color:var(--ink-mute);margin:0 0 10px">'+
-    'Sends the content on this device — rooms, bags, contents, photos, inventory, '+
-    'people — to everyone else. Replaces the shared copy, so press Get latest first '+
-    'if someone else may have edited.</p>'+
+
     '<div class="row"><button class="btn solid" onclick="publishContent()">Publish</button>'+
     '<button class="btn ghost" onclick="pullContent()">Get latest</button>'+
     '<span id="pubState" style="font-size:13px;color:var(--ink-faint)">'+
     (contentState.dirty?'Unpublished changes on this device.':'')+'</span></div></div>';
 
   h+='<div class="card mt"><h3>This device</h3>'+
-    '<p style="font-size:13.5px;color:var(--ink-mute);margin:0 0 10px">'+
-    'Edits are saved in this browser only.</p>'+
+
     '<div class="row"><button class="btn ghost" onclick="exportDB()">Export a copy</button>'+
     '<button class="btn danger" onclick="confirmReset()">Reset to defaults</button></div></div>';
 
   host.innerHTML=h;
+}
+
+function setLearnPublic(on){
+  DB.learnPublic=!!on; saveDB(); applyGates();
+  var cur=document.querySelector('.view.active');
+  if(cur && cur.getAttribute('data-view')==='learn' && !canSeeLearn()) go(homeFor());
 }
 
 function saveApi(){
@@ -4073,7 +4090,7 @@ function init(){
   });
 
   window.addEventListener('hashchange',function(){
-    go(location.hash.slice(1)||HOME,true);
+    go(location.hash.slice(1)||homeFor(),true);
   });
 
   document.addEventListener('keydown',function(e){
@@ -4081,7 +4098,7 @@ function init(){
   });
 
   renderAll();
-  go(location.hash.slice(1)||HOME,true);
+  go(location.hash.slice(1)||homeFor(),true);
   // Shared content arrives after first paint: the page is usable immediately
   // and updates in place rather than blocking on the network.
   pullContent();
