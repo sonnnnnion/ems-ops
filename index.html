@@ -1361,7 +1361,7 @@ var DEFAULTS={
      older seed, so a corrected bag list actually reaches people instead of
      sitting behind whatever they cached weeks ago. Their own data — submissions,
      the To Get list, the spreadsheet link, who has access — is never touched. */
-  seed:2,
+  seed:3,
 
   // ONE Apps Script Web App in front of ONE spreadsheet. Every form writes to
   // its own tab in that file, so Equipment and Office data sit side by side and
@@ -1556,24 +1556,131 @@ var DEFAULTS={
          {id:'ev-blackpouch', label:'Black pouch — BZK'}]}
      ]},
 
-    /* ---- Specialty Bag: the red Iron Duck in the photos. Contents not
-           documented anywhere yet. ---- */
-    {id:'specialty', name:'Specialty Bag', active:false, where:'Duty room rack',
-     photos:['jumpkit-closed','jumpkit-open','jumpkit-closed-alt'],
-     note:'Contents not documented yet.', sections:[]},
+    /* ---- Blue Bag: bagcontents.pdf ---- */
+    {id:'blue', name:'Blue Bag', active:true, where:'Equipment room',
+     photos:['bluebag-aed','bluebag-open'], note:'',
+     sections:[
+       {name:'Front', items:[
+         {id:'bb-aed', label:'(1) AED', exp:true},
+         {id:'bb-childpads', label:'(1) child pads (behind AED)', exp:true}]},
+       {name:'Main compartment', items:[
+         {id:'bb-suction', label:'(1) suction unit — with one set of catheters and tubing inside'},
+         {id:'bb-hardcath', label:'(2) hard suction catheters'},
+         {id:'bb-flexcath', label:'(2) flexible suction catheters'},
+         {id:'bb-medpouch', label:'(1) BLS med pouch'},
+         {id:'bb-ccollar', label:'(1) C-collar'},
+         {id:'bb-manual', label:'(1) manual suction setup'},
+         {id:'bb-cpap', label:'(1) disposable CPAP'}]},
+       {name:'BLS med pouch', items:[
+         {id:'bb-aspirin', label:'(1) Aspirin', exp:true},
+         {id:'bb-epi-adult', label:'(2) Adult Epi-Pens', exp:true},
+         {id:'bb-epi-jr', label:'(2) Jr. Epi-Pens', exp:true},
+         {id:'bb-naloxone', label:'(2) Naloxone', exp:true},
+         {id:'bb-mad', label:'(2) MADs'}]},
+       {name:'Left side compartment', items:[
+         {id:'bb-sharps', label:'(1) sharps shuttle'},
+         {id:'bb-hemorolled', label:'(2) hemostatic rolled gauze', exp:true},
+         {id:'bb-hemo4x4', label:'(2) 4x4 hemostatic gauze', exp:true}]},
+       {name:'Right side compartment', items:[
+         {id:'bb-pulseox', label:'(1) pulse oximeter'},
+         {id:'bb-gluc', label:'(1) glucometer setup'},
+         {id:'bb-thermo', label:'(1) thermometer'},
+         {id:'bb-probes', label:'(1) box of thermometer probes'}]}
+     ]},
 
-    {id:'blue', name:'Blue Bag', active:false, where:'Equipment room',
-     photos:['bluebag-aed','bluebag-open'],
-     note:'Contents not documented yet.', sections:[]},
+    /* ---- Specialty Bag: bagcontents.pdf. A few lines in that PDF do not
+           decode cleanly and are left out rather than guessed. ---- */
+    {id:'specialty', name:'Specialty Bag', active:true, where:'Squad trunk',
+     photos:['jumpkit-closed','jumpkit-open','jumpkit-closed-alt'], note:'',
+     sections:[
+       {name:'Main compartment', items:[
+         {id:'sp-gloves', label:'(3 ea.) S, M, L, XL gloves'},
+         {id:'sp-n95', label:'(3) N-95 masks'},
+         {id:'sp-ppe', label:'(2) PPE kits'},
+         {id:'sp-surgical', label:'(3) surgical masks'},
+         {id:'sp-clip', label:'(1) full clipboard w/ pens'},
+         {id:'sp-npakit', label:'(1) NPA kit'},
+         {id:'sp-pednrb', label:'(2) Ped. NRB'},
+         {id:'sp-infnrb', label:'(2) Inf. NRB'},
+         {id:'sp-pednc', label:'(2) Ped. NC'},
+         {id:'sp-infnc', label:'(2) Inf. NC'},
+         {id:'sp-pedbvm', label:'(1) Ped. BVM'},
+         {id:'sp-infbvm', label:'(1) Inf. BVM w/ (2) sized masks'},
+         {id:'sp-smallopa', label:'(1) set small OPAs'},
+         {id:'sp-ob', label:'(1) OB kit'},
+         {id:'sp-kleenex', label:'(2) Kleenex packs'},
+         {id:'sp-suctioncath', label:'(1 ea.) Fr. suction catheters'},
+         {id:'sp-yankauer', label:'(1) Yankauer hard suction catheter'}]},
+       {name:'BP cuffs', items:[
+         {id:'sp-infbp', label:'(1) Inf. BP cuff'},
+         {id:'sp-pedbp', label:'(1) Ped. BP cuff'},
+         {id:'sp-adultbp', label:'(1) adult BP cuff'},
+         {id:'sp-baribp', label:'(1) bariatric BP cuff'}]},
+       {name:'Trauma', items:[
+         {id:'sp-burn', label:'(2) burn sheets'},
+         {id:'sp-multitrauma', label:'(2) multi-trauma dressings'},
+         {id:'sp-gauze', label:'Assorted 2x2, 4x4 gauze, combine pads'},
+         {id:'sp-petro', label:'(4) 4x4 petroleum gauze', exp:true},
+         {id:'sp-mylar', label:'(2) Mylar blankets'},
+         {id:'sp-cat', label:'(2) CATs'},
+         {id:'sp-shears', label:'(1) pair trauma shears'}]}
+     ]},
+
+    /* ---- MCI Bag: bagcontents.pdf ---- */
+    {id:'mci', name:'MCI Bag', active:true, where:'Squad trunk',
+     photos:['mci-kit'], note:'',
+     sections:[
+       {name:'Main compartment', items:[
+         {id:'mci-glovesm', label:'(1) box medium gloves'},
+         {id:'mci-glovesl', label:'(2) box large gloves'},
+         {id:'mci-board', label:'(1) dry erase board w/ marker'},
+         {id:'mci-tarp', label:'(1) blue tarp'},
+         {id:'mci-regionbag', label:'(1) Region 13 MCI bag (clear bag)'},
+         {id:'mci-n95', label:'(12) N-95 masks'},
+         {id:'mci-cats3', label:'(3) CATs'}]},
+       {name:'Triage', items:[
+         {id:'mci-sharpie', label:'(1) Sharpie'},
+         {id:'mci-shears', label:'(1) pair trauma shears'},
+         {id:'mci-npakit', label:'(1) NPA kit'},
+         {id:'mci-tags', label:'(6) triage tags'},
+         {id:'mci-blacktags', label:'(3) black tags'},
+         {id:'mci-combine', label:'(4) combine pads'},
+         {id:'mci-qcrolled', label:'(1) rolled Quickclot gauze', exp:true},
+         {id:'mci-qc4x4', label:'(2) 4x4 Quickclot gauze', exp:true},
+         {id:'mci-chestseal', label:'(1) Hyfin twin pack chest seals', exp:true},
+         {id:'mci-fanny', label:'(2) MCI triage fanny packs'}]},
+       {name:'Scene', items:[
+         {id:'mci-smart', label:'(1) SMART triage bag'},
+         {id:'mci-paint', label:'(1) can spray paint'},
+         {id:'mci-duct', label:'(1) roll duct tape'},
+         {id:'mci-caution', label:'(1) roll caution tape'},
+         {id:'mci-triagetape', label:'(1) set triage tape'},
+         {id:'mci-vests', label:'(2) MCI safety vests'},
+         {id:'mci-chemlights', label:'Blue, red, yellow and green chemlights'},
+         {id:'mci-postits', label:'(1) pack Post-Its, Sharpies, pens, pencils'}]}
+     ]},
+
+    /* ---- Squad car: bagcontents.pdf ---- */
+    {id:'squad', name:'Squad Car', active:true, where:'Squad vehicle',
+     photos:[], note:'',
+     sections:[
+       {name:'Trunk', items:[
+         {id:'sq-o2bags', label:'(2) O2 bags'},
+         {id:'sq-mcibag', label:'(1) MCI bag'},
+         {id:'sq-specialty', label:'(1) specialty bag'},
+         {id:'sq-bluebag', label:'(1) blue bag'},
+         {id:'sq-backboard', label:'(1) backboard'},
+         {id:'sq-extinguisher', label:'(1) water extinguisher'},
+         {id:'sq-jumppack', label:'(1) portable jump pack'}]},
+       {name:'Behind rear seat', items:[
+         {id:'sq-padded', label:'Padded board splints'},
+         {id:'sq-traction', label:'(1) traction splint'},
+         {id:'sq-ked', label:'(1) KED'},
+         {id:'sq-vacuum', label:'(2) vacuum splints'}]}
+     ]},
 
     {id:'trauma', name:'Trauma Bag', active:false, where:'Equipment room',
-     photos:[], note:'Contents not documented yet.', sections:[]},
-
-    {id:'squad', name:'Squad Car Kit', active:false, where:'Police vehicles',
-     photos:[], note:'Contents not documented yet.', sections:[]},
-
-    {id:'mci', name:'MCI Kit', active:false, where:'Equipment room',
-     photos:['mci-kit'], note:'Contents not documented yet.', sections:[]}
+     photos:[], note:'Contents not documented yet.', sections:[]}
   ],
 
   /* ---------- post-call --------------------------------------------------
@@ -1613,15 +1720,16 @@ var DEFAULTS={
     {id:'jk-e', name:'Jumpkit E', type:'jumpkit', active:true},
     {id:'jk-f', name:'Jumpkit F', type:'jumpkit', active:true},
     {id:'jk-personal', ready:false, name:'Personal Jumpkit', type:'jumpkit', active:true},
-    // Checked on the Bike Ops site, but the form lists them here too.
-    {id:'bk-3', ready:false, name:'Bike Bag 3', type:'jumpkit', active:true},
-    {id:'bk-4', ready:false, name:'Bike Bag 4', type:'jumpkit', active:true},
     {id:'ev-1', name:'Event Bag 1', type:'event', active:true},
     {id:'ev-2', name:'Event Bag 2', type:'event', active:true},
     {id:'ev-3', name:'Event Bag 3', type:'event', active:true},
     {id:'ev-4', name:'Event Bag 4', type:'event', active:true},
     {id:'ev-5', name:'Event Bag 5', type:'event', active:true},
-    {id:'u-medpod', ready:false, name:'Med Pod', type:'medpod', active:true}
+    {id:'u-medpod', ready:false, name:'Med Pod', type:'medpod', active:true},
+    {id:'u-blue', name:'Blue Bag', type:'blue', active:true},
+    {id:'u-specialty', ready:false, name:'Specialty Bag', type:'specialty', active:true},
+    {id:'u-mci', ready:false, name:'MCI Bag', type:'mci', active:true},
+    {id:'u-squad', ready:false, name:'Squad Car', type:'squad', active:true, need:'equipment'}
   ],
 
   /* ---------- consumables -----------------------------------------------
