@@ -263,7 +263,15 @@
 
   /* ---------- collapsible (bylaws) ---------- */
   .acc{border:1.5px solid var(--rule);background:var(--card);margin-bottom:10px;box-shadow:var(--shadow-sm)}
-  .acc .acchead{display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer;font-weight:700;font-size:15px}
+  /* `.acchead` is a <button>, and a button does not stretch just because it is
+     display:flex — its UA width is shrink-to-fit. Without these resets the
+     header rendered as a small floating box instead of a full-width bar. Same
+     resets `.sb-item` already carries, for the same reason. */
+  .acc .acchead{display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer;
+    font-weight:700;font-size:15px;width:100%;text-align:left;background:none;border:0;
+    font-family:inherit;color:inherit;line-height:inherit;-webkit-appearance:none;appearance:none}
+  .acc .acchead:hover{background:var(--bg-2)}
+  .acc .acchead:focus-visible{outline:2px solid var(--brand);outline-offset:-2px}
   /* min-width, not width — the article numeral is roman, so VIII must be able to
      widen the badge instead of overflowing a 24px box. */
   .acc .acchead .num{font-family:var(--font-mono);font-size:11.5px;letter-spacing:.04em;color:#fff;
@@ -489,11 +497,17 @@
 
   /* ---------- task lists (quick actions) ---------- */
   .quick{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-top:14px}
-  .quick button{display:flex;align-items:center;gap:9px;padding:13px 15px;border-radius:var(--radius);
+  .quick button,.quick .qbtn{display:flex;align-items:center;gap:9px;padding:13px 15px;border-radius:var(--radius);
     border:1.5px solid var(--rule-strong);background:var(--card);cursor:pointer;font:inherit;font-size:14.5px;
-    font-weight:600;color:var(--ink);text-align:left;transition:border-color .16s var(--ease),background .16s var(--ease)}
-  .quick button:hover{border-color:var(--brand);background:var(--brand-tint)}
-  .quick button .ic{color:var(--brand);font-size:15px}
+    font-weight:600;color:var(--ink);text-align:left;text-decoration:none;
+    transition:border-color .16s var(--ease),background .16s var(--ease)}
+  .quick button:hover,.quick .qbtn:hover{border-color:var(--brand);background:var(--brand-tint)}
+  .quick button .ic,.quick .qbtn .ic{color:var(--brand);font-size:15px}
+  .ext-mark{margin-left:auto;color:var(--ink-faint);font-size:12px}
+  /* The sidebar link to the bike site is an <a>, so it needs the text-decoration
+     and colour resets a <button> did not. */
+  .sb-item.sb-ext{text-decoration:none}
+  .sb-item.sb-ext:hover .ext-mark{color:var(--ink)}
 
   /* ---------- photo galleries ---------- */
   .photogrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px;margin-top:16px}
@@ -688,19 +702,18 @@
     <button type="button" class="sb-item active" data-view="home"><span class="ic">◈</span>Start here</button>
     <button type="button" class="sb-item" data-view="checkout"><span class="ic">▸</span>Check Out a Bag</button>
     <button type="button" class="sb-item" data-view="readiness"><span class="ic">◉</span>What's Ready</button>
-    <button type="button" class="sb-item" data-view="room-check"><span class="ic">✔</span>Room Check</button>
     <button type="button" class="sb-item" data-view="post-call"><span class="ic">↻</span>After a Call</button>
-    <button type="button" class="sb-item" data-view="post-shift"><span class="ic">⇥</span>End of Shift</button>
     <button type="button" class="sb-item" data-view="report"><span class="ic">⚑</span>Report a Problem</button>
 
     <div class="sb-label">Reference</div>
     <button type="button" class="sb-item" data-view="bags"><span class="ic">▩</span>What's in each bag</button>
-    <button type="button" class="sb-item" onclick="openExternal('https://sonnnnnion.github.io/bike-ops/','Bike Ops')"><span class="ic">⚙</span>Bike Ops ↗</button>
+    <a class="sb-item sb-ext" href="https://sonnnnnion.github.io/bike-ops/" target="_blank" rel="noopener"><span class="ic">⚙</span>Bike Ops<span class="ext-mark">↗</span></a>
 
     <div class="sb-label" data-need="mgr">Manage</div>
     <button type="button" class="sb-item" data-need="mgr" data-view="reports"><span class="ic">▤</span>Reports</button>
     <button type="button" class="sb-item" data-need="equipment" data-view="bag-check"><span class="ic">✚</span>Full Contents Check</button>
     <button type="button" class="sb-item" data-need="equipment" data-view="inventory"><span class="ic">▦</span>Equipment Inventory</button>
+    <button type="button" class="sb-item" data-need="office" data-view="room-check"><span class="ic">✔</span>Room Check</button>
     <button type="button" class="sb-item" data-need="office" data-view="tracker"><span class="ic">▤</span>Duty-Period Tracker</button>
     <button type="button" class="sb-item" data-need="office" data-view="rooms"><span class="ic">▦</span>Rooms &amp; Standards</button>
     <button type="button" class="sb-item" data-need="office" data-view="restock"><span class="ic">▤</span>Office Restock List</button>
@@ -726,11 +739,11 @@
         <div class="quick">
           <button type="button" onclick="go('checkout')"><span class="ic">▸</span>Take a bag out</button>
           <button type="button" onclick="go('readiness')"><span class="ic">◉</span>What's ready</button>
-          <button type="button" onclick="go('room-check')"><span class="ic">✔</span>Room check</button>
           <button type="button" onclick="go('post-call')"><span class="ic">↻</span>After a call</button>
-          <button type="button" onclick="go('post-shift')"><span class="ic">⇥</span>End of shift</button>
           <button type="button" onclick="go('report')"><span class="ic">⚑</span>Report a problem</button>
           <button type="button" onclick="go('bags')"><span class="ic">▩</span>What's in each bag</button>
+          <a class="qbtn" href="https://sonnnnnion.github.io/bike-ops/" target="_blank" rel="noopener"><span class="ic">⚙</span>Bike Ops<span class="ext-mark">↗</span></a>
+          <button type="button" data-need="office" onclick="go('room-check')"><span class="ic">✔</span>Room check</button>
           <button type="button" data-need="mgr" onclick="go('reports')"><span class="ic">▤</span>Reports</button>
           <button type="button" data-need="equipment" onclick="go('bag-check')"><span class="ic">✚</span>Full contents check</button>
         </div>
@@ -791,12 +804,6 @@
       <div id="postCallHost"></div>
     </section>
 
-    <!-- ===== POST-SHIFT ====================================================== -->
-    <section class="view" data-view="post-shift">
-      <h2 class="view-title">End of <em>shift</em></h2>
-      <p class="view-sub">Put it all back.</p>
-      <div id="postShiftHost"></div>
-    </section>
 
     <!-- ===== REPORT A PROBLEM ================================================ -->
     <section class="view" data-view="report">
@@ -1582,7 +1589,7 @@ var DEFAULTS={
      ]}
   ],
 
-  /* ---------- post-call / post-shift ------------------------------------
+  /* ---------- post-call --------------------------------------------------
      Restocking is the Equipment Manager's job, not the member's. So nothing
      here asks a member to replace stock — reporting what was used IS the
      handover, and the usage rows are what the Equipment Manager restocks from. */
@@ -1595,14 +1602,6 @@ var DEFAULTS={
       {id:'pc-back', label:'Kit back where it belongs'}]},
     {name:'Recorded', items:[
       {id:'pc-logged', label:'Call submitted on PONS'}]}
-  ],
-  postShift:[
-    {name:'Back where it belongs', items:[
-      {id:'ps-jumpkit', label:'Jumpkit back in the radio room'},
-      {id:'ps-radio', label:'Radio back in the radio room'},
-      {id:'ps-battery', label:'Radio battery back on the charger'},
-      {id:'ps-shoes', label:'Shoes tucked back in their cubby'},
-      {id:'ps-laundry', label:'Used shirts and bedding in the dirty laundry bin'}]}
   ],
 
   /* ---------- physical units in service ---------------------------------
@@ -1888,10 +1887,39 @@ var MANAGER_VIEWS={
   learn:'ops', people:'ops'
 };
 
-/* Sign-in is by address, not by menu. The Operations Officer holds the shared
-   account; everyone else is assigned a role under People and signs in with
-   their own address, so nobody picks a role they were not given. */
+/* Sign-in is Google's, so an address has to be proved rather than typed. The
+   Operations Officer holds the shared account; everyone else is assigned a role
+   under People and signs in with their own Google account.
+
+   Fill this in from the Google Cloud console (see SETUP-BACKEND.md). Until it is
+   set, sign-in says so plainly rather than failing silently. */
+var GOOGLE_CLIENT_ID='';
+var googleIdToken='';
+
 function normEmail(e){ return String(e||'').trim().toLowerCase(); }
+
+// Reads the verified address out of the Google ID token. Decoding a JWT
+// client-side proves nothing on its own — it is what makes the UI show the
+// right buttons. The Apps Script is what actually verifies a token.
+function emailFromIdToken(jwt){
+  try{
+    var part=String(jwt).split('.')[1];
+    var b64=part.replace(/-/g,'+').replace(/_/g,'/');
+    while(b64.length%4) b64+='=';
+    var claims=JSON.parse(decodeURIComponent(escape(atob(b64))));
+    return claims.email_verified?String(claims.email||'').toLowerCase():'';
+  }catch(e){ return ''; }
+}
+
+function loadGis(){
+  if(window.google&&google.accounts&&google.accounts.id) return Promise.resolve(true);
+  return new Promise(function(res){
+    var t=document.createElement('script');
+    t.src='https://accounts.google.com/gsi/client';
+    t.async=true; t.onload=function(){res(true);}; t.onerror=function(){res(false);};
+    document.head.appendChild(t);
+  });
+}
 
 function roleForEmail(email){
   var e=normEmail(email);
@@ -1928,25 +1956,45 @@ function openRolePicker(){
       });
     return;
   }
-  // NOTE: the dialog helpers take `key` (not `id`) on a field, and `okText`
-  // (not `ok`) in options. Getting that wrong is silent — the field renders,
-  // the dialog opens, and the result object comes back keyed `undefined`, so
-  // the caller's `v.role` is undefined and nothing happens. That shipped once
-  // and made manager sign-in a no-op.
-  uiForm('Sign in','Hides tools. Does not protect data.',
-    [{key:'email',label:'Your email',type:'text',required:true}],
-    {okText:'Sign in'})
-   .then(function(v){
-     if(!v||!v.email) return;
-     var r=roleForEmail(v.email);
-     if(!r){
-       uiAlert('That address has no role yet. The Operations Officer adds it under People.',
-               'Not on the list');
-       return;
-     }
-     try{ localStorage.setItem(LS_EMAIL,normEmail(v.email)); }catch(e){}
-     setRole(r);
-   });
+  if(!GOOGLE_CLIENT_ID){
+    uiAlert('Google sign-in is not set up yet. Add the client ID to '+
+            'GOOGLE_CLIENT_ID in index.html — the steps are in SETUP-BACKEND.md.',
+            'Not set up');
+    return;
+  }
+  loadGis().then(function(loaded){
+    if(!loaded){
+      uiAlert('Could not reach Google. Check the connection and try again.','Sign-in unavailable');
+      return;
+    }
+    return openModal({
+      title:'Sign in',
+      body:'<div id="gsiBtn" style="display:flex;justify-content:center;padding:8px 0 4px"></div>',
+      cancelText:'Close', noOk:true,
+      onOpen:function(w,close){
+        try{
+          google.accounts.id.initialize({
+            client_id:GOOGLE_CLIENT_ID,
+            callback:function(resp){
+              var email=emailFromIdToken(resp&&resp.credential);
+              googleIdToken=(resp&&resp.credential)||'';
+              close({email:email, role:roleForEmail(email)});
+            }
+          });
+          google.accounts.id.renderButton(w.querySelector('#gsiBtn'),
+            {theme:'outline',size:'large',text:'signin_with',shape:'pill'});
+        }catch(e){ console.error('Google sign-in failed to initialise:',e); }
+      }
+    }).then(function(r){
+      if(!r||!r.email) return;
+      if(!r.role){
+        uiAlert('Signed in as '+r.email+', which has no role here.','No access');
+        return;
+      }
+      try{ localStorage.setItem(LS_EMAIL,r.email); }catch(e){}
+      setRole(r.role);
+    });
+  });
 }
 
 /* ============================================================================
@@ -2054,13 +2102,6 @@ var FORMS={
     extras:[{id:'callnum', label:'Call number', hint:'If you have it. It is how this links to the call record.', short:true},
             {id:'short', label:'Anything you could not replace?',
              hint:'This is the one that matters — an unreplaced item is a gap on the next call.'}]
-  },
-  'post-shift':{
-    host:'postShiftHost', tab:'Post-Shift',
-    lead:'Six things. It takes under a minute.',
-    who:{callsign:true,name:true,andrew:false},
-    fixed:'postShift',
-    extras:[]
   },
   'report':{
     host:'reportHost', tab:'Reports',
@@ -2557,15 +2598,14 @@ function doSubmit(fid,s){
        "2 tourniquets present". Leaving one unticked says something is wrong and a
        manager should look.
 
-       On post-call and post-shift the list describes YOUR TASKS: "shoes tucked
-       back in their cubby", "radio back in the radio room". Leaving one unticked
+       On post-call the list describes YOUR TASKS: "wiped down anything used",
+       "kit back where it belongs". Leaving one unticked
        says you did not do it — that is not an equipment fault, and filing it as
-       one buried the problem log. One post-shift submission with nothing ticked
-       used to create six issues, and one post-call created nine; across eighty
-       members that drowns every real concern within days, including in the
-       Friday email. The counts still reach the spreadsheet either way, which is
-       where "who is not closing out their shift" belongs. */
-    var TASKLIST={'Post-Call':1,'Post-Shift':1};
+       one buried the problem log: a single submission with nothing ticked used to
+       file nine issues, and across eighty members that drowns every real concern
+       within days, including in the Friday email. The counts still reach the
+       spreadsheet either way. */
+    var TASKLIST={'Post-Call':1};
     var area=(c.tab==='Room Checks')?'Office':'Equipment';
     if(!TASKLIST[c.tab]){
       s.missing.forEach(function(m){
@@ -2924,14 +2964,16 @@ function saveOfficer(){
 }
 function addPerson(){
   uiForm('Add someone','',
-    [{key:'email',label:'Email',type:'text',required:true},
-     {key:'role',label:'Role',type:'select',value:'equipment',options:[
+    [{key:'email',label:'Email (their Google account)',type:'text',required:true},
+     {key:'role',label:'Role',type:'select',required:true,value:'equipment',options:[
        {v:'equipment',t:'Equipment Manager'},
        {v:'office',t:'Office Manager'},
        {v:'ops',t:'Operations Officer'}]}],{okText:'Add'})
    .then(function(v){
      if(!v||!v.email) return;
      var e=normEmail(v.email);
+     // Assigning Operations Officer here grants the full role — it does not move
+     // the shared account, which stays whatever is set in the box above.
      DB.access.people=(DB.access.people||[]).filter(function(p){return normEmail(p.email)!==e;});
      DB.access.people.push({email:e,role:v.role||'equipment'});
      saveDB(); renderPeople();
@@ -2950,11 +2992,7 @@ function delPerson(i){
 var QR_TARGETS=[
   {view:'checkout',   title:'Check Out a Bag',   who:'Duty room rack, and the equipment room shelf'},
   {view:'room-check', title:'Room Check',        who:'Post on the tracker board'},
-  {view:'post-call',  title:'Post-Call Restock', who:'Radio room, by the kit shelf'},
-  {view:'post-shift', title:'End of Shift',      who:'By the door and the cubbies'},
-  {view:'report',     title:'Report a Problem',  who:'Anywhere — foyer, equipment room, kitchen'},
-  {view:'bags',       title:"What's in each bag",who:'Inside the equipment room'},
-  {view:'home',       title:'Operations Home',   who:'General purpose'}
+  {view:'post-call',  title:'After a Call',      who:'Radio room, by the kit shelf'}
 ];
 
 function renderQR(){
@@ -3442,7 +3480,7 @@ function renderSettings(){
     'Tabs are created automatically on the first submission of each type: '+
     '<span class="mono">Room Checks</span>, <span class="mono">Checkouts</span>, '+
     '<span class="mono">Bag Checks</span>, <span class="mono">Post-Call</span>, '+
-    '<span class="mono">Post-Shift</span>, <span class="mono">Reports</span>. '+
+    '<span class="mono">Reports</span>. '+
     'Do not rename them.</p>'+
     '<div class="field"><label for="apiUrl">Apps Script Web App URL</label>'+
     '<input type="url" id="apiUrl" placeholder="https://script.google.com/macros/s/…/exec" '+

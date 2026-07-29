@@ -5,7 +5,7 @@ phone that filled it in. This document is how you fix that. It takes about
 twenty minutes and you only do it once.
 
 You will end up with **one Google Sheet** holding **one tab per form** —
-Room Checks, Bag Checks, Post-Call, Post-Shift and Reports side by side in the
+Room Checks, Checkouts, Bag Checks, Post-Call and Reports side by side in the
 same file, which is what makes it possible to write a formula across Equipment
 and Office data.
 
@@ -105,7 +105,7 @@ Google's error pages carry no CORS headers — the browser reports it as a gener
 
 ## 4. Point the site at it
 
-1. Open the site, press **Manager** in the top bar, pick your role.
+1. Open the site, press **Manager** in the top bar and sign in with Google.
 2. Go to **Site Settings**.
 3. Paste the **Web app URL** into the first box and the **spreadsheet URL** into
    the second.
@@ -173,8 +173,6 @@ var LAYOUT = {
   'Post-Call':   ['date', 'submitted', 'callsign', 'name', 'callnum', 'doneCount',
                   'missingCount', 'done', 'missing', 'usageText', 'usageCount',
                   'short', 'usageJson'],
-  'Post-Shift':  ['date', 'submitted', 'callsign', 'name', 'doneCount',
-                  'missingCount', 'done', 'missing'],
   'Reports':     ['date', 'submitted', 'callsign', 'name', 'area', 'urgency',
                   'what', 'where']
 };
