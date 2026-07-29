@@ -64,6 +64,8 @@
     font-family:var(--font-body);font-size:15px;transition:border-color .16s var(--ease),box-shadow .16s var(--ease)}
   input:focus,textarea:focus,select:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-wash)}
   .hint{font-size:12px;color:var(--ink-faint);margin-top:10px}
+  .fieldmsg{font-size:12.5px;margin-top:6px;min-height:1px}
+  .fieldmsg.bad{color:var(--oos);font-weight:600}
   .field{margin-bottom:14px}
   .field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   @media(max-width:640px){.field-row{grid-template-columns:1fr}}
@@ -712,6 +714,7 @@
     <div class="sb-label" data-need="mgr">Manage</div>
     <button type="button" class="sb-item" data-need="mgr" data-view="reports"><span class="ic">▤</span>Reports</button>
     <button type="button" class="sb-item" data-need="equipment" data-view="bag-check"><span class="ic">✚</span>Full Contents Check</button>
+    <button type="button" class="sb-item" data-need="equipment" data-view="toget"><span class="ic">▤</span>To Get</button>
     <button type="button" class="sb-item" data-need="equipment" data-view="inventory"><span class="ic">▦</span>Equipment Inventory</button>
     <button type="button" class="sb-item" data-need="office" data-view="room-check"><span class="ic">✔</span>Room Check</button>
     <button type="button" class="sb-item" data-need="office" data-view="tracker"><span class="ic">▤</span>Duty-Period Tracker</button>
@@ -855,6 +858,13 @@
     </section>
 
     <!-- ===== EQUIPMENT INVENTORY (Equipment Manager) ========================= -->
+    <!-- ===== TO GET (shopping list) ========================================= -->
+    <section class="view" data-view="toget">
+      <h2 class="view-title">To <em>get</em></h2>
+      <p class="view-sub">Everything reported used or missing, still outstanding.</p>
+      <div id="togetHost"></div>
+    </section>
+
     <section class="view" data-view="inventory">
       <h2 class="view-title">Equipment <em>inventory</em></h2>
       <p class="view-sub">Par levels and homes. Counts live in the spreadsheet.</p>
@@ -863,8 +873,8 @@
 
     <!-- ===== REPORTS ========================================================
          What to buy, and what people have flagged, over a chosen period. The
-         site can show this on demand; it cannot send the Friday email, because
-         it is not running on Fridays — that trigger lives in the Apps Script. -->
+         Generated on demand here. Nothing is emailed — the spreadsheet keeps a
+         Restock tab, and To Get is the same list inside the site. -->
     <section class="view" data-view="reports">
       <h2 class="view-title">Ops <em>reports</em></h2>
       <p class="view-sub">What to buy, and what people flagged.</p>
@@ -1806,7 +1816,9 @@ var DEFAULTS={
   ],
 
   issues:[],
-  restockLog:[]
+  // The shopping list. One entry per ITEM, not per report — asking again bumps
+  // the count instead of adding a duplicate line.
+  toGet:[]
 };
 
 
@@ -1882,7 +1894,7 @@ function applyGates(root){
 
 var MANAGER_VIEWS={
   tracker:'office', restock:'office', rooms:'office',
-  inventory:'equipment', 'bag-check':'equipment',
+  inventory:'equipment', 'bag-check':'equipment', toget:'equipment',
   reports:'mgr', log:'mgr', roles:'mgr', qr:'mgr', settings:'mgr',
   learn:'ops', people:'ops'
 };
@@ -2042,6 +2054,7 @@ function go(v,fromHash){
   if(v==='reports') renderReports();
   if(v==='log') renderLog();
   if(v==='readiness') renderReadiness();
+  if(v==='toget') renderToGet();
 
   closeNav();
   window.scrollTo(0,0);
@@ -2095,7 +2108,7 @@ var FORMS={
     who:{callsign:true,name:true,andrew:false},
     fixed:'postCall',
     // The structured bit. Item, how many, which unit it came out of — all
-    // picked, none typed, so the Friday buy-list can actually be summed.
+    // picked, none typed, so the buy-list can actually be summed.
     usage:{label:'What did you use, and from where?',
            hint:'One row per item. This is what the equipment-to-buy report adds up, '+
                 'so a rough count is far more useful than a blank.'},
@@ -2179,10 +2192,13 @@ function renderCheck(fid){
   }
   if(c.who.andrew){
     // Andrew ID is what actually resolves to a person across EMS records; two
-    // members can share a first and last name.
+    // members can share a first and last name. It is always 8 characters, so a
+    // shorter one is a typo and worth catching while they are still looking at
+    // the field rather than after the row has landed in the sheet.
     h+='<div class="field"><label for="'+fid+'-aid">Andrew ID</label>'+
-       '<input type="text" id="'+fid+'-aid" maxlength="10" autocapitalize="none" autocorrect="off" '+
-       'spellcheck="false" oninput="onFormInput(\''+fid+'\')"></div>';
+       '<input type="text" id="'+fid+'-aid" maxlength="8" autocapitalize="none" autocorrect="off" '+
+       'spellcheck="false" inputmode="text" oninput="onFormInput(\''+fid+'\')">'+
+       '<div id="'+fid+'-aidmsg" class="fieldmsg"></div></div>';
   }
   h+='<p class="hint" style="margin-top:0">The date is recorded automatically.</p></div>';
 
@@ -2420,7 +2436,29 @@ function calcCheck(fid){
         'they are filed as missing or not done so someone can follow up.')+'</div></div>';
 }
 
-function onFormInput(fid){ calcCheck(fid); saveDraft(fid); }
+/* An Andrew ID is exactly 8 characters. Anything else is a typo, and a typo here
+   is worse than a blank: it lands in the sheet looking like a real person and
+   nobody can match it back. Warn while the field is still on screen. */
+function andrewState(v){
+  v=String(v||'').trim();
+  if(!v) return {ok:false, empty:true, msg:''};
+  if(v.length!==8) return {ok:false, empty:false,
+    msg:'Andrew IDs are 8 characters — this one is '+v.length+'.'};
+  if(!/^[a-z0-9]+$/i.test(v)) return {ok:false, empty:false,
+    msg:'Letters and numbers only.'};
+  return {ok:true, empty:false, msg:''};
+}
+
+function renderAndrewMsg(fid){
+  var box=document.getElementById(fid+'-aidmsg'); if(!box) return;
+  var el=document.getElementById(fid+'-aid'); if(!el) return;
+  var st=andrewState(el.value);
+  box.textContent=st.msg;
+  box.className='fieldmsg'+(st.msg?' bad':'');
+  el.style.borderColor=st.msg?'var(--oos)':'';
+}
+
+function onFormInput(fid){ renderAndrewMsg(fid); calcCheck(fid); saveDraft(fid); }
 
 /* ---- drafts ----
    Kept out of DB on purpose: a half-finished form is one person's device state,
@@ -2517,6 +2555,15 @@ function submitCheck(fid){
     uiAlert('Still needed: '+missing.join(', ')+'.','Not quite done');
     return;
   }
+  if(c.who.andrew){
+    var a=andrewState(s.andrew);
+    if(!a.ok){
+      renderAndrewMsg(fid);
+      uiAlert(a.empty ? 'Your Andrew ID is needed — 8 characters.' : a.msg,'Check your Andrew ID');
+      var el=document.getElementById(fid+'-aid'); if(el) el.focus();
+      return;
+    }
+  }
   if(!c.freeform && !c.fixed && !c.usage && !s.done.length && !s.missing.length){
     uiAlert('There is nothing ticked on this checklist yet.','Nothing to submit'); return;
   }
@@ -2534,6 +2581,10 @@ function doSubmit(fid,s){
   var c=fcfg(fid);
   var payload={
     form:c.tab, date:s.date, submitted:new Date().toISOString(),
+    // A phone on patchy wifi can fire the same submission twice. The script
+    // keeps the last hundred ids per tab and drops a repeat, so a double-tap or
+    // a retry does not become two rows.
+    sid:uid('s')+'-'+Date.now(),
     callsign:s.callsign, name:(s.first+' '+s.last).trim(), andrew:s.andrew,
     subject:s.pickName, done:s.done.join(' | '), missing:s.missing.join(' | '),
     doneCount:s.done.length, missingCount:s.missing.length
@@ -2543,7 +2594,7 @@ function doSubmit(fid,s){
 
   // Usage goes to the sheet twice, deliberately. `usageText` is one readable
   // cell a human can skim on the Post-Call tab; `usageJson` is the machine copy
-  // the Friday report sums. Writing only the prose version is how the existing
+  // the report sums. Writing only the prose version is how the existing
   // Equipment Exhausted sheet ended up unsummable.
   if(s.usage && s.usage.length){
     payload.usageText=s.usage.map(function(r){
@@ -2559,6 +2610,11 @@ function doSubmit(fid,s){
         call:s.extras.callnum||'', by:(s.first+' '+s.last).trim()||s.callsign||''});
     });
     if(DB.usage.length>2000) DB.usage.length=2000;
+    // Anything used is something to replace, so it goes straight on the list.
+    s.usage.forEach(function(r){
+      wantItem({item:r.item, qty:r.qty, unit:r.unit, cat:'Equipment',
+        where:r.fromName, by:(s.first+' '+s.last).trim()||s.callsign||''});
+    });
     saveDB();
   }
 
@@ -2603,20 +2659,27 @@ function doSubmit(fid,s){
        says you did not do it — that is not an equipment fault, and filing it as
        one buried the problem log: a single submission with nothing ticked used to
        file nine issues, and across eighty members that drowns every real concern
-       within days, including in the Friday email. The counts still reach the
+       within days, including in the reports. The counts still reach the
        spreadsheet either way. */
     var TASKLIST={'Post-Call':1};
     var area=(c.tab==='Room Checks')?'Office':'Equipment';
     if(!TASKLIST[c.tab]){
       s.missing.forEach(function(m){
         addIssue({area:area, urgency:'Soon', what:m, where:s.pickName, by:openedBy});
+        // Something missing from a bag is something to buy, so it joins the list
+        // rather than only sitting in the problem log.
+        if(c.tab==='Bag Checks')
+          wantItem({name:m, cat:'Equipment', where:s.pickName, by:openedBy});
       });
     }
     // Free text is always a real report, on every form — somebody chose to type it.
     [['restock','Office'],['maint','Office'],['short','Equipment']].forEach(function(pair){
       var v=s.extras[pair[0]];
-      if(v) addIssue({area:(c.tab==='Room Checks')?pair[1]:area, urgency:'Soon',
-        what:v, where:s.pickName, by:openedBy});
+      if(!v) return;
+      var ar=(c.tab==='Room Checks')?pair[1]:area;
+      addIssue({area:ar, urgency:'Soon', what:v, where:s.pickName, by:openedBy});
+      // "restock" and "could not replace" are both requests to buy something.
+      if(pair[0]!=='maint') wantItem({name:v, cat:ar, where:s.pickName, by:openedBy});
     });
   }
 
@@ -2884,6 +2947,125 @@ function clearUnit(id){
       (DB.issues||[]).forEach(function(i){ if(i.unit===id) i.open=false; });
       saveDB(); renderReadiness(); renderLog();
     });
+}
+
+/* ---- the shopping list ----
+   One entry per ITEM, keyed by id, not one per report. Asking for the same thing
+   again bumps its count and its last-asked date rather than adding a second
+   line, so the length of this list is the length of the actual job. Ticking an
+   item done greys it; if it is reported again afterwards the row reopens,
+   because a ticked row that is no longer true is worse than no row.
+   Mirrors the Restock tab the Apps Script maintains in the spreadsheet. */
+function wantItem(o){
+  DB.toGet=DB.toGet||[];
+  var key=o.item||('free:'+(o.name||'').toLowerCase());
+  var hit=DB.toGet.filter(function(t){return t.key===key;})[0];
+  var now=Date.now();
+  if(hit){
+    if(hit.done){ hit.done=false; hit.times=1; hit.qty=o.qty||1; hit.first=now; }
+    else { hit.times=(hit.times||1)+1; hit.qty=(hit.qty||0)+(o.qty||1); }
+    hit.last=now;
+    if(o.where) hit.where=o.where;
+    if(o.by) hit.by=o.by;
+  }else{
+    DB.toGet.unshift({key:key, item:o.item||'', name:o.name||'', cat:o.cat||'Equipment',
+      qty:o.qty||1, unit:o.unit||'', times:1, first:now, last:now,
+      where:o.where||'', by:o.by||'', done:false});
+  }
+  if(DB.toGet.length>400) DB.toGet.length=400;
+}
+
+function toGetName(t){
+  if(t.item){
+    var c=(DB.consumables||[]).filter(function(x){return x.id===t.item;})[0];
+    if(c) return c.name;
+  }
+  return t.name||t.item||'—';
+}
+
+function renderToGet(){
+  var host=document.getElementById('togetHost'); if(!host) return;
+  var list=(DB.toGet||[]);
+  var open=list.filter(function(t){return !t.done;});
+  var done=list.filter(function(t){return t.done;});
+  var h='';
+  if(!list.length){
+    h='<div class="card"><p class="hint" style="margin:0">Nothing outstanding. '+
+      'Items land here when a post-call logs usage or a check finds something missing.</p></div>';
+    h+='<div class="row mt"><button class="btn ghost sm" onclick="addToGet()">Add an item</button></div>';
+    host.innerHTML=h; return;
+  }
+  h+='<div class="repgrid"><div class="repstat"><div class="rs-n">'+open.length+
+     '</div><div class="rs-l">to get</div></div>'+
+     '<div class="repstat"><div class="rs-n">'+
+     open.filter(function(t){return (t.times||1)>1;}).length+
+     '</div><div class="rs-l">asked more than once</div></div></div>';
+
+  h+='<div class="invwrap"><table class="invtable"><thead><tr>'+
+     '<th></th><th>Item</th><th>Qty</th><th>Asked</th><th>Last</th><th>Where</th><th></th>'+
+     '</tr></thead><tbody>';
+  open.forEach(function(t,i){
+    var idx=list.indexOf(t);
+    h+='<tr><td><input type="checkbox" onchange="toggleToGet('+idx+')" '+
+       'aria-label="Mark got"></td>'+
+       '<td>'+esc(toGetName(t))+'<br><span style="font-size:11px;color:var(--ink-faint)">'+
+       esc(t.cat)+'</span></td>'+
+       '<td class="num">'+esc(String(t.qty||1))+(t.unit&&t.unit!=='each'?' '+esc(t.unit):'')+'</td>'+
+       '<td class="num"'+((t.times||1)>1?' style="font-weight:700;color:var(--warn)"':'')+'>'+
+       (t.times||1)+'</td>'+
+       '<td style="font-size:12px">'+esc(new Date(t.last).toLocaleDateString())+'</td>'+
+       '<td style="font-size:12px">'+esc(t.where||'—')+'</td>'+
+       '<td><button class="btn xs" onclick="delToGet('+idx+')">✕</button></td></tr>';
+  });
+  h+='</tbody></table></div>';
+
+  h+='<div class="row mt"><button class="btn ghost sm" onclick="addToGet()">Add an item</button>'+
+     '<button class="btn ghost sm" onclick="copyToGet()">Copy list</button>'+
+     '<button class="btn ghost sm" onclick="openSheet()">Open the spreadsheet</button>'+
+     '<span id="togetMsg" style="font-size:13px;color:var(--ink-faint)"></span></div>';
+
+  if(done.length){
+    h+='<div class="acc mt"><button type="button" class="acchead" onclick="toggleAcc(this)">'+
+       '<span class="num">'+done.length+'</span><span>Got</span><span class="chev">▾</span></button>'+
+       '<div class="accbody"><ul class="isslist">'+done.slice(0,60).map(function(t){
+         var idx=list.indexOf(t);
+         return '<li><b style="text-decoration:line-through;color:var(--ink-faint)">'+
+           esc(toGetName(t))+'</b>'+
+           '<button class="issx" onclick="toggleToGet('+idx+')">Undo</button></li>';
+       }).join('')+'</ul></div></div>';
+  }
+  host.innerHTML=h;
+}
+
+function toggleToGet(i){
+  var t=(DB.toGet||[])[i]; if(!t) return;
+  t.done=!t.done; t.last=Date.now();
+  saveDB(); renderToGet();
+}
+function delToGet(i){ (DB.toGet||[]).splice(i,1); saveDB(); renderToGet(); }
+function addToGet(){
+  uiForm('Add an item','',
+    [{key:'name',label:'Item',type:'text',required:true},
+     {key:'qty',label:'How many',type:'number'},
+     {key:'cat',label:'Category',type:'select',value:'Equipment',options:[
+       {v:'Equipment',t:'Equipment'},{v:'Office',t:'Office'}]}],{okText:'Add'})
+   .then(function(v){
+     if(!v||!v.name) return;
+     wantItem({name:v.name.trim(), qty:Math.max(1,parseInt(v.qty,10)||1),
+               cat:v.cat||'Equipment', by:ROLE_LABEL[ROLE]});
+     saveDB(); renderToGet();
+   });
+}
+function copyToGet(){
+  var open=(DB.toGet||[]).filter(function(t){return !t.done;});
+  var txt='CMU EMS — to get\n\n'+open.map(function(t){
+    return '  '+(t.qty||1)+' x '+toGetName(t)+
+      ((t.times||1)>1?'   (asked '+t.times+'x)':''); }).join('\n');
+  var msg=document.getElementById('togetMsg');
+  var done=function(){ if(msg) msg.textContent='Copied.'; };
+  if(navigator.clipboard&&navigator.clipboard.writeText)
+    navigator.clipboard.writeText(txt).then(done,function(){fallbackCopy(txt,done);});
+  else fallbackCopy(txt,done);
 }
 
 /* ---- videos & lectures ---- */
@@ -3213,11 +3395,10 @@ function addInvItem(){
    "an email every friday with a list of equipment to buy and any concerns
    people reported" — that is the ask, and this is the on-demand half of it.
 
-   The site cannot send a Friday email: it only runs when someone has it open.
-   The scheduled send lives in the Apps Script, where a time-driven trigger can
-   fire whether or not anyone is looking. What follows is the same report,
-   generated on demand, so a manager can pull it any time and so the numbers can
-   be sanity-checked against the sheet.
+   Nothing is emailed. Sending mail from the script needs a permission scope
+   that makes Google throw a warning at whoever deploys it, and the same
+   information is better placed where the work happens: the Restock tab in the
+   spreadsheet, and To Get inside the site. This view is the period summary.
    ========================================================================== */
 var REPORT_PERIOD='week';
 
@@ -3324,10 +3505,8 @@ function renderReports(){
   // needs to know whether it covers the whole team or just their own phone.
   h+= live
     ? '<div class="notice"><b>These numbers are from this browser.</b>'+
-      '<p>A spreadsheet is connected, so every submission is being stored — but reading it '+
-      'back into this page needs the reporting endpoint from <span class="mono">SETUP-BACKEND.md</span> '+
-      '§8. Until that is deployed, what you see here covers only what was filed on this device. '+
-      'The Friday email runs inside the Apps Script and does see everything.</p></div>'
+      '<p>Every submission is being stored. This page sums what was filed on this '+
+      'device; the spreadsheet Restock tab sums everything.</p></div>'
     : '<div class="notice warn"><b>No spreadsheet connected.</b>'+
       '<p>Nothing is being stored centrally yet, so this report covers only what was filed on '+
       'this device. Finish Site Settings and the report becomes real.</p></div>';
@@ -3517,9 +3696,9 @@ function saveApi(){
    proves nothing. A GET is readable, so the ping is what actually tells you
    whether the endpoint is live and pointed at the right file. */
 /* The sheet stores item and bag IDs, because an ID survives a rename and a
-   display name does not. That makes the Friday email read "8 x c-bandaid"
-   unless the script knows the names — so this hands them over. Re-run it after
-   renaming or adding anything, or the email will show a raw id for the new one. */
+   display name does not. That makes the spreadsheet Restock tab read
+   "8 x c-bandaid" unless the script knows the names — so this hands them over.
+   Re-run it after renaming or adding anything. */
 function pushNames(){
   var u=((document.getElementById('apiUrl')||{}).value||'').trim()||((DB.api&&DB.api.url)||'');
   var msg=document.getElementById('apiMsg');
@@ -3533,7 +3712,7 @@ function pushNames(){
     .then(function(t){
       var j=null; try{ j=JSON.parse(t); }catch(e){}
       msg.innerHTML = (j&&j.ok&&j.stored)
-        ? '<span style="color:var(--ok)">Names sent — the Friday email will read properly.</span>'
+        ? '<span style="color:var(--ok)">Names sent — the Restock tab will read properly.</span>'
         : '<span style="color:var(--warn)">Reached it, but it did not confirm. The script may '+
           'predate the reporting section of the setup doc.</span>';
     })
@@ -3603,6 +3782,7 @@ function renderAll(){
   renderRestock();
   renderInventory();
   renderReadiness();
+  renderToGet();
   renderLearn();
   renderPeople();
   renderReports();
