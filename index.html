@@ -1361,7 +1361,7 @@ var DEFAULTS={
      older seed, so a corrected bag list actually reaches people instead of
      sitting behind whatever they cached weeks ago. Their own data — submissions,
      the To Get list, the spreadsheet link, who has access — is never touched. */
-  seed:3,
+  seed:5,
 
   // ONE Apps Script Web App in front of ONE spreadsheet. Every form writes to
   // its own tab in that file, so Equipment and Office data sit side by side and
@@ -1395,46 +1395,46 @@ var DEFAULTS={
      for the high-traffic rooms, two elsewhere. `photo` names a file in
      assets/rooms/ and is the reference standard for "clean". */
   rooms:[
-    {id:'equipment', name:'Equipment Room', tier:'high', slots:3, photo:'equipment-room',
+    {id:'equipment', name:'Equipment Room', tier:'high', slots:3, photos:['equipment-room','equipment-room-2'],
      tasks:['Restock the blue bins from the shelf stock','Bags and kits back on their own shelf',
             'Nothing expired left in a stocked bin — pull it and flag it','Shelf and bin labels still readable',
             'Floor clear enough to walk the aisle','Sweep or vacuum the floor']},
-    {id:'radio', name:'Radio Room', tier:'high', slots:3, photo:'radio-room',
+    {id:'radio', name:'Radio Room', tier:'high', slots:3, photos:['radio-room'],
      tasks:['Every radio is in a charger or on the rack','Batteries on charge, none left loose',
             'Chargers powered and none blinking a fault','Desk surface clear','Wipe the desk and keyboard',
             'Vacuum the floor']},
-    {id:'kitchen', name:'Kitchen', tier:'high', slots:3, photo:'',
+    {id:'kitchen', name:'Kitchen', tier:'high', slots:3, photos:[],
      tasks:['Sink empty, dishes washed and put away','Counters wiped down',
             'Fridge checked — anything expired or unlabelled binned','Microwave wiped inside',
             'Trash and recycling taken out if over half full','Sweep or Swiffer the floor']},
-    {id:'training', name:'Training Room', tier:'high', slots:3, photo:'training-room',
+    {id:'training', name:'Training Room', tier:'high', slots:3, photos:['training-room'],
      tasks:['Chairs back around the table','Table wiped down','Manikins and training gear put away',
             'TV and any equipment powered off','Whiteboard cleared','Sweep or Swiffer the floor']},
-    {id:'laundry', name:'Laundry', tier:'high', slots:3, photo:'',
+    {id:'laundry', name:'Laundry', tier:'high', slots:3, photos:[],
      tasks:['Washer empty','Dryer empty, lint trap cleared','Dirty laundry bin not overflowing',
             'Clean bedding folded and put away','Detergent in stock','Floor clear and wiped']},
-    {id:'living', name:'Living Room', tier:'std', slots:2, photo:'living-room',
+    {id:'living', name:'Living Room', tier:'std', slots:2, photos:['living-room'],
      tasks:['Couch cushions straightened, blankets folded','Coffee table clear','Personal items moved to cubbies',
             'Trash emptied if over half full','Vacuum the floor']},
-    {id:'office', name:'Office', tier:'std', slots:2, photo:'small-office',
+    {id:'office', name:'Office', tier:'std', slots:2, photos:['small-office'],
      tasks:['Desk surfaces clear','Loose paperwork filed or shredded','Shredder bin emptied if full',
             'Printer has paper','Wipe the desk','Vacuum the floor']},
-    {id:'tech', name:'Tech Room (R+)', tier:'std', slots:2, photo:'storage-room',
+    {id:'tech', name:'Tech Room (R+)', tier:'std', slots:2, photos:['tech-room'],
      tasks:['Tools returned to the chest','Bins pushed back and labels facing out','Boxes broken down',
             'Nothing blocking the aisle','Sweep or vacuum the floor']},
-    {id:'bath1', name:'Bathroom 1 (front)', tier:'std', slots:2, photo:'bathroom-1',
+    {id:'bath1', name:'Bathroom 1 (front)', tier:'std', slots:2, photos:['bathroom-1'],
      tasks:['Toilet cleaned','Sink and mirror wiped','Toilet paper stocked','Paper towels stocked',
             'Hand soap stocked','Trash emptied','Floor mopped or wiped']},
-    {id:'bath2', name:'Bathroom 2 (back)', tier:'std', slots:2, photo:'bathroom-2',
+    {id:'bath2', name:'Bathroom 2 (back)', tier:'std', slots:2, photos:['bathroom-2'],
      tasks:['Toilet cleaned','Sink and mirror wiped','Shower rinsed, drain clear','Toilet paper stocked',
             'Paper towels stocked','Hand soap stocked','Trash emptied','Floor mopped or wiped']},
-    {id:'hall-up', name:'Upstairs Hallway', tier:'std', slots:2, photo:'',
+    {id:'hall-up', name:'Upstairs Hallway', tier:'std', slots:2, photos:[],
      tasks:['Nothing stored in the walkway','Walls and doorframes free of marks','Vacuum or sweep the floor']},
-    {id:'hall-down', name:'Downstairs Hallway', tier:'std', slots:2, photo:'',
+    {id:'hall-down', name:'Downstairs Hallway', tier:'std', slots:2, photos:[],
      tasks:['Nothing stored in the walkway','Walls and doorframes free of marks','Vacuum or sweep the floor']},
-    {id:'stairs', name:'Stairs', tier:'std', slots:2, photo:'',
+    {id:'stairs', name:'Stairs', tier:'std', slots:2, photos:[],
      tasks:['Steps clear — nothing left on a tread','Handrail wiped','Sweep or vacuum each step']},
-    {id:'foyer', name:'Foyer', tier:'std', slots:2, photo:'',
+    {id:'foyer', name:'Foyer', tier:'std', slots:2, photos:['foyer'],
      tasks:['Shoe cubbies tidy, shoes in their own cubby','Bulletin board current — nothing months out of date',
             'Entry mat straight and clear','Trash emptied','Sweep or vacuum the floor']}
   ],
@@ -1677,10 +1677,7 @@ var DEFAULTS={
          {id:'sq-traction', label:'(1) traction splint'},
          {id:'sq-ked', label:'(1) KED'},
          {id:'sq-vacuum', label:'(2) vacuum splints'}]}
-     ]},
-
-    {id:'trauma', name:'Trauma Bag', active:false, where:'Equipment room',
-     photos:[], note:'Contents not documented yet.', sections:[]}
+     ]}
   ],
 
   /* ---------- post-call --------------------------------------------------
@@ -1781,12 +1778,7 @@ var DEFAULTS={
      they are not claimable tasks. They are still the Office Manager's to look
      after, and there are reference photos, so they appear in the room reference
      without appearing in the check picker. */
-  otherSpaces:[
-    {id:'duty', name:'Duty Room', photo:'duty-room',
-     note:'Jumpkit rack, uniforms and radio chargers.'},
-    {id:'crew', name:'Crew Quarters', photo:'crew-quarters',
-     note:'Bunks, cubbies and personal storage.'}
-  ],
+  otherSpaces:[],
 
   /* ---------- office supplies (non-medical) ----------------------------- */
   officeSupplies:[
@@ -1902,6 +1894,12 @@ var DEFAULTS={
 
   // itemId -> yyyy-mm-dd, so an expiry is typed once rather than every check.
   expiry:{},
+  /* Concerns shown in Reports come from the spreadsheet, and the sheet has no
+     idea what has been dealt with — so clearing one locally used to leave it in
+     the report forever. These are the signatures of concerns that have been
+     handled; the report filters against them. */
+  resolvedKeys:[],
+
   issues:[],
   // The shopping list. One entry per ITEM, not per report — asking again bumps
   // the count instead of adding a duplicate line.
@@ -2558,11 +2556,12 @@ function checkBody(fid){
   // member here, where they are actually standing in the room.
   if(c.pick && c.pick.from==='rooms'){
     var room=DB.rooms.filter(function(r){return r.id===formPick[fid];})[0];
-    if(room && room.photo){
+    if(room && (room.photos||[]).length){
+      var rp=room.photos[0];
       h+='<div class="card mt"><h3>What "done" looks like</h3>'+
          '<button type="button" class="photo" style="max-width:340px" '+
-         'onclick="openLightbox(\'assets/rooms/'+jsq(room.photo)+'.jpg\',\''+jsq(room.name)+'\')">'+
-         '<img src="assets/rooms/'+esc(room.photo)+'.jpg" alt="'+esc(room.name)+
+         'onclick="openLightbox(\'assets/rooms/'+jsq(rp)+'.jpg\',\''+jsq(room.name)+'\')">'+
+         '<img src="assets/rooms/'+esc(rp)+'.jpg" alt="'+esc(room.name)+
          ' reference photo" loading="lazy">'+
          '<div class="pcap">'+esc(room.name)+'<small>Tap to enlarge</small></div></button></div>';
     }
@@ -3011,6 +3010,27 @@ function startAgain(fid){ formDone[fid]=false; renderCheck(fid); }
 /* ============================================================================
    PROBLEM LOG
    ========================================================================== */
+function concernKey(what,where){
+  return String(what||'').trim().toLowerCase()+'|'+String(where||'').trim().toLowerCase();
+}
+function isResolvedConcern(what,where){
+  return (DB.resolvedKeys||[]).indexOf(concernKey(what,where))>=0;
+}
+function resolveConcern(what,where){
+  DB.resolvedKeys=DB.resolvedKeys||[];
+  var k=concernKey(what,where);
+  if(DB.resolvedKeys.indexOf(k)<0) DB.resolvedKeys.push(k);
+  (DB.issues||[]).forEach(function(i){ if(concernKey(i.what,i.where)===k) i.open=false; });
+  if(DB.resolvedKeys.length>800) DB.resolvedKeys.splice(0,DB.resolvedKeys.length-800);
+  saveDB();
+}
+function unresolveConcern(what,where){
+  var k=concernKey(what,where);
+  DB.resolvedKeys=(DB.resolvedKeys||[]).filter(function(x){return x!==k;});
+  (DB.issues||[]).forEach(function(i){ if(concernKey(i.what,i.where)===k) i.open=true; });
+  saveDB();
+}
+
 function addIssue(o){
   // `unit` is the bag-unit id when the problem is about a specific bag. That id
   // is what the readiness board keys on, so status follows a rename.
@@ -3020,6 +3040,13 @@ function addIssue(o){
   if(DB.issues.length>500) DB.issues.length=500;
   saveDB();
 }
+function resolveConcernUI(what,where){
+  resolveConcern(what,where); renderLog(); renderReports(); renderDash(); renderReadiness();
+}
+function reopenConcernUI(what,where){
+  unresolveConcern(what,where); renderLog(); renderReports(); renderDash(); renderReadiness();
+}
+
 function resolveIssue(id){
   DB.issues.forEach(function(i){ if(i.id===id) i.open=false; });
   saveDB(); renderLog();
@@ -3108,11 +3135,12 @@ function renderRooms(){
   var host=document.getElementById('roomsHost'); if(!host) return;
   var h='<div class="photogrid">';
   DB.rooms.forEach(function(r){
-    if(!r.photo) return;
-    h+='<button type="button" class="photo" onclick="openLightbox(\'assets/rooms/'+jsq(r.photo)+
-       '.jpg\',\''+jsq(r.name)+'\')">'+
-       '<img src="assets/rooms/'+esc(r.photo)+'.jpg" alt="'+esc(r.name)+'" loading="lazy">'+
-       '<div class="pcap">'+esc(r.name)+'<small>'+r.slots+' slots per duty period</small></div></button>';
+    (r.photos||[]).forEach(function(ph){
+      h+='<button type="button" class="photo" onclick="openLightbox(\'assets/rooms/'+jsq(ph)+
+         '.jpg\',\''+jsq(r.name)+'\')">'+
+         '<img src="assets/rooms/'+esc(ph)+'.jpg" alt="'+esc(r.name)+'" loading="lazy">'+
+         '<div class="pcap">'+esc(r.name)+'<small>'+r.slots+' slots per duty period</small></div></button>';
+    });
   });
   h+='</div>';
 
@@ -3879,8 +3907,9 @@ function reportData(p){
       byUnit[f]=(byUnit[f]||0)+b.from[f]; }); });
     return {since:r.since, remote:true, buy:buy, byUnit:byUnit,
             usage:[{qty:buy.reduce(function(a,x){return a+x.qty;},0)}],
-            issuesOpen:(r.concerns||[]).map(function(c){
-              return {what:c.what, where:c.where, urgency:c.urgency, open:true}; }),
+            issuesOpen:(r.concerns||[])
+              .filter(function(c){ return !isResolvedConcern(c.what,c.where); })
+              .map(function(c){ return {what:c.what, where:c.where, urgency:c.urgency, open:true}; }),
             issuesAll:(r.concerns||[]), calls:r.calls||0};
   }
   var since=periodStart(p);
@@ -3992,7 +4021,8 @@ function renderReports(){
     h+='<ul class="isslist">'+d.issuesOpen.map(function(i){
       return '<li><span class="tag '+(badge[i.urgency]||'brand')+'">'+esc(i.urgency)+'</span>'+
         '<b>'+esc(i.what)+'</b>'+(i.where?' <span style="color:var(--ink-faint)">— '+esc(i.where)+'</span>':'')+
-        '</li>';
+        '<button class="issx" onclick="clearReportConcern(\''+jsq(i.what)+'\',\''+
+        jsq(i.where||'')+'\')">Mark resolved</button></li>';
     }).join('')+'</ul>';
     var closed=d.issuesAll.length-d.issuesOpen.length;
     if(closed) h+='<p class="hint">'+closed+' more were reported and resolved in this period.</p>';
@@ -4016,6 +4046,11 @@ function renderReports(){
 
   host.innerHTML=h;
   applyGates(host);
+}
+
+function clearReportConcern(what,where){
+  resolveConcern(what,where);
+  renderReports(); renderLog(); renderDash();
 }
 
 function reportText(){
@@ -4073,7 +4108,8 @@ function renderLog(){
       (i.where?' <span style="color:var(--ink-faint)">— '+esc(i.where)+'</span>':'')+
       '<div style="font-size:11.5px;color:var(--ink-faint);margin-top:2px">'+
       esc(i.area)+' · '+esc(i.by||'anonymous')+' · '+new Date(i.at).toLocaleDateString()+'</div>'+
-      '<button class="issx" onclick="'+(isOpen?'resolveIssue':'reopenIssue')+'(\''+i.id+'\')">'+
+      '<button class="issx" onclick="'+(isOpen?'resolveConcernUI':'reopenConcernUI')+
+      '(\''+jsq(i.what)+'\',\''+jsq(i.where||'')+'\')">'+
       (isOpen?'Mark resolved':'Reopen')+'</button></li>';
   };
   h+='<div class="card"><h3>Open — '+open.length+'</h3>';
