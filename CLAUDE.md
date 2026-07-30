@@ -44,6 +44,18 @@ re-read the exact region immediately before each `Edit`.
   role means adding it to `ROLE_LABEL` and to `can()`, nothing else.
 - **`MANAGER_VIEWS` is enforced inside `go()`**, not just by hiding nav items —
   every view is hash-addressable, so hiding a button gates nothing.
+- **The sidebar is grouped by whose job it is**, and every `.sb-label` carries
+  the same `data-need` as the items beneath it. Break that pairing and a role
+  gets a heading with nothing under it, or a button under somebody else's title.
+  `learnNav` is the deliberate exception: `applyGates()` reveals it whenever
+  `DB.learnPublic` is set, so it lives under **Reference**, which is ungated.
+- **`checkAfterUse:true` on a bag TYPE** makes a post-call naming one of its
+  units raise a "Used on a call" concern, so the readiness board shows *Check
+  first* until an equipment manager clears it. Jumpkits have it. It is data on
+  the type, not a hard-coded id — extend it by editing the bag, not `doSubmit`.
+  The flag carries the date on purpose: `resolveConcern()` banks a `what|where`
+  signature in `resolvedKeys` permanently, so a fixed string would mean the
+  first clear silently swallowed every later flag for that bag.
 - **One form engine.** `FORMS` describes every check; `renderCheck`/`readCheck`/
   `calcCheck`/`submitCheck` are generic. Adding a form means adding a `FORMS`
   entry, a `<section class="view">` with a host div, and a `LAYOUT` row in the
@@ -80,6 +92,13 @@ re-read the exact region immediately before each `Edit`.
   `.countline .cl-lbl` and `.photo .pcap` already do.
 - Never use `new Date().toISOString().slice(0,10)` for a local calendar date; it
   returns *tomorrow* after 8pm EDT. Use `todayISO()`.
+- **Bump `seed` once per release, at the end.** Bumping it early then adding more
+  seeded content in the same session leaves your own browser holding the new
+  number with the old data, and `loadDB()` will not re-seed — the change looks
+  like it silently did nothing. Clear `emsops_db_v1` to retest.
+- The photo caption under a bag or room is **the filename** with dashes turned
+  into spaces, so a file whose name no longer matches what it shows is a visible
+  lie, not just untidy. Rename the asset rather than only reassigning it.
 - `.topbar` must span `grid-column:1/-1`, not `1/3` — a hard-coded 2-column span
   conjures an implicit second column back into the single-column mobile layout.
 - The sidebar must not be `display:none` on mobile. QR codes are scanned on

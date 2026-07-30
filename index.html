@@ -719,8 +719,15 @@
          room standards gallery and the item-by-item contents audit are all
          manager detail: useful to the two managers, clutter to the eighty people
          who just took Jumpkit B out for a shift. -->
-    <div class="sb-label">On duty</div>
+    <!-- Grouped by WHOSE JOB IT IS, not by what kind of screen it is. A flat
+         list made the Equipment Manager read past the Office Manager's four
+         screens to find their three, which is how fifteen buttons feel like
+         fifty. Each heading carries the same data-need as the items under it,
+         so applyGates() empties a whole group at once and nobody is left
+         staring at a heading with nothing beneath it. -->
+    <button type="button" class="sb-item" data-need="mgr" data-view="home"><span class="ic">◈</span>Start here</button>
 
+    <div class="sb-label">On duty</div>
     <button type="button" class="sb-item active" data-view="checkout"><span class="ic">▸</span>Check Out a Bag</button>
     <button type="button" class="sb-item" data-view="readiness"><span class="ic">◉</span>What's Ready</button>
     <button type="button" class="sb-item" data-view="post-call"><span class="ic">↻</span>After a Call</button>
@@ -728,24 +735,32 @@
 
     <div class="sb-label">Reference</div>
     <button type="button" class="sb-item" data-view="bags"><span class="ic">▩</span>What's in each bag</button>
+    <!-- Videos sits here, not under Operations Officer: applyGates() can reveal
+         it to everyone when DB.learnPublic is on, and under an ops-gated heading
+         that would strand a lone button beneath somebody else's title. -->
+    <button type="button" class="sb-item" id="learnNav" data-view="learn"><span class="ic">▶</span>Videos &amp; Lectures</button>
     <a class="sb-item sb-ext" href="https://sonnnnnion.github.io/bike-ops/" target="_blank" rel="noopener"><span class="ic">⚙</span>Bike Ops<span class="ext-mark">↗</span></a>
 
-    <div class="sb-label" data-need="mgr">Manage</div>
-    <button type="button" class="sb-item" data-need="mgr" data-view="home"><span class="ic">◈</span>Start here</button>
-    <button type="button" class="sb-item" data-need="mgr" data-view="reports"><span class="ic">▤</span>Reports</button>
+    <div class="sb-label" data-need="equipment">Equipment Manager</div>
     <button type="button" class="sb-item" data-need="equipment" data-view="bag-check"><span class="ic">✚</span>Full Contents Check</button>
-    <button type="button" class="sb-item" data-need="equipment" data-view="toget"><span class="ic">▤</span>To Get</button>
     <button type="button" class="sb-item" data-need="equipment" data-view="inventory"><span class="ic">▦</span>Equipment Inventory</button>
+    <button type="button" class="sb-item" data-need="equipment" data-view="toget"><span class="ic">▤</span>To Get</button>
+
+    <div class="sb-label" data-need="office">Office Manager</div>
     <button type="button" class="sb-item" data-need="office" data-view="room-check"><span class="ic">✔</span>Room Check</button>
-    <button type="button" class="sb-item" data-need="office" data-view="tracker"><span class="ic">▤</span>Duty-Period Tracker</button>
     <button type="button" class="sb-item" data-need="office" data-view="rooms"><span class="ic">▦</span>Rooms &amp; Standards</button>
+    <button type="button" class="sb-item" data-need="office" data-view="tracker"><span class="ic">▤</span>Duty-Period Tracker</button>
     <button type="button" class="sb-item" data-need="office" data-view="restock"><span class="ic">▤</span>Office Restock List</button>
+
+    <div class="sb-label" data-need="mgr">Oversight</div>
+    <button type="button" class="sb-item" data-need="mgr" data-view="reports"><span class="ic">▤</span>Reports</button>
     <button type="button" class="sb-item" data-need="mgr" data-view="log"><span class="ic">⚑</span>Reported Problems</button>
     <button type="button" class="sb-item" data-need="mgr" data-view="roles"><span class="ic">§</span>Role Checklists</button>
     <button type="button" class="sb-item" data-need="mgr" data-view="qr"><span class="ic">▤</span>QR Codes</button>
-    <button type="button" class="sb-item" id="learnNav" data-need="ops" data-view="learn"><span class="ic">▶</span>Videos &amp; Lectures</button>
-    <button type="button" class="sb-item" data-need="ops" data-view="people"><span class="ic">◈</span>People</button>
     <button type="button" class="sb-item" data-need="mgr" data-view="settings"><span class="ic">⚙</span>Site Settings</button>
+
+    <div class="sb-label" data-need="ops">Operations Officer</div>
+    <button type="button" class="sb-item" data-need="ops" data-view="people"><span class="ic">◈</span>People</button>
   </nav>
 
   <main>
@@ -1361,7 +1376,7 @@ var DEFAULTS={
      older seed, so a corrected bag list actually reaches people instead of
      sitting behind whatever they cached weeks ago. Their own data — submissions,
      the To Get list, the spreadsheet link, who has access — is never touched. */
-  seed:5,
+  seed:6,
 
   // ONE Apps Script Web App in front of ONE spreadsheet. Every form writes to
   // its own tab in that file, so Equipment and Office data sit side by side and
@@ -1446,9 +1461,12 @@ var DEFAULTS={
      they start inactive with a first-draft list rather than a blank one. */
   bags:[
     /* ---- Jumpkit: transcribed from the Jumpkit Checkout Form, section 2 ----
-       No photo: the red Iron Duck pictures are the Specialty Bag, not this. */
+       No photo: the orange Iron Duck pictures are the Specialty Bag and the red
+       one is the MCI bag, so nothing we have actually shows a jumpkit.
+       `checkAfterUse` puts the unit on "Check first" after a post-call names it —
+       these are the bags that go out on every call and come back depleted. */
     {id:'jumpkit', name:'Jumpkit', active:true, where:'Duty room rack', photos:[],
-     note:'',
+     checkAfterUse:true, note:'',
      sections:[
        {name:'Main compartment', items:[
          {id:'jk-clip', label:'Clipboard with (4) refusal forms, (4) alcohol refusal forms, (3) PEMS transfer of care forms, (1) pen'},
@@ -1591,7 +1609,7 @@ var DEFAULTS={
     /* ---- Specialty Bag: bagcontents.pdf. A few lines in that PDF do not
            decode cleanly and are left out rather than guessed. ---- */
     {id:'specialty', name:'Specialty Bag', active:true, where:'Squad trunk',
-     photos:['jumpkit-closed','jumpkit-open','jumpkit-closed-alt'], note:'',
+     photos:['specialty-closed','specialty-open'], note:'',
      sections:[
        {name:'Main compartment', items:[
          {id:'sp-gloves', label:'(3 ea.) S, M, L, XL gloves'},
@@ -1628,28 +1646,34 @@ var DEFAULTS={
 
     /* ---- MCI Bag: bagcontents.pdf ---- */
     {id:'mci', name:'MCI Bag', active:true, where:'Squad trunk',
-     photos:['mci-kit'], note:'',
+     photos:['mci-closed','mci-fanny-pack','mci-region-13'], note:'',
      sections:[
        {name:'Main compartment', items:[
          {id:'mci-glovesm', label:'(1) box medium gloves'},
          {id:'mci-glovesl', label:'(2) box large gloves'},
          {id:'mci-board', label:'(1) dry erase board w/ marker'},
          {id:'mci-tarp', label:'(1) blue tarp'},
-         {id:'mci-regionbag', label:'(1) Region 13 MCI bag (clear bag)'},
-         {id:'mci-n95', label:'(12) N-95 masks'},
+         {id:'mci-regionbag', label:'(1) Region 13 MCI bag (clear bag)'}]},
+       {name:'Left compartment', items:[
          {id:'mci-cats3', label:'(3) CATs'}]},
-       {name:'Triage', items:[
+       {name:'Right compartment', items:[
+         {id:'mci-n95', label:'(12) N-95 masks'}]},
+       {name:'Front', items:[
+         {id:'mci-fanny-front', label:'(2) MCI triage fanny packs'}]},
+       {name:'Back', items:[
+         {id:'mci-fanny-back', label:'(2) MCI triage fanny packs'}]},
+       {name:'Inside each triage fanny pack', items:[
          {id:'mci-sharpie', label:'(1) Sharpie'},
          {id:'mci-shears', label:'(1) pair trauma shears'},
+         {id:'mci-fp-cats', label:'(3) CATs'},
          {id:'mci-npakit', label:'(1) NPA kit'},
-         {id:'mci-tags', label:'(6) triage tags'},
+         {id:'mci-tags', label:'(5) triage tags'},
          {id:'mci-blacktags', label:'(3) black tags'},
          {id:'mci-combine', label:'(4) combine pads'},
          {id:'mci-qcrolled', label:'(1) rolled Quickclot gauze', exp:true},
          {id:'mci-qc4x4', label:'(2) 4x4 Quickclot gauze', exp:true},
-         {id:'mci-chestseal', label:'(1) Hyfin twin pack chest seals', exp:true},
-         {id:'mci-fanny', label:'(2) MCI triage fanny packs'}]},
-       {name:'Scene', items:[
+         {id:'mci-chestseal', label:'(1) Hyfin twin pack chest seals', exp:true}]},
+       {name:'Inside the Region 13 MCI bag', items:[
          {id:'mci-smart', label:'(1) SMART triage bag'},
          {id:'mci-paint', label:'(1) can spray paint'},
          {id:'mci-duct', label:'(1) roll duct tape'},
@@ -1657,7 +1681,8 @@ var DEFAULTS={
          {id:'mci-triagetape', label:'(1) set triage tape'},
          {id:'mci-vests', label:'(2) MCI safety vests'},
          {id:'mci-chemlights', label:'Blue, red, yellow and green chemlights'},
-         {id:'mci-postits', label:'(1) pack Post-Its, Sharpies, pens, pencils'}]}
+         {id:'mci-postits', label:'(1) pack Post-Its'},
+         {id:'mci-writing', label:'Sharpies, pens, pencils'}]}
      ]},
 
     /* ---- Squad car: bagcontents.pdf ---- */
@@ -2086,9 +2111,22 @@ function openRolePicker(){
     }
     return openModal({
       title:'Sign in',
-      body:'<div id="gsiBtn" style="display:flex;justify-content:center;padding:8px 0 4px"></div>',
+      body:'<div id="gsiBtn" style="display:flex;justify-content:center;padding:8px 0 4px"></div>'+
+           '<div id="gsiErr" hidden></div>',
       cancelText:'Close', noOk:true,
       onOpen:function(w,close){
+        // Google refusing the client is the one failure that looks like nothing
+        // happening: the button renders, the popup opens, and it dies inside
+        // Google's own page with "Error 401: disabled_client". Nothing reaches
+        // us, so say up front what that error means and who can fix it —
+        // otherwise the next person concludes the site is broken.
+        var showTrouble=function(msg){
+          var box=w.querySelector('#gsiErr'); if(!box) return;
+          box.hidden=false;
+          box.innerHTML='<p style="font-size:12.5px;line-height:1.5;color:var(--ink-mute);'+
+            'margin:14px 0 0;padding-top:12px;border-top:1px solid var(--rule)">'+
+            esc(msg)+'</p>';
+        };
         try{
           google.accounts.id.initialize({
             client_id:GOOGLE_CLIENT_ID,
@@ -2096,11 +2134,23 @@ function openRolePicker(){
               var email=emailFromIdToken(resp&&resp.credential);
               googleIdToken=(resp&&resp.credential)||'';
               close({email:email, role:roleForEmail(email)});
+            },
+            error_callback:function(err){
+              console.error('Google sign-in error:',err);
+              showTrouble('Google refused the sign-in. If it said "Error 401: '+
+                'disabled_client", this site’s OAuth client no longer exists — '+
+                'the Operations Officer has to make a new one and paste its ID '+
+                'into GOOGLE_CLIENT_ID. The steps are in SETUP-BACKEND.md §7.');
             }
           });
           google.accounts.id.renderButton(w.querySelector('#gsiBtn'),
             {theme:'outline',size:'large',text:'signin_with',shape:'pill'});
-        }catch(e){ console.error('Google sign-in failed to initialise:',e); }
+        }catch(e){
+          console.error('Google sign-in failed to initialise:',e);
+          showTrouble('Google sign-in could not start on this device. If Google '+
+            'reports "disabled_client", the OAuth client needs replacing — see '+
+            'SETUP-BACKEND.md §7.');
+        }
       }
     }).then(function(r){
       if(!r||!r.email) return;
@@ -2927,6 +2977,35 @@ function doSubmit(fid,s){
       where:s.pickName, unit:(c.pick&&c.pick.from==='units')?s.pick:'', by:openedBy});
     wantItem({name:m, cat:'Equipment', where:s.pickName, by:openedBy});
   });
+  // A bag that came back from a call is not known-complete — something came out
+  // of it. Flagging it amber makes the next person open it before they rely on
+  // it, and an equipment manager clears it with the same "Mark fixed" as any
+  // other concern. Which kinds get flagged is data on the bag TYPE, not a
+  // hard-coded id, so covering the event bag later is an edit rather than a patch.
+  if(c.tab==='Post-Call'){
+    var flaggedUnits={};
+    (s.usage||[]).forEach(function(r){
+      if(!r.from || flaggedUnits[r.from]) return;
+      var unit=(DB.bagUnits||[]).filter(function(x){return x.id===r.from;})[0];
+      if(!unit) return;
+      var type=(DB.bags||[]).filter(function(b){return b.id===unit.type;})[0];
+      if(!type || !type.checkAfterUse) return;
+      flaggedUnits[r.from]=1;
+      // One open flag per bag. A jumpkit used on four calls before anyone gets
+      // to it is still one thing to check, and four identical rows would bury
+      // the real concerns underneath them.
+      var already=(DB.issues||[]).filter(function(i){
+        return i.open && i.unit===r.from &&
+               String(i.what).indexOf(USED_ON_CALL)===0; }).length;
+      if(already) return;
+      // The date rides along deliberately. Clearing a concern from the log banks
+      // its what|where signature in resolvedKeys forever, so a fixed string
+      // would mean the first clear silently swallowed every later flag for that
+      // bag. A date that changes keeps each one its own concern.
+      addIssue({area:'Equipment', urgency:'Soon', what:USED_ON_CALL+' '+s.date,
+        where:unit.name, unit:r.from, by:openedBy});
+    });
+  }
   if(false){
     // A checkout only raises a problem when the member says there is one.
     if(s.radios.condition && s.radios.condition!=='Complete'){
@@ -3010,6 +3089,10 @@ function startAgain(fid){ formDone[fid]=false; renderCheck(fid); }
 /* ============================================================================
    PROBLEM LOG
    ========================================================================== */
+/* Opening text of the flag a post-call raises against the bag it used. Matched
+   by prefix rather than equality, because the date is appended — see doSubmit. */
+var USED_ON_CALL='Used on a call';
+
 function concernKey(what,where){
   return String(what||'').trim().toLowerCase()+'|'+String(where||'').trim().toLowerCase();
 }
