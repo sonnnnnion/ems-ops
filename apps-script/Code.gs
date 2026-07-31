@@ -125,6 +125,7 @@ function doPost(e) {
   try {
     var p = JSON.parse(e.postData.contents);
     if (p.form === '__content') return saveContent(p);
+    if (p.form === '__restock') return setRestockGot(p);
     var conf = SHEETS[p.form] || SHEETS['Reports'];
     var sh = ensureSheet(conf);
     if (alreadySeen(sh, conf, p.sid)) return json({ result: 'duplicate ignored' });
@@ -337,31 +338,30 @@ function verifiedEmail(idToken, clientId) {
   } catch (err) { return ''; }
 }
 
-function saveContent(p) {
-  var props = PropertiesService.getScriptProperties();
+/* Who may write manager-level data — publishing content, and ticking Restock.
+   Returns the name to record, or '' for refused.
 
-  // Two ways in, and the endpoint is public, so BOTH have to be real checks.
-  //
-  // 1. A Google ID token, verified with Google and matched against the people
-  //    the site says are managers. Strongest: it names a person, and removing
-  //    them under People takes the access away.
-  //
-  // 2. A PUBLISH_KEY script property, matched against a key the officer types
-  //    into Site Settings. Weaker on purpose — it says "whoever holds this",
-  //    not "who you are" — but the key is never in the public repo or the page
-  //    source; it lives in one browser's localStorage. Set the property only
-  //    while you want this route open, and clear it to close it again.
-  //
-  // If neither is configured, nothing may publish. That is the safe default:
-  // an unauthenticated write here would let any visitor rewrite the site.
+   Two ways in, and the endpoint is public, so BOTH have to be real checks.
+
+   1. A Google ID token, verified with Google and matched against the people the
+      site says are managers. Strongest: it names a person, and removing them
+      under People takes the access away.
+
+   2. A PUBLISH_KEY script property, matched against a key the officer types into
+      Site Settings. Weaker on purpose — it says "whoever holds this", not "who
+      you are" — but the key is never in the public repo or the page source; it
+      lives in one browser's localStorage. Set the property only while you want
+      this route open, and delete it to close it again.
+
+   If neither is configured, nothing may write. That is the safe default: an
+   unauthenticated write here would let any visitor rewrite the site. */
+function writerName(p) {
+  var props = PropertiesService.getScriptProperties();
   var key = props.getProperty('PUBLISH_KEY');
-  if (key && p.key && String(p.key) === String(key)) {
-    props.setProperty('CONTENT',
-      JSON.stringify({ at: Date.now(), by: 'publish key', content: p.content }));
-    return json({ ok: true, saved: true });
-  }
+  if (key && p.key && String(p.key) === String(key)) return 'publish key';
 
   var who = verifiedEmail(p.idToken, props.getProperty('CLIENT_ID'));
+  if (!who) return '';
   var allowed = MANAGER_EMAILS.map(function (e) { return e.toLowerCase(); });
   // Anyone the site has been told is a manager may publish; the officer address
   // and the People list travel inside the content itself.
@@ -373,9 +373,61 @@ function saveContent(p) {
       (c.people || []).forEach(function (x) { allowed.push(String(x.email).toLowerCase()); });
     } catch (err) {}
   }
-  if (!who || allowed.indexOf(who) < 0) return json({ ok: false, error: 'not allowed' });
-  props.setProperty('CONTENT', JSON.stringify({ at: Date.now(), by: who, content: p.content }));
+  return allowed.indexOf(who) < 0 ? '' : who;
+}
+
+function saveContent(p) {
+  var who = writerName(p);
+  if (!who) return json({ ok: false, error: 'not allowed' });
+  PropertiesService.getScriptProperties()
+    .setProperty('CONTENT', JSON.stringify({ at: Date.now(), by: who, content: p.content }));
   return json({ ok: true, saved: true });
+}
+
+// ---- Restock, read and tick ------------------------------------------------
+// The sheet is the shopping list of record: every device's submissions land in
+// it, where the site's own To Get only ever saw what that one browser filed.
+// These two let the site show the real list and tick it off from a phone.
+
+function restockRows() {
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(RESTOCK.name);
+  if (!sh) return [];
+  var last = sh.getLastRow();
+  if (last < 2) return [];
+  var tz = Session.getScriptTimeZone();
+  var asDate = function (v) {
+    if (!v) return '';
+    // Written as yyyy-MM-dd strings, but a human editing the cell can turn one
+    // back into a real Date, so handle both rather than printing [object Date].
+    return (v instanceof Date) ? Utilities.formatDate(v, tz, 'yyyy-MM-dd') : String(v);
+  };
+  return sh.getRange(2, 1, last - 1, RESTOCK.headers.length).getValues()
+    .filter(function (r) { return String(r[1] || '').trim() !== ''; })
+    .map(function (r) {
+      return { got: r[0] === true, item: String(r[1]), cat: String(r[2] || ''),
+               qty: Number(r[3]) || 0, times: Number(r[4]) || 0,
+               first: asDate(r[5]), last: asDate(r[6]),
+               where: String(r[7] || ''), who: String(r[8] || '') };
+    });
+}
+
+function setRestockGot(p) {
+  if (!writerName(p)) return json({ ok: false, error: 'not allowed' });
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(RESTOCK.name);
+  if (!sh) return json({ ok: false, error: 'no restock tab' });
+  var last = sh.getLastRow();
+  if (last < 2) return json({ ok: false, error: 'nothing to tick' });
+  // Matched on the item text, which is the same key addToRestock indexes on.
+  // Not the row number: a sort or an inserted row would tick the wrong thing.
+  var names = sh.getRange(2, 2, last - 1, 1).getValues();
+  for (var i = 0; i < names.length; i++) {
+    if (String(names[i][0]) === String(p.item)) {
+      sh.getRange(i + 2, 1).setValue(p.got === true);
+      paintRestock(sh);
+      return json({ ok: true, set: true });
+    }
+  }
+  return json({ ok: false, error: 'not found' });
 }
 
 // ---- reports ----------------------------------------------------------------
@@ -472,6 +524,9 @@ function doGet(e) {
   }
   if (p.report) {
     return json({ ok: true, report: collectReport(p.report) });
+  }
+  if (p.restock) {
+    return json({ ok: true, restock: restockRows() });
   }
   if (p.names) {
     PropertiesService.getScriptProperties().setProperty('NAMES', p.names);

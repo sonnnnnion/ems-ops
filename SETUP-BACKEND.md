@@ -143,6 +143,13 @@ repaint Restock). Everything else is called by those.
 It creates seven tabs on demand: Room Checks, Checkouts, Bag Checks, Post-Call,
 Reports, Items and Restock.
 
+**Restock is the shopping list of record.** Every device's submissions land in
+it, and the site reads it back under **To Get** — so a manager sees what all
+eighty members filed, not just what they filed themselves. Ticking `Got` works
+from either end: tick it in the sheet, or tick it in To Get and the site writes
+it through and re-reads to confirm. Writing a tick needs the same permission as
+publishing (§7), because it changes what everyone else sees.
+
 ---
 
 ## 7. Manager sign-in (the OAuth client)

@@ -2446,7 +2446,9 @@ function go(v,fromHash){
   if(v==='reports'){ remoteReport[REPORT_PERIOD]=null; renderReports(); }
   if(v==='log') renderLog();
   if(v==='readiness') renderReadiness();
-  if(v==='toget') renderToGet();
+  // Paint what we have immediately, then replace it with the sheet's copy when
+  // it lands — the list is the same shape either way, so nothing jumps about.
+  if(v==='toget'){ renderToGet(); fetchRestock().then(function(){ renderToGet(); }); }
 
   closeNav();
   window.scrollTo(0,0);
@@ -3692,12 +3694,36 @@ function toGetName(t){
   return t.name||t.item||'—';
 }
 
+/* The sheet sends yyyy-MM-dd, the local list stores a timestamp. Show the sheet's
+   string as-is rather than through new Date(): parsing a bare yyyy-MM-dd treats
+   it as UTC, which prints yesterday for anyone west of Greenwich. */
+function toGetDate(t){
+  if(!t.last) return '—';
+  if(t.remote) return String(t.last);
+  var d=new Date(t.last);
+  return isNaN(d.getTime())?'—':d.toLocaleDateString();
+}
+
 function renderToGet(){
   var host=document.getElementById('togetHost'); if(!host) return;
-  var list=(DB.toGet||[]);
+  var remote=!!remoteRestock;
+  // One shape either way, so the table below does not care which list it got.
+  var list=remote
+    ? remoteRestock.map(function(r){
+        return {name:r.item, cat:r.cat||'Equipment', qty:r.qty, times:r.times,
+                last:r.last, where:r.where, done:r.got, item:r.item, remote:true};
+      })
+    : (DB.toGet||[]);
   var open=list.filter(function(t){return !t.done;});
   var done=list.filter(function(t){return t.done;});
   var h='';
+  if(remote||restockState.error){
+    h+='<p style="font-size:12px;color:var(--ink-faint);margin:0 0 10px">'+
+       (restockState.error
+         ? esc(restockState.error)
+         : 'From the spreadsheet — everyone’s checks, not just this device.')+
+       '</p>';
+  }
   if(!list.length){
     h='<div class="card"><p class="hint" style="margin:0">Nothing outstanding. '+
       'Items land here when a post-call logs usage or a check finds something missing.</p></div>';
@@ -3715,16 +3741,22 @@ function renderToGet(){
      '</tr></thead><tbody>';
   open.forEach(function(t,i){
     var idx=list.indexOf(t);
-    h+='<tr><td><input type="checkbox" onchange="toggleToGet('+idx+')" '+
+    var tick=t.remote
+      ? 'toggleRestock(\''+jsq(t.item)+'\',true)'
+      : 'toggleToGet('+idx+')';
+    h+='<tr><td><input type="checkbox" onchange="'+tick+'" '+
        'aria-label="Mark got"></td>'+
        '<td>'+esc(toGetName(t))+'<br><span style="font-size:11px;color:var(--ink-faint)">'+
        esc(t.cat)+'</span></td>'+
        '<td class="num">'+esc(String(t.qty||1))+(t.unit&&t.unit!=='each'?' '+esc(t.unit):'')+'</td>'+
        '<td class="num"'+((t.times||1)>1?' style="font-weight:700;color:var(--warn)"':'')+'>'+
        (t.times||1)+'</td>'+
-       '<td style="font-size:12px">'+esc(new Date(t.last).toLocaleDateString())+'</td>'+
+       '<td style="font-size:12px">'+esc(toGetDate(t))+'</td>'+
        '<td style="font-size:12px">'+esc(t.where||'—')+'</td>'+
-       '<td><button class="btn xs" onclick="delToGet('+idx+')">✕</button></td></tr>';
+       // Removing a row from the sheet is the sheet's job — a delete here would
+       // have to be undone there, and the two would disagree in the meantime.
+       '<td>'+(t.remote?'':'<button class="btn xs" onclick="delToGet('+idx+')">✕</button>')+
+       '</td></tr>';
   });
   h+='</tbody></table></div>';
 
@@ -3738,18 +3770,77 @@ function renderToGet(){
        '<span class="num">'+done.length+'</span><span>Got</span><span class="chev">▾</span></button>'+
        '<div class="accbody"><ul class="isslist">'+done.slice(0,60).map(function(t){
          var idx=list.indexOf(t);
+         var undo=t.remote
+           ? 'toggleRestock(\''+jsq(t.item)+'\',false)'
+           : 'toggleToGet('+idx+')';
          return '<li><b style="text-decoration:line-through;color:var(--ink-faint)">'+
            esc(toGetName(t))+'</b>'+
-           '<button class="issx" onclick="toggleToGet('+idx+')">Undo</button></li>';
+           '<button class="issx" onclick="'+undo+'">Undo</button></li>';
        }).join('')+'</ul></div></div>';
   }
   host.innerHTML=h;
+}
+
+/* ---- the shopping list, read back from the sheet ----------------------------
+   DB.toGet only ever held what THIS browser filed, because wantItem() runs on
+   submit and nothing came the other way. Every post-call filed on somebody's
+   phone reached the Restock tab and never reached here, so the list a manager
+   shopped from was a fraction of the real one.
+
+   The sheet is the list of record now. When it can be reached, To Get renders
+   from it and ticks write through; when it cannot, the local list is the
+   fallback so the view still works offline and before a backend exists. One
+   source at a time, deliberately — merging two done-flags with no idea which is
+   newer is how an item gets bought twice or not at all. */
+var remoteRestock=null, restockState={loading:false, error:''};
+
+function fetchRestock(){
+  var url=(DB.api&&DB.api.url)||'';
+  if(!url) return Promise.resolve(null);
+  restockState.loading=true; restockState.error='';
+  return fetch(url+(url.indexOf('?')<0?'?':'&')+'restock=1')
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      restockState.loading=false;
+      if(!j||!j.ok||!j.restock) throw 0;
+      remoteRestock=j.restock;
+      return remoteRestock;
+    })
+    .catch(function(){
+      restockState.loading=false;
+      // Say so rather than quietly showing the local list as if it were the
+      // real one — that is the bug this whole thing is fixing.
+      restockState.error='Could not reach the spreadsheet. Showing this device only.';
+      return null;
+    });
 }
 
 function toggleToGet(i){
   var t=(DB.toGet||[])[i]; if(!t) return;
   t.done=!t.done; t.last=Date.now();
   saveDB(); renderToGet();
+}
+
+function toggleRestock(item,got){
+  var url=(DB.api&&DB.api.url)||''; if(!url) return;
+  var row=(remoteRestock||[]).filter(function(r){return r.item===item;})[0];
+  if(row) row.got=got;                       // optimistic, so the tick feels instant
+  renderToGet();
+  var msg=document.getElementById('togetMsg');
+  if(msg) msg.textContent='Saving…';
+  fetch(url,{method:'POST', mode:'no-cors',
+    headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body:JSON.stringify({form:'__restock', item:item, got:got,
+                         idToken:googleIdToken, key:(DB.api&&DB.api.key)||''})});
+  // no-cors means the reply is unreadable, so the only honest confirmation is
+  // to read the sheet back and re-render from what it actually says.
+  setTimeout(function(){
+    fetchRestock().then(function(){
+      renderToGet();
+      var m=document.getElementById('togetMsg');
+      if(m) m.textContent=restockState.error?'':'Saved to the spreadsheet.';
+    });
+  },1200);
 }
 function delToGet(i){ (DB.toGet||[]).splice(i,1); saveDB(); renderToGet(); }
 function addToGet(){
@@ -3766,8 +3857,12 @@ function addToGet(){
    });
 }
 function copyToGet(){
-  var open=(DB.toGet||[]).filter(function(t){return !t.done;});
-  var txt='CMU EMS — to get\n\n'+open.map(function(t){
+  // Copy what is on screen, which is the sheet's list whenever it loaded.
+  var src=remoteRestock
+    ? remoteRestock.filter(function(r){return !r.got;})
+        .map(function(r){return {name:r.item, qty:r.qty, times:r.times};})
+    : (DB.toGet||[]).filter(function(t){return !t.done;});
+  var txt='CMU EMS — to get\n\n'+src.map(function(t){
     return '  '+(t.qty||1)+' x '+toGetName(t)+
       ((t.times||1)>1?'   (asked '+t.times+'x)':''); }).join('\n');
   var msg=document.getElementById('togetMsg');
