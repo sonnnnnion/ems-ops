@@ -339,6 +339,28 @@ function verifiedEmail(idToken, clientId) {
 
 function saveContent(p) {
   var props = PropertiesService.getScriptProperties();
+
+  // Two ways in, and the endpoint is public, so BOTH have to be real checks.
+  //
+  // 1. A Google ID token, verified with Google and matched against the people
+  //    the site says are managers. Strongest: it names a person, and removing
+  //    them under People takes the access away.
+  //
+  // 2. A PUBLISH_KEY script property, matched against a key the officer types
+  //    into Site Settings. Weaker on purpose — it says "whoever holds this",
+  //    not "who you are" — but the key is never in the public repo or the page
+  //    source; it lives in one browser's localStorage. Set the property only
+  //    while you want this route open, and clear it to close it again.
+  //
+  // If neither is configured, nothing may publish. That is the safe default:
+  // an unauthenticated write here would let any visitor rewrite the site.
+  var key = props.getProperty('PUBLISH_KEY');
+  if (key && p.key && String(p.key) === String(key)) {
+    props.setProperty('CONTENT',
+      JSON.stringify({ at: Date.now(), by: 'publish key', content: p.content }));
+    return json({ ok: true, saved: true });
+  }
+
   var who = verifiedEmail(p.idToken, props.getProperty('CLIENT_ID'));
   var allowed = MANAGER_EMAILS.map(function (e) { return e.toLowerCase(); });
   // Anyone the site has been told is a manager may publish; the officer address

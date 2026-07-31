@@ -1957,6 +1957,44 @@ function saveDB(){
   markContentDirty();
   try{ localStorage.setItem(LS_DB,JSON.stringify(DB)); }
   catch(e){ /* private mode / quota — the site still works, edits just don't persist */ }
+  syncNames();
+}
+
+/* ---- keeping the sheet's id→name map current --------------------------------
+   The sheet stores item ids, because an id survives a rename. The script turns
+   them back into names using a map it was sent once, so the map going stale is
+   invisible until somebody opens Restock and finds `c-bandaid` on the shopping
+   list. Asking a manager to remember a button after every rename was never
+   going to hold, so this rides on saveDB: it compares the current map with the
+   last one the script confirmed, and only when they differ does it send.
+   Cheap enough to sit in the save path — the map is a few dozen short strings. */
+var LS_NAMESENT='emsops_namessent_v1', _namesTimer=null;
+function nameMapJSON(){
+  var n={items:{},units:{}};
+  (DB.consumables||[]).forEach(function(c){ n.items[c.id]=c.name; });
+  (DB.bagUnits||[]).forEach(function(b){ n.units[b.id]=b.name; });
+  return JSON.stringify(n);
+}
+function syncNames(force){
+  var url=(DB.api&&DB.api.url)||''; if(!url) return;
+  var body=nameMapJSON();
+  if(!force){
+    var sent=null; try{ sent=localStorage.getItem(LS_NAMESENT); }catch(e){}
+    if(sent===body) return;
+  }
+  // Debounced: renaming five things in a row is one upload, not five.
+  clearTimeout(_namesTimer);
+  _namesTimer=setTimeout(function(){
+    fetch(url+(url.indexOf('?')<0?'?':'&')+'names='+encodeURIComponent(body))
+      .then(function(r){ return r.text(); })
+      .then(function(t){
+        var j=null; try{ j=JSON.parse(t); }catch(e){}
+        // Only remember it as sent once the script says it stored it, so a
+        // failed upload is retried on the next change rather than assumed done.
+        if(j&&j.ok&&j.stored){ try{ localStorage.setItem(LS_NAMESENT,body); }catch(e){} }
+      })
+      .catch(function(){});
+  },1200);
 }
 function resetDB(){
   try{ localStorage.removeItem(LS_DB); }catch(e){}
@@ -2334,15 +2372,20 @@ function publishContent(){
   var msg=document.getElementById('pubState');
   var url=(DB.api&&DB.api.url)||'';
   if(!url){ if(msg) msg.textContent='Connect a spreadsheet first.'; return; }
-  if(!googleIdToken){
-    uiAlert('Sign in with Google first — publishing is verified against your account.',
-            'Sign in needed');
+  var key=(DB.api&&DB.api.key)||'';
+  // Either route will do, and the script checks whichever one arrives. Without
+  // one of them the request would simply be refused, so say so here rather than
+  // firing it off and reporting a success the reply cannot actually confirm.
+  if(!googleIdToken && !key){
+    uiAlert('Publishing needs either a Google sign-in or a publish key. Add the '+
+            'key under Site Settings — the steps are in SETUP-BACKEND.md §7.',
+            'Cannot publish yet');
     return;
   }
   if(msg) msg.textContent='Publishing…';
   fetch(url,{method:'POST', mode:'no-cors',
     headers:{'Content-Type':'text/plain;charset=utf-8'},
-    body:JSON.stringify({form:'__content', idToken:googleIdToken,
+    body:JSON.stringify({form:'__content', idToken:googleIdToken, key:key,
                          content:contentPayload()})});
   // no-cors again: the reply is unreadable, so confirm by pulling it back.
   setTimeout(function(){
@@ -4375,10 +4418,21 @@ function renderSettings(){
     '<div class="field"><label for="sheetUrl">Spreadsheet link (for managers)</label>'+
     '<input type="url" id="sheetUrl" placeholder="https://docs.google.com/spreadsheets/d/…" '+
     'value="'+esc((DB.api&&DB.api.sheet)||'')+'"></div>'+
+    // Item names now go up on their own whenever they change, so this is a
+    // "do it again" for when the script has been redeployed, not a step.
     '<div class="row"><button class="btn solid" onclick="saveApi()">Save</button>'+
     '<button class="btn ghost" onclick="testApi()">Test connection</button>'+
-    '<button class="btn ghost" onclick="pushNames()">Send item names</button>'+
+    '<button class="btn ghost" onclick="pushNames()">Resend item names</button>'+
     '<span id="apiMsg" style="font-size:13px"></span></div></div>';
+
+  h+='<div class="card mt" data-need="ops"><h3>Publish key</h3>'+
+    '<div class="field"><label for="pubKey">Key</label>'+
+    '<input type="password" id="pubKey" autocomplete="off" placeholder="Set PUBLISH_KEY in the script to match" '+
+    'value="'+esc((DB.api&&DB.api.key)||'')+'"></div>'+
+    '<div class="row"><button class="btn solid" onclick="saveApi()">Save</button>'+
+    '<span id="keyMsg" style="font-size:13px;color:var(--ink-faint)">'+
+    ((DB.api&&DB.api.key)?'Set on this device.':'Not set — publishing needs Google sign-in.')+
+    '</span></div></div>';
 
   h+='<div class="card mt" data-need="ops"><h3>Videos &amp; lectures</h3>'+
     '<label class="checkline"><input type="checkbox" id="learnPublic"'+
@@ -4414,8 +4468,14 @@ function saveApi(){
   DB.api=DB.api||{};
   DB.api.url=(document.getElementById('apiUrl').value||'').trim();
   DB.api.sheet=(document.getElementById('sheetUrl').value||'').trim();
+  // `api` is in NO_SYNC, so the key stays on this device and never travels
+  // inside published content. It is not in the repo either — only here.
+  var k=document.getElementById('pubKey');
+  if(k) DB.api.key=(k.value||'').trim();
   saveDB();
-  document.getElementById('apiMsg').textContent='Saved on this device.';
+  var m=document.getElementById('apiMsg'); if(m) m.textContent='Saved on this device.';
+  var km=document.getElementById('keyMsg');
+  if(km) km.textContent=DB.api.key?'Set on this device.':'Not set — publishing needs Google sign-in.';
 }
 
 /* A POST is sent with mode:'no-cors', so its response is unreadable and "sent"
@@ -4425,18 +4485,21 @@ function saveApi(){
    display name does not. That makes the spreadsheet Restock tab read
    "8 x c-bandaid" unless the script knows the names — so this hands them over.
    Re-run it after renaming or adding anything. */
+/* The manual version. Names go up on their own whenever they change, so this
+   exists for the one case that cannot detect itself: the script was redeployed
+   or its properties were cleared, and the map this device believes it already
+   sent is no longer there. It bypasses that memory and sends regardless. */
 function pushNames(){
   var u=((document.getElementById('apiUrl')||{}).value||'').trim()||((DB.api&&DB.api.url)||'');
   var msg=document.getElementById('apiMsg');
   if(!u){ msg.textContent='Save the Web App URL first.'; return; }
-  var names={items:{},units:{}};
-  (DB.consumables||[]).forEach(function(c){ names.items[c.id]=c.name; });
-  (DB.bagUnits||[]).forEach(function(b){ names.units[b.id]=b.name; });
+  var body=nameMapJSON();
   msg.textContent='Sending…';
-  fetch(u+(u.indexOf('?')<0?'?':'&')+'names='+encodeURIComponent(JSON.stringify(names)))
+  fetch(u+(u.indexOf('?')<0?'?':'&')+'names='+encodeURIComponent(body))
     .then(function(r){ return r.text(); })
     .then(function(t){
       var j=null; try{ j=JSON.parse(t); }catch(e){}
+      if(j&&j.ok&&j.stored){ try{ localStorage.setItem(LS_NAMESENT,body); }catch(e){} }
       msg.innerHTML = (j&&j.ok&&j.stored)
         ? '<span style="color:var(--ok)">Names sent — the Restock tab will read properly.</span>'
         : '<span style="color:var(--warn)">Reached it, but it did not confirm. The script may '+

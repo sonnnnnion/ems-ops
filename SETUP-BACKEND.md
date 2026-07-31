@@ -72,11 +72,17 @@ fetch" rather than telling you what went wrong.
 
 1. Sign in on the site, go to **Site Settings**.
 2. Paste the `/exec` URL and the spreadsheet URL.
-3. **Save** ▸ **Test connection** ▸ **Send item names**.
+3. **Save**, then **Test connection**.
 
-**Send item names** matters: the sheet stores item ids, because an id survives a
-rename. Without the names, the Restock tab reads `c-bandaid` instead of
-`Adhesive bandages`. Re-run it after renaming or adding consumables or bags.
+**Item names look after themselves.** The sheet stores item *ids*, because an id
+survives a rename — so the script needs an id→name map or the Restock tab reads
+`c-bandaid` instead of `Adhesive bandages`. The site now uploads that map by
+itself whenever it changes, so there is nothing to remember after renaming or
+adding a consumable or a bag.
+
+**Resend item names** is only for when the script has been redeployed or its
+properties cleared: the browser thinks it already sent the current map, and this
+sends it anyway.
 
 `Test connection` does a `GET`, which the browser can read, so it is the only
 step that proves anything:
@@ -207,9 +213,35 @@ site: the Operations Officer address and the People list, both under **Site
 Settings ▸ People**. An address that is not on either list signs in fine and is
 told it has no role here.
 
-`MANAGER_EMAILS` at the top of §6 is the bootstrap — the one address that can
-publish before any People list exists. Change it to the ops account once there
-is one.
+`MANAGER_EMAILS` at the top of the script is the bootstrap — the one address
+that can publish before any People list exists. Change it to the ops account
+once there is one.
+
+### Publishing without Google: the publish key
+
+Publishing is the one action that changes what *everyone* sees, so the endpoint
+will not accept it unauthenticated. While Google sign-in is switched off, the
+alternative is a shared key:
+
+1. Apps Script ▸ **Project Settings ▸ Script properties ▸ Add script property**.
+   Name `PUBLISH_KEY`, value a long random string you invent. Save.
+2. On the site, **Site Settings ▸ Publish key**, paste the same string, **Save**.
+
+Publish then works from any role that can reach Site Settings.
+
+Know what this is and is not. A Google sign-in proves *who* you are, and taking
+someone off the People list takes their access with it. A key proves only that
+whoever is holding it has it — there is no per-person revocation, and changing
+it means telling everyone the new one. It is a caretaker measure, not a
+replacement.
+
+What it is not is a secret in a public repo. The key never appears in
+`index.html` or in the page source; it lives in one browser's localStorage,
+under `api`, which is on the never-published list. Do not paste it into a commit
+message, a doc or a screenshot.
+
+**To close this route, delete the `PUBLISH_KEY` property.** Publishing goes back
+to being Google-only immediately, no redeploy needed.
 
 ---
 
