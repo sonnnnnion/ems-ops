@@ -610,14 +610,7 @@
   .legend .item{font-size:12px;color:var(--ink-mute)}
 
   /* ---------- one big printable code ---------- */
-  .bigqr{text-align:center;border:1px solid var(--rule);border-radius:var(--r-md);
-    background:var(--card);padding:26px;margin-top:16px}
-  .bigqr h3{margin:0 0 4px;font-size:22px}
-  .bigqr .bq-sub{font-size:13px;color:var(--ink-mute);margin-bottom:16px}
-  .bigqr .qrsvg{max-width:100%;height:auto}
   @media print{
-    .bigqr{border:0;padding:0;page-break-after:always}
-    .bigqr h3{font-size:28px}
   }
 
   /* ---------- expiry ---------- */
@@ -2593,6 +2586,9 @@ function renderCheck(fid){
   }
 
   /* --- checklist --- */
+  // The edit row sits directly above the list it edits, and gets its own node so
+  // setPick can refresh it: which bag is picked decides what the button opens.
+  h+='<div id="'+fid+'-editrow">'+formEditRow(fid)+'</div>';
   h+='<div id="'+fid+'-body">'+checkBody(fid)+'</div>';
 
   /* --- structured usage rows --- */
@@ -2700,6 +2696,84 @@ function usageComplete(fid){
   });
 }
 
+/* ---- editing a checklist from the form it belongs to ------------------------
+   The list a member ticks lives in DB.bags or DB.rooms, not in the form, so this
+   opens the existing editor for whatever is currently picked rather than being a
+   second way to edit the same thing. Which role may press it follows the list:
+   bags are the Equipment Manager's, rooms are the Office Manager's. */
+function formListTarget(fid){
+  var c=fcfg(fid), pick=formPick[fid];
+  if(c.fixed==='postCall') return {kind:'postCall', need:'mgr', label:'the after-a-call list'};
+  if(!pick) return null;
+  if(c.pick.from==='rooms'){
+    var r=(DB.rooms||[]).filter(function(x){return x.id===pick;})[0];
+    return r && {kind:'room', id:r.id, need:'office', label:r.name};
+  }
+  // A checkout picks a UNIT, so the list to edit is its TYPE's.
+  var typeId=pick;
+  if(c.pick.from==='units'){
+    var u=(DB.bagUnits||[]).filter(function(x){return x.id===pick;})[0];
+    if(!u) return null;
+    typeId=u.type;
+  }
+  var b=(DB.bags||[]).filter(function(x){return x.id===typeId;})[0];
+  return b && {kind:'bag', id:b.id, need:'equipment', label:b.name};
+}
+
+function formEditRow(fid){
+  var t=formListTarget(fid);
+  if(!t) return '';
+  return '<div class="row noprint" data-need="'+esc(t.need)+'" '+
+    'style="justify-content:flex-end;margin:0 0 12px"><button class="btn xs" '+
+    'onclick="editFormList(\''+jsq(fid)+'\')">Edit this list</button></div>';
+}
+
+function editFormList(fid){
+  var t=formListTarget(fid);
+  if(!t || !can(t.need)) return;
+  if(t.kind==='room')    return editRoomTasks(t.id);
+  if(t.kind==='bag')     return editBagContents(t.id);
+  if(t.kind==='postCall')return editPostCall();
+}
+
+/* The after-a-call list is the one checklist that is not about a bag or a room —
+   it describes what YOU do when you get back — so it lives on its own key and
+   gets its own editor, in the same "== Heading" text format as the bags. */
+function editPostCall(){
+  if(!can('mgr')) return;
+  var txt=(DB.postCall||[]).map(function(sec){
+    return '== '+sec.name+'\n'+(sec.items||[]).map(function(it){return it.label;}).join('\n');
+  }).join('\n\n');
+  // An id already earned by a line is reused when that line comes back
+  // unchanged. Regenerating them from the text would mean pressing Save without
+  // editing anything silently renamed every item — which drops the ticks in a
+  // half-finished draft and breaks any id the sheet already carries.
+  var byLabel={};
+  (DB.postCall||[]).forEach(function(sec){ (sec.items||[]).forEach(function(it){
+    byLabel[it.label]=it.id; }); });
+
+  uiPrompt('One task per line. "== Heading" starts a section.', txt,
+           'After a call', {rows:14, okText:'Save'})
+    .then(function(v){
+      if(v==null) return;
+      var secs=[], cur=null, used={};
+      v.split('\n').forEach(function(line){
+        var s=line.trim(); if(!s) return;
+        if(s.indexOf('==')===0){ cur={name:s.replace(/^==\s*/,''),items:[]}; secs.push(cur); return; }
+        if(!cur){ cur={name:'After a call',items:[]}; secs.push(cur); }
+        var id=byLabel[s];
+        if(!id || used[id]){
+          var base='pc-'+s.toLowerCase().replace(/[^a-z0-9]+/g,'-').slice(0,40).replace(/-$/,'');
+          id=base; var n=2; while(used[id]) id=base+'-'+(n++);
+        }
+        used[id]=1;
+        cur.items.push({id:id, label:s});
+      });
+      if(!secs.length) return;
+      DB.postCall=secs; saveDB(); renderCheck('post-call');
+    });
+}
+
 function checkBody(fid){
   var c=fcfg(fid);
   if(c.freeform) return '';
@@ -2755,6 +2829,8 @@ function setPick(fid,id){
   for(var i=0;i<picks.length;i++) picks[i].classList.remove('on');
   var body=document.getElementById(fid+'-body');
   if(body) body.innerHTML=checkBody(fid);
+  var er=document.getElementById(fid+'-editrow');
+  if(er){ er.innerHTML=formEditRow(fid); applyGates(er); }
   var list=pickList(fcfg(fid).pick.from);
   for(var j=0;j<list.length;j++) if(list[j].id===id && picks[j]) picks[j].classList.add('on');
   saveDraft(fid); calcCheck(fid);
@@ -3757,27 +3833,17 @@ var QR_TARGETS=[
 function renderQR(){
   var host=document.getElementById('qrHost'); if(!host) return;
   var base=publicBase();
-  var h='';
-  if(isLocalPreview()){
-    
-  }
-
-  // The one that goes on the rack, big enough to scan from arm's length.
-  h+='<div class="row noprint" style="margin-bottom:4px">'+
-     '<button class="btn solid" onclick="printOne(\'checkout\')">Print the checkout code</button>'+
-     '<button class="btn ghost" onclick="window.print()">Print the whole sheet</button></div>';
-  h+='<div class="bigqr" id="bigCheckout"><h3>Check out a bag</h3>'+
-     '<div class="bq-sub">Scan before you take a jumpkit or event bag</div>'+
-     qrSVG(base+'#checkout',300)+
-     '<div class="qrlink">'+esc(base+'#checkout')+'</div></div>';
-
-  h+='<h3 class="mt-lg noprint" style="font-family:var(--font-display);font-size:19px">Everything else</h3>';
+  // Three codes, one card each. There used to be a big "Check out a bag" hero
+  // above these and the same code again in the grid below it — two of the three
+  // stickers you print are the same sticker, which is only confusing.
+  var h='<div class="row noprint" style="margin-bottom:4px">'+
+     '<button class="btn solid" onclick="window.print()">Print the sheet</button></div>';
   h+='<div class="qrsheet">';
   QR_TARGETS.forEach(function(t){
     var url=base+'#'+t.view;
     h+='<div class="qrcard"><h4>'+esc(t.title)+'</h4>'+
        '<div class="qrwho">'+esc(t.who)+'</div>'+
-       qrSVG(url,190)+
+       qrSVG(url,230)+
        '<div class="qrlink">'+esc(url)+'</div></div>';
   });
   h+='</div>';
@@ -3788,17 +3854,6 @@ function renderQR(){
 /* Print a single code without the rest of the sheet: hide everything, print,
    put it back. Simpler and more reliable than a print-only stylesheet that has
    to know about every element on the page. */
-function printOne(view){
-  var keep=document.getElementById('bigCheckout');
-  if(!keep) { window.print(); return; }
-  var sheet=document.querySelector('#qrHost .qrsheet');
-  var heads=document.querySelectorAll('#qrHost h3, #qrHost .notice, #qrHost .hint');
-  var hidden=[];
-  if(sheet){ sheet.style.display='none'; hidden.push(sheet); }
-  heads.forEach(function(e){ if(!keep.contains(e)){ e.style.display='none'; hidden.push(e); } });
-  window.print();
-  setTimeout(function(){ hidden.forEach(function(e){ e.style.display=''; }); },300);
-}
 
 /* ---- duty-period tracker (printable) ---- */
 function renderTracker(){
