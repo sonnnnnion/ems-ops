@@ -1939,7 +1939,11 @@ var DEFAULTS={
    falls back to its default instead of coming back undefined.
    ========================================================================== */
 var LS_DB='emsops_db_v1', LS_DRAFT='emsops_draft_v1', LS_ROLE='emsops_role_v1',
-    LS_EMAIL='emsops_email_v1';
+    LS_EMAIL='emsops_email_v1',
+    // Kept apart from LS_ROLE and LS_EMAIL so the temporary unlock leaves no
+    // trace in the real sign-in path — clearing the flag orphans this key and
+    // init() stops reading it. See LOCAL_MANAGER_UNLOCK.
+    LS_LOCALROLE='emsops_localrole_v1';
 var DB={};
 
 // Content that ships with the site, as opposed to data this deployment created.
@@ -2038,6 +2042,22 @@ var MANAGER_VIEWS={
 var GOOGLE_CLIENT_ID='649290078556-l1p8l9qr5stjldgrs08c8eo0od6c727e.apps.googleusercontent.com';
 var googleIdToken='';
 
+/* ---- TEMPORARY: local manager unlock ---------------------------------------
+   The Google account that owned this credential was disabled on 2026-07-30, so
+   the client above returns `disabled_client` and nobody can sign in at all.
+   While that is true, a manager can pick a role for their own device instead.
+
+   This unlocks BUTTONS, not data. Publishing still posts a Google ID token that
+   the Apps Script verifies against CLIENT_ID server-side, so a locally picked
+   role cannot write shared content — it edits this browser's copy only. That is
+   the same boundary as before; this changes nothing about it.
+
+   SET THIS BACK TO false once a new OAuth client exists (SETUP-BACKEND.md §7).
+   Leaving it on means every visitor can open the manager views. Acceptable
+   while the site is idle over the summer and the People list is empty; not
+   acceptable once either of those changes. Settings shows a reminder while on. */
+var LOCAL_MANAGER_UNLOCK=true;
+
 function normEmail(e){ return String(e||'').trim().toLowerCase(); }
 
 // Reads the verified address out of the Google ID token. Decoding a JWT
@@ -2087,6 +2107,28 @@ function setRole(r,quiet){
   if(!quiet) renderAll();
 }
 
+/* Both halves of the temporary unlock live here so removing it is one block plus
+   the flag. `pickLocalRole` deliberately does NOT touch LS_EMAIL: an address is
+   a claim about who you are, and nobody has proved anything here. */
+function localUnlockHTML(){
+  return '<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--rule)">'+
+    '<p style="font-size:12.5px;line-height:1.5;color:var(--ink-mute);margin:0 0 10px">'+
+    'Google sign-in is down while the ops account is locked. Pick a role for this '+
+    'device to keep working. It changes what is on screen here only — nothing is '+
+    'published and nobody else sees it.</p>'+
+    '<div class="row" style="flex-wrap:wrap;gap:6px">'+
+    ['equipment','office','ops'].map(function(r){
+      return '<button type="button" class="btn xs" onclick="pickLocalRole(\''+jsq(r)+'\')">'+
+             esc(ROLE_LABEL[r])+'</button>';
+    }).join('')+'</div></div>';
+}
+function pickLocalRole(r){
+  try{ localStorage.setItem(LS_LOCALROLE,r); }catch(e){}
+  var c=document.querySelector('.modal-wrap [data-mcancel]');
+  if(c) c.click();
+  setRole(r);
+}
+
 function openRolePicker(){
   if(ROLE!=='member'){
     uiConfirm('Signed in as '+ROLE_LABEL[ROLE]+'. Sign out?','Sign out',
@@ -2094,6 +2136,7 @@ function openRolePicker(){
       .then(function(y){
         if(!y) return;
         try{ localStorage.removeItem(LS_EMAIL); }catch(e){}
+        try{ localStorage.removeItem(LS_LOCALROLE); }catch(e){}
         setRole('member');
       });
     return;
@@ -2112,7 +2155,8 @@ function openRolePicker(){
     return openModal({
       title:'Sign in',
       body:'<div id="gsiBtn" style="display:flex;justify-content:center;padding:8px 0 4px"></div>'+
-           '<div id="gsiErr" hidden></div>',
+           '<div id="gsiErr" hidden></div>'+
+           (LOCAL_MANAGER_UNLOCK?localUnlockHTML():''),
       cancelText:'Close', noOk:true,
       onOpen:function(w,close){
         // Google refusing the client is the one failure that looks like nothing
@@ -4211,7 +4255,20 @@ function renderLog(){
 /* ---- settings ---- */
 function renderSettings(){
   var host=document.getElementById('settingsHost'); if(!host) return;
-  var h='<div class="card brandtop"><h3>Link a spreadsheet</h3>'+
+  var h='';
+  // A temporary switch nobody can see is a permanent switch. This is the one
+  // screen a manager reaches while setting the backend up, so the reminder to
+  // turn it off again lives here.
+  if(LOCAL_MANAGER_UNLOCK) h+='<div class="card brandtop"><h3>Sign-in is unlocked</h3>'+
+    '<p style="font-size:13.5px;color:var(--ink-soft);line-height:1.7;margin:0">'+
+    'Anyone can open the manager views by picking a role — Google sign-in is '+
+    'switched off because the account that issued it was disabled. Publishing '+
+    'still needs a verified Google account, so shared content cannot be changed '+
+    'from here.<br><br>Once a new OAuth client exists '+
+    '(<span class="mono">SETUP-BACKEND.md §7</span>), set '+
+    '<span class="mono">LOCAL_MANAGER_UNLOCK</span> to '+
+    '<span class="mono">false</span> in <span class="mono">index.html</span>.</p></div>';
+  h+='<div class="card brandtop"><h3>Link a spreadsheet</h3>'+
     '<ol style="font-size:13.5px;color:var(--ink-soft);margin:0 0 12px;padding-left:20px;line-height:1.7">'+
     '<li>Open the spreadsheet ▸ <b>Extensions ▸ Apps Script</b>.</li>'+
     '<li>Paste the script, <b>Save</b>.</li>'+
@@ -4380,6 +4437,13 @@ function init(){
   try{
     var e=localStorage.getItem(LS_EMAIL);
     saved=(e && roleForEmail(e)) || 'member';
+    // The temporary unlock is read only while its flag is on, so turning the
+    // flag off drops everyone back to member on their next load without anyone
+    // having to clear anything.
+    if(saved==='member' && LOCAL_MANAGER_UNLOCK){
+      var lr=localStorage.getItem(LS_LOCALROLE);
+      if(lr && ROLE_LABEL[lr] && lr!=='member') saved=lr;
+    }
   }catch(err){ saved='member'; }
   setRole(saved,true);
 
