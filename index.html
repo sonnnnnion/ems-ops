@@ -1051,12 +1051,6 @@ function uiForm(title,message,fields,opts){
 // tomorrow's date any evening after 8pm EDT, which would misdate submissions.
 function todayISO(){var d=new Date();
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
-function daysUntil(iso){
-  if(!iso) return null;
-  var d=new Date(iso+'T00:00:00'); if(isNaN(d.getTime())) return null;
-  var t=new Date(); t.setHours(0,0,0,0);
-  return Math.round((d-t)/86400000);
-}
 
 /* ============================================================
    QR CODES — byte mode, ECC level M, versions 1-10, no library.
@@ -1948,6 +1942,15 @@ function loadDB(){
     DB.access.officer='';
     stale=true;
   }
+  // Expiry dates used to be keyed by item id alone, which meant one date covered
+  // every bag of that kind. Those keys cannot be attributed to a physical bag
+  // after the fact — "the red pouch expires in August" does not say whose — so
+  // they are dropped rather than guessed at and shown against the wrong kit.
+  if(DB.expiry){
+    Object.keys(DB.expiry).forEach(function(k){
+      if(k.indexOf('|')<0){ delete DB.expiry[k]; stale=true; }
+    });
+  }
   if(stale) saveDB();
 }
 function saveDB(){
@@ -2807,11 +2810,14 @@ function checkBody(fid){
          (it.qty?'<span class="qty">'+esc(it.qty)+'</span>':'')+'</label>';
       if(it.exp){
         // Entered once and remembered, so a check is not 12 date pickers every
-        // time — only the ones that changed since last time.
-        var known=(DB.expiry||{})[it.id]||'';
+        // time — only the ones that changed since last time. Remembered against
+        // the bag that was picked, not the item alone: six jumpkits share their
+        // type's item ids, so a single date per item made one kit's expiry date
+        // appear on all six and hid a genuinely expired pouch behind a fresh one.
+        var known=(DB.expiry||{})[expiryKey(fid,it.id)]||'';
         h+='<div class="exprow"><label for="x-'+esc(it.id)+'">Expires</label>'+
            '<input type="date" id="x-'+esc(it.id)+'" data-exp="'+esc(it.id)+'" value="'+esc(known)+'" '+
-           'onchange="setExpiry(\''+jsq(it.id)+'\',this.value);onFormInput(\''+fid+'\')">'+
+           'onchange="setExpiry(\''+jsq(fid)+'\',\''+jsq(it.id)+'\',this.value);onFormInput(\''+fid+'\')">'+
            '<span class="expbadge" data-expbadge="'+esc(it.id)+'"></span></div>';
       }
     });
@@ -2934,7 +2940,17 @@ function renderAndrewMsg(fid){
   el.style.borderColor=st.msg?'var(--oos)':'';
 }
 
-function setExpiry(id,v){ DB.expiry=DB.expiry||{}; if(v) DB.expiry[id]=v; else delete DB.expiry[id]; saveDB(); }
+/* An expiry date belongs to a physical thing, so it is stored against whatever
+   the form picked — Jumpkit A, not "jumpkits". A contents check picks a TYPE, so
+   its dates key on the type; that is a different scope from any one kit on
+   purpose, rather than silently writing over all six. */
+function expiryKey(fid,itemId){ return (formPick[fid]||'-')+'|'+itemId; }
+function setExpiry(fid,id,v){
+  DB.expiry=DB.expiry||{};
+  var k=expiryKey(fid,id);
+  if(v) DB.expiry[k]=v; else delete DB.expiry[k];
+  saveDB();
+}
 function daysUntil(iso){
   if(!iso) return null;
   var p=String(iso).split('-'); if(p.length!==3) return null;
@@ -2948,6 +2964,8 @@ function paintExpiry(fid){
   host.querySelectorAll('[data-exp]').forEach(function(el){
     var id=el.getAttribute('data-exp');
     var badge=host.querySelector('[data-expbadge="'+id+'"]');
+    // Read the field, not the store: the field is what this bag's key filled in,
+    // and it is also what the member has just typed but not yet blurred.
     var n=daysUntil(el.value);
     var lbl=(host.querySelector('[data-item="'+id+'"]')||{}).getAttribute
       ? host.querySelector('[data-item="'+id+'"]').getAttribute('data-label') : id;
