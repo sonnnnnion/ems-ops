@@ -3652,22 +3652,32 @@ function renderLearn(){
     h+='<div class="card mt"><h3>Videos</h3><ul class="isslist">'+vids.map(function(v,i){
       return '<li><b>'+esc(v.title)+'</b>'+
         (v.url?' <a href="'+esc(v.url)+'" target="_blank" rel="noopener">open ↗</a>':'')+
-        '<button class="issx" onclick="delLearn(\'videos\','+i+')">Remove</button></li>';
+        '<button class="issx" data-need="ops" onclick="delLearn(\'videos\','+i+')">Remove</button></li>';
     }).join('')+'</ul></div>';
   }
   if(lecs.length){
     h+='<div class="card mt"><h3>Lectures</h3><ul class="isslist">'+lecs.map(function(v,i){
       return '<li><b>'+esc(v.title)+'</b>'+
         (v.url?' <a href="'+esc(v.url)+'" target="_blank" rel="noopener">open ↗</a>':'')+
-        '<button class="issx" onclick="delLearn(\'lectures\','+i+')">Remove</button></li>';
+        '<button class="issx" data-need="ops" onclick="delLearn(\'lectures\','+i+')">Remove</button></li>';
     }).join('')+'</ul></div>';
   }
-  h+='<div class="row mt"><button class="btn ghost sm" onclick="addLearn(\'videos\')">Add a video</button>'+
+  h+='<div class="row mt" data-need="ops">'+
+     '<button class="btn ghost sm" onclick="addLearn(\'videos\')">Add a video</button>'+
      '<button class="btn ghost sm" onclick="addLearn(\'lectures\')">Add a lecture</button></div>';
-  
+
   host.innerHTML=h;
+  // This is the one view a member can reach without holding a role — DB.learnPublic
+  // opens it to everyone — so it is also the one renderer where forgetting this
+  // call puts Add and Remove in front of eighty people.
+  applyGates(host);
 }
+/* Guarded as well as hidden. Every other editable view is unreachable without a
+   role, so hiding the control is the whole gate; this list is deliberately
+   readable by everyone, which makes its buttons the one place a hidden control
+   is still a callable one. */
 function addLearn(kind){
+  if(!can('ops')) return;
   uiForm(kind==='videos'?'Add a video':'Add a lecture','',
     [{key:'title',label:'Title',type:'text',required:true},
      {key:'url',label:'Link',type:'url'}],{okText:'Add'})
@@ -3678,6 +3688,7 @@ function addLearn(kind){
    });
 }
 function delLearn(kind,i){
+  if(!can('ops')) return;
   DB[kind].splice(i,1); saveDB(); renderLearn();
 }
 
@@ -4314,6 +4325,10 @@ function renderSettings(){
     '<button class="btn danger" onclick="confirmReset()">Reset to defaults</button></div></div>';
 
   host.innerHTML=h;
+  // This panel carries an ops-only card, and only renderAll's global pass was
+  // gating it — so any future "save a setting, redraw the panel" call would have
+  // shown it to whichever manager pressed the button.
+  applyGates(host);
 }
 
 function setLearnPublic(on){
