@@ -483,23 +483,8 @@
      no gating rule applied at all, so its own layout is untouched. */
   [hidden]{display:none !important}
 
-  /* ---------- home ---------- */
-  .rolegrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px;margin-top:20px}
-  .rolecard{display:block;text-align:left;background:var(--card);border:1px solid var(--rule);border-radius:var(--r-md);
-    padding:20px;box-shadow:var(--shadow-sm);cursor:pointer;font:inherit;color:inherit;width:100%;
-    transition:transform .16s var(--ease),box-shadow .16s var(--ease),border-color .16s var(--ease)}
-  .rolecard:hover{transform:translateY(-2px);box-shadow:var(--shadow-md);border-color:var(--brand)}
-  .rolecard:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
-  .rolecard .rc-ic{font-size:22px;color:var(--brand);line-height:1}
-  .rolecard b{display:block;font-family:var(--font-display);font-size:18px;margin:10px 0 4px}
-  .rolecard p{margin:0;font-size:13.5px;color:var(--ink-mute);line-height:1.5}
-  .rolecard .rc-go{display:inline-block;margin-top:12px;font-size:12px;font-weight:700;
-    text-transform:uppercase;letter-spacing:.08em;color:var(--brand)}
-  .rolecard.ext .rc-go::after{content:' ↗'}
-
   /* ---------- log in ----------
-     One row per role, because "which manager are you" is the actual question.
-     Same shape as .rolecard, sized for a dialog. */
+     One row per role, because "which manager are you" is the actual question. */
   .loginlist{display:flex;flex-direction:column;gap:8px;margin:4px 0 0}
   .loginrole{display:flex;align-items:center;gap:12px;text-align:left;width:100%;
     background:var(--card);border:1px solid var(--rule);border-radius:var(--radius);
@@ -516,13 +501,6 @@
   .loginsep::before,.loginsep::after{content:'';flex:1;height:1px;background:var(--rule)}
 
   /* ---------- task lists (quick actions) ---------- */
-  .quick{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-top:14px}
-  .quick button,.quick .qbtn{display:flex;align-items:center;gap:9px;padding:13px 15px;border-radius:var(--radius);
-    border:1.5px solid var(--rule-strong);background:var(--card);cursor:pointer;font:inherit;font-size:14.5px;
-    font-weight:600;color:var(--ink);text-align:left;text-decoration:none;
-    transition:border-color .16s var(--ease),background .16s var(--ease)}
-  .quick button:hover,.quick .qbtn:hover{border-color:var(--brand);background:var(--brand-tint)}
-  .quick button .ic,.quick .qbtn .ic{color:var(--brand);font-size:15px}
   .ext-mark{margin-left:auto;color:var(--ink-faint);font-size:12px}
   /* The sidebar link to the bike site is an <a>, so it needs the text-decoration
      and colour resets a <button> did not. */
@@ -743,8 +721,6 @@
          fifty. Each heading carries the same data-need as the items under it,
          so applyGates() empties a whole group at once and nobody is left
          staring at a heading with nothing beneath it. -->
-    <button type="button" class="sb-item" data-need="mgr" data-view="home"><span class="ic">◈</span>Start here</button>
-
     <div class="sb-label">On duty</div>
     <button type="button" class="sb-item active" data-view="checkout"><span class="ic">▸</span>Check Out a Bag</button>
     <button type="button" class="sb-item" data-view="readiness"><span class="ic">◉</span>What's Ready</button>
@@ -783,31 +759,6 @@
 
   <main>
 
-    <!-- ===== HOME ============================================================
-         Three roles, one of which (Bike) lives on its own site. Rather than
-         reproduce the bike content here, the card links out — one source of
-         truth per role. -->
-    <section class="view active" data-view="home">
-      <h2 class="view-title">CMU EMS <em>Operations</em></h2>
-
-      <div class="card brandtop mt">
-        <div class="quick">
-          <button type="button" onclick="go('checkout')"><span class="ic">▸</span>Take a bag out</button>
-          <button type="button" onclick="go('readiness')"><span class="ic">◉</span>What's ready</button>
-          <button type="button" onclick="go('post-call')"><span class="ic">↻</span>After a call</button>
-          <button type="button" onclick="go('report')"><span class="ic">⚑</span>Report a problem</button>
-          <button type="button" onclick="go('bags')"><span class="ic">▩</span>What's in each bag</button>
-          <a class="qbtn" href="https://sonnnnnion.github.io/bike-ops/" target="_blank" rel="noopener"><span class="ic">⚙</span>Bike Ops<span class="ext-mark">↗</span></a>
-          <button type="button" data-need="office" onclick="go('room-check')"><span class="ic">✔</span>Room check</button>
-          <button type="button" data-need="mgr" onclick="go('reports')"><span class="ic">▤</span>Reports</button>
-          <button type="button" data-need="equipment" onclick="go('bag-check')"><span class="ic">✚</span>Full contents check</button>
-        </div>
-      </div>
-
-      <div id="dashHost"></div>
-      <div class="rolegrid" id="roleCards"></div>
-    </section>
-
     <!-- ===== WHAT'S READY ==================================================== -->
     <section class="view" data-view="readiness">
       <h2 class="view-title">What's <em>ready</em></h2>
@@ -837,7 +788,7 @@
          reported missing, flags that bag on the readiness board and lands on the
          restock list — a bag going out short is the thing managers need to hear
          about. -->
-    <section class="view" data-view="checkout">
+    <section class="view active" data-view="checkout">
       <h2 class="view-title">Check out a <em>bag</em></h2>
       <div id="checkoutHost"></div>
     </section>
@@ -1394,7 +1345,7 @@ var DEFAULTS={
      older seed, so a corrected bag list actually reaches people instead of
      sitting behind whatever they cached weeks ago. Their own data — submissions,
      the To Get list, the spreadsheet link, who has access — is never touched. */
-  seed:7,
+  seed:8,
 
   // ONE Apps Script Web App in front of ONE spreadsheet. Every form writes to
   // its own tab in that file, so Equipment and Office data sit side by side and
@@ -1488,7 +1439,7 @@ var DEFAULTS={
        one is the MCI bag, so nothing we have actually shows a jumpkit.
        `checkAfterUse` puts the unit on "Check first" after a post-call names it —
        these are the bags that go out on every call and come back depleted. */
-    {id:'jumpkit', name:'Jumpkit', active:true, where:'Duty room rack', photos:[],
+    {id:'jumpkit', name:'Jumpkit', active:true, where:'Radio room', photos:[],
      checkAfterUse:true, note:'',
      sections:[
        {name:'Main compartment', items:[
@@ -1532,9 +1483,13 @@ var DEFAULTS={
          {id:'jk-tested', label:'Stethoscope, BP cuff and pulse ox all tested and working'}]}
      ]},
 
-    /* ---- Med Pod: Jumpkit Checkout Form, section 4 ---- */
-    {id:'medpod', name:'Med Pod', active:true, where:'With the crew chief',
-     photos:['medkit-open'], note:'',
+    /* ---- CC Pod: Jumpkit Checkout Form, section 4 ----
+       No `where`: it does not have a home, and an empty string renders as no
+       line at all rather than a "Lives in:" with nothing after it. The id stays
+       `medpod` — ids are what usage, expiry and the readiness board key on, and
+       renaming one to match a label is how a bag splits into two in the totals. */
+    {id:'medpod', name:'CC Pod', active:true, where:'',
+     photos:['ccpod-open'], note:'',
      sections:[
        {name:'Main compartment', items:[
          {id:'mp-aspirin', label:'(1) Aspirin', exp:true},
@@ -1770,7 +1725,7 @@ var DEFAULTS={
     {id:'ev-3', name:'Event Bag 3', type:'event', active:true},
     {id:'ev-4', name:'Event Bag 4', type:'event', active:true},
     {id:'ev-5', name:'Event Bag 5', type:'event', active:true},
-    {id:'u-medpod', ready:false, name:'Med Pod', type:'medpod', active:true},
+    {id:'u-medpod', ready:false, name:'CC Pod', type:'medpod', active:true},
     {id:'u-blue', name:'Blue Bag', type:'blue', active:true},
     {id:'u-specialty', ready:false, name:'Specialty Bag', type:'specialty', active:true},
     {id:'u-mci', ready:false, name:'MCI Bag', type:'mci', active:true},
@@ -2059,7 +2014,7 @@ function canSeeLearn(){ return !!DB.learnPublic || can('ops'); }
 var MANAGER_VIEWS={
   tracker:'office', restock:'office', rooms:'office',
   inventory:'equipment', 'bag-check':'equipment', toget:'equipment',
-  home:'mgr', reports:'mgr', log:'mgr', roles:'mgr', qr:'mgr', settings:'mgr',
+  reports:'mgr', log:'mgr', roles:'mgr', qr:'mgr', settings:'mgr',
   people:'ops'
 };
 
@@ -2405,10 +2360,11 @@ function publishContent(){
 /* ============================================================================
    NAVIGATION
    ========================================================================== */
-// Members open straight into the form they came for. Start here is a manager
-// dashboard, so it is gated and is not their landing page.
-var HOME='home';
-function homeFor(){ return can('mgr') ? 'home' : 'checkout'; }
+// Everyone lands on the checkout form, managers included. There used to be a
+// manager dashboard here; it was a second menu in front of the one job the site
+// is opened to do, so it went. Anything it counted is on the view that acts on
+// it — flagged bags on What's Ready, concerns on Reported Problems.
+function homeFor(){ return 'checkout'; }
 function navIsOpen(){ return document.body.classList.contains('nav-open'); }
 function navIsDrawer(){ return window.matchMedia('(max-width:820px)').matches; }
 function setNav(open){
@@ -2452,7 +2408,6 @@ function go(v,fromHash){
   if(v==='log') renderLog();
   if(v==='readiness') renderReadiness();
   if(v==='toget') renderToGet();
-  if(v==='home') renderDash();
 
   closeNav();
   window.scrollTo(0,0);
@@ -3277,10 +3232,10 @@ function addIssue(o){
   saveDB();
 }
 function resolveConcernUI(what,where){
-  resolveConcern(what,where); renderLog(); renderReports(); renderDash(); renderReadiness();
+  resolveConcern(what,where); renderLog(); renderReports(); renderReadiness();
 }
 function reopenConcernUI(what,where){
-  unresolveConcern(what,where); renderLog(); renderReports(); renderDash(); renderReadiness();
+  unresolveConcern(what,where); renderLog(); renderReports(); renderReadiness();
 }
 
 function resolveIssue(id){
@@ -3296,68 +3251,6 @@ function reopenIssue(id){
 /* ============================================================================
    VIEW RENDERERS
    ========================================================================== */
-
-/* ---- the manager dashboard ----
-   Start here is manager-only, so it shows the numbers that belong to whoever is
-   signed in rather than the same four tiles for everybody. Each figure links to
-   the view that acts on it — a count you cannot act on is decoration. */
-function renderDash(){
-  var host=document.getElementById('dashHost'); if(!host) return;
-  if(!can('mgr')){ host.innerHTML=''; return; }
-
-  var openIssues=(DB.issues||[]).filter(function(i){return i.open;});
-  var byArea=function(a){ return openIssues.filter(function(i){return i.area===a;}).length; };
-  var toGet=(DB.toGet||[]).filter(function(t){return !t.done;});
-  var flagged=(DB.bagUnits||[]).filter(function(u){
-    return u.active && u.ready!==false && unitStatus(u.id).cls!=='ok'; });
-  var expired=openIssues.filter(function(i){return /expired/i.test(i.what);}).length;
-  var since=periodStart('week');
-  var roomsDone={};
-  (DB.issues||[]).forEach(function(i){ if(i.area==='Office'&&i.where) roomsDone[i.where]=1; });
-
-  var tiles=[];
-  if(can('equipment')) tiles.push(
-    {n:toGet.length, l:'to get', v:'toget'},
-    {n:flagged.length, l:'bags flagged', v:'readiness'},
-    {n:expired, l:'expired', v:'log'},
-    {n:byArea('Equipment'), l:'equipment concerns', v:'log'});
-  if(can('office')) tiles.push(
-    {n:byArea('Office'), l:'office concerns', v:'log'},
-    {n:(DB.officeSupplies||[]).length, l:'supplies tracked', v:'restock'},
-    {n:(DB.rooms||[]).length, l:'rooms on the tracker', v:'tracker'});
-
-  var h='<div class="repgrid">'+tiles.map(function(t){
-    return '<button type="button" class="repstat dashstat" onclick="go(\''+jsq(t.v)+'\')">'+
-      '<div class="rs-n">'+t.n+'</div><div class="rs-l">'+esc(t.l)+'</div></button>';
-  }).join('')+'</div>';
-
-  // The one thing that should not wait: anything blocking.
-  var blocking=openIssues.filter(function(i){return i.urgency==='Blocking';});
-  if(blocking.length){
-    h+='<div class="card mt"><h3>Blocking</h3><ul class="isslist">'+
-      blocking.slice(0,6).map(function(i){
-        return '<li><span class="tag crit">'+esc(i.urgency)+'</span><b>'+esc(i.what)+'</b>'+
-          (i.where?' <span style="color:var(--ink-faint)">— '+esc(i.where)+'</span>':'')+'</li>';
-      }).join('')+'</ul></div>';
-  }
-  host.innerHTML=h;
-  applyGates(host);
-}
-
-/* ---- home: one card per role ---- */
-function renderRoleCards(){
-  var host=document.getElementById('roleCards'); if(!host) return;
-  var ICON={equipment:'▦',office:'⌂',bike:'⚙'};
-  host.innerHTML=DB.roles.map(function(r){
-    var ext=!!r.external;
-    return '<button type="button" class="rolecard'+(ext?' ext':'')+'" '+
-      (ext?'onclick="openExternal(\''+jsq(r.external)+'\',\''+jsq(r.title)+'\')"'
-          :'onclick="go(\'roles\')"')+'>'+
-      '<span class="rc-ic">'+(ICON[r.id]||'◈')+'</span>'+
-      '<b>'+esc(r.title)+'</b>'+
-      '<span class="rc-go">'+(ext?'Open Bike Ops':'Checklist')+'</span></button>';
-  }).join('');
-}
 
 function openExternal(url,title){
   uiConfirm('The '+title+' role has its own site, with its own checks and QR codes. '+
@@ -3433,7 +3326,9 @@ function renderBags(){
     h+='<div class="card mt"><h3>'+esc(b.name)+
        (b.active?'':' <span class="tag warn">check not in use yet</span>')+'</h3>'+
        '<p style="font-size:13.5px;color:var(--ink-mute);margin:0 0 4px">'+esc(b.note||'')+'</p>'+
-       '<p style="font-size:12px;color:var(--ink-faint);margin:0">Lives in: '+esc(b.where)+'</p>';
+       // A bag with no fixed home says nothing, rather than "Lives in:" and a gap.
+       (b.where?'<p style="font-size:12px;color:var(--ink-faint);margin:0">Lives in: '+
+                esc(b.where)+'</p>':'');
     if(b.photos&&b.photos.length){
       h+='<div class="photogrid">';
       b.photos.forEach(function(p){
@@ -4286,7 +4181,7 @@ function renderReports(){
 
 function clearReportConcern(what,where){
   resolveConcern(what,where);
-  renderReports(); renderLog(); renderDash();
+  renderReports(); renderLog(); 
 }
 
 function reportText(){
@@ -4516,8 +4411,7 @@ function closeLightbox(){
    BOOT
    ========================================================================== */
 function renderAll(){
-  renderDash();
-  renderRoleCards();
+  
   renderRooms();
   renderBags();
   renderRoles();
