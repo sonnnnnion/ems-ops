@@ -497,6 +497,24 @@
     text-transform:uppercase;letter-spacing:.08em;color:var(--brand)}
   .rolecard.ext .rc-go::after{content:' ↗'}
 
+  /* ---------- log in ----------
+     One row per role, because "which manager are you" is the actual question.
+     Same shape as .rolecard, sized for a dialog. */
+  .loginlist{display:flex;flex-direction:column;gap:8px;margin:4px 0 0}
+  .loginrole{display:flex;align-items:center;gap:12px;text-align:left;width:100%;
+    background:var(--card);border:1px solid var(--rule);border-radius:var(--radius);
+    padding:12px 14px;cursor:pointer;font:inherit;color:inherit;
+    transition:border-color .16s var(--ease),background .16s var(--ease)}
+  .loginrole:hover{border-color:var(--brand);background:var(--brand-tint)}
+  .loginrole:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+  .loginrole .lr-ic{font-size:16px;color:var(--brand);line-height:1;flex:none}
+  .loginrole .lr-t{flex:1;min-width:0}
+  .loginrole b{display:block;font-size:14.5px;font-weight:700;letter-spacing:0}
+  .loginrole small{display:block;font-size:12px;color:var(--ink-faint);margin-top:2px}
+  .loginsep{display:flex;align-items:center;gap:10px;margin:16px 0 12px;
+    font-size:11.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-faint)}
+  .loginsep::before,.loginsep::after{content:'';flex:1;height:1px;background:var(--rule)}
+
   /* ---------- task lists (quick actions) ---------- */
   .quick{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-top:14px}
   .quick button,.quick .qbtn{display:flex;align-items:center;gap:9px;padding:13px 15px;border-radius:var(--radius);
@@ -709,7 +727,7 @@
     <div class="brand"><b>Operations</b><span class="term">CMU EMS</span></div>
     <div class="spacer"></div>
     <span id="rolePill" class="role-pill">Member view</span>
-    <button class="btn sm" onclick="openRolePicker()" id="roleBtn">🔒 Manager</button>
+    <button class="btn sm" onclick="openRolePicker()" id="roleBtn">🔒 Log in</button>
   </div>
 
   <div class="navscrim" id="navScrim" onclick="closeNav()"></div>
@@ -1376,7 +1394,7 @@ var DEFAULTS={
      older seed, so a corrected bag list actually reaches people instead of
      sitting behind whatever they cached weeks ago. Their own data — submissions,
      the To Get list, the spreadsheet link, who has access — is never touched. */
-  seed:6,
+  seed:7,
 
   // ONE Apps Script Web App in front of ONE spreadsheet. Every form writes to
   // its own tab in that file, so Equipment and Office data sit side by side and
@@ -1392,7 +1410,12 @@ var DEFAULTS={
      typing an address that is not theirs. It decides which buttons are on
      screen; it does not protect data. The Apps Script is what does that. */
   access:{
-    officer:'bikecmuems@gmail.com',
+    // Empty on purpose. This was bikecmuems@gmail.com until Google disabled that
+    // account on 2026-07-30; pointing a role at a dead address is worse than
+    // pointing it at none, because the login dialog then sends you into a Google
+    // flow that cannot succeed and the role becomes unreachable. Set this to the
+    // replacement ops account under Site Settings ▸ People.
+    officer:'',
     people:[]                      // [{email, role:'equipment'|'office'|'ops'}]
   },
 
@@ -1968,6 +1991,15 @@ function loadDB(){
           : JSON.parse(JSON.stringify(DEFAULTS[k]));
   });
   DB.seed=DEFAULTS.seed;
+  // `access` is never re-seeded — it holds the People list, and wiping that on
+  // every content release would be worse than any stale value in it. So this one
+  // dead address has to be retired by hand: Google disabled it on 2026-07-30,
+  // and a role pointed at a dead account is unreachable once the local unlock
+  // goes away. Safe to delete this block once no browser can still be holding it.
+  if(DB.access && String(DB.access.officer||'').toLowerCase()==='bikecmuems@gmail.com'){
+    DB.access.officer='';
+    stale=true;
+  }
   if(stale) saveDB();
 }
 function saveDB(){
@@ -2098,7 +2130,7 @@ function setRole(r,quiet){
   var pill=document.getElementById('rolePill');
   pill.textContent=ROLE_LABEL[ROLE];
   pill.classList.toggle('web',ROLE!=='member');
-  document.getElementById('roleBtn').textContent = ROLE==='member' ? '🔒 Manager' : '✓ Signed in';
+  document.getElementById('roleBtn').textContent = ROLE==='member' ? '🔒 Log in' : '✓ Logged in';
   applyGates();
   // A gated view reached by hash must not simply stay open when the role drops.
   var cur=document.querySelector('.view.active');
@@ -2107,32 +2139,64 @@ function setRole(r,quiet){
   if(!quiet) renderAll();
 }
 
-/* Both halves of the temporary unlock live here so removing it is one block plus
-   the flag. `pickLocalRole` deliberately does NOT touch LS_EMAIL: an address is
-   a claim about who you are, and nobody has proved anything here. */
-function localUnlockHTML(){
-  return '<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--rule)">'+
-    '<p style="font-size:12.5px;line-height:1.5;color:var(--ink-mute);margin:0 0 10px">'+
-    'Google sign-in is down while the ops account is locked. Pick a role for this '+
-    'device to keep working. It changes what is on screen here only — nothing is '+
-    'published and nobody else sees it.</p>'+
-    '<div class="row" style="flex-wrap:wrap;gap:6px">'+
-    ['equipment','office','ops'].map(function(r){
-      return '<button type="button" class="btn xs" onclick="pickLocalRole(\''+jsq(r)+'\')">'+
-             esc(ROLE_LABEL[r])+'</button>';
-    }).join('')+'</div></div>';
+/* ---- logging in ------------------------------------------------------------
+   "Which manager are you" is the question, so the roles are the login options
+   and Google is how you prove one. Today nothing is linked and the client is
+   dead, so picking a role just takes it. The moment an address is filled in
+   under People — or the officer address is set — that role stops being free
+   and starts requiring the account behind it. Same dialog either way; the
+   difference is data, so nothing here changes when the accounts arrive. */
+var LOGIN_ROLES=['equipment','office','ops'];
+var LOGIN_ICON={equipment:'✚', office:'⌂', ops:'◈'};
+
+function roleAccounts(role){
+  var out=[];
+  if(role==='ops' && DB.access && DB.access.officer) out.push(DB.access.officer);
+  ((DB.access&&DB.access.people)||[]).forEach(function(p){
+    if(p.role===role && p.email) out.push(p.email);
+  });
+  return out;
 }
-function pickLocalRole(r){
-  try{ localStorage.setItem(LS_LOCALROLE,r); }catch(e){}
+
+function loginOptionsHTML(){
+  return '<div class="loginlist">'+LOGIN_ROLES.map(function(r){
+    var n=roleAccounts(r).length;
+    // The count, never the addresses — anyone can open this dialog.
+    var note = LOCAL_MANAGER_UNLOCK
+      ? (n?'Opens without a password for now':'No account linked yet')
+      : (n?(n===1?'Log in with the linked account':'Log in with a linked account')
+          :'No account linked — cannot log in');
+    return '<button type="button" class="loginrole" onclick="loginAs(\''+jsq(r)+'\')">'+
+      '<span class="lr-ic">'+esc(LOGIN_ICON[r]||'◈')+'</span>'+
+      '<span class="lr-t"><b>'+esc(ROLE_LABEL[r])+'</b><small>'+esc(note)+'</small></span>'+
+      '</button>';
+  }).join('')+'</div>';
+}
+
+function loginAs(role){
+  // While the unlock is on, Google is known to be broken, so sending anyone into
+  // it is always wrong — even for a role that has an address against it. Turn
+  // the flag off and the linked roles go back to requiring that account.
+  if(!LOCAL_MANAGER_UNLOCK){
+    if(roleAccounts(role).length) return googleSignIn(role);
+    uiAlert('Nobody is linked to '+ROLE_LABEL[role]+' yet. The Operations Officer '+
+            'adds people under Site Settings ▸ People.','Not set up');
+    return;
+  }
+  try{ localStorage.setItem(LS_LOCALROLE,role); }catch(e){}
+  closeOpenModal();
+  setRole(role);
+}
+
+function closeOpenModal(){
   var c=document.querySelector('.modal-wrap [data-mcancel]');
   if(c) c.click();
-  setRole(r);
 }
 
 function openRolePicker(){
   if(ROLE!=='member'){
-    uiConfirm('Signed in as '+ROLE_LABEL[ROLE]+'. Sign out?','Sign out',
-              {okText:'Sign out',cancelText:'Stay signed in'})
+    uiConfirm('Logged in as '+ROLE_LABEL[ROLE]+'. Log out?','Log out',
+              {okText:'Log out',cancelText:'Stay logged in'})
       .then(function(y){
         if(!y) return;
         try{ localStorage.removeItem(LS_EMAIL); }catch(e){}
@@ -2141,69 +2205,114 @@ function openRolePicker(){
       });
     return;
   }
+  openModal({
+    title:'Log in',
+    body:loginOptionsHTML()+
+         '<div class="loginsep">or</div>'+
+         '<div id="gsiBtn" style="display:flex;justify-content:center;padding:2px 0 4px"></div>'+
+         '<div id="gsiErr" hidden></div>',
+    cancelText:'Close', noOk:true,
+    onOpen:function(w){
+      // The Google button is rendered into this same dialog when it can be, so
+      // somebody whose address already carries a role never has to guess which
+      // of the three rows is theirs — they just sign in and land in it.
+      if(!GOOGLE_CLIENT_ID) return;
+      loadGis().then(function(loaded){
+        if(loaded && w.isConnected) renderGsi(w, function(res){
+          closeOpenModal();
+          finishGoogleLogin(res);
+        });
+      });
+    }
+  });
+}
+
+/* Google, extracted so the login dialog and a future per-role prompt can both
+   use it. `done` is called with {email, role} or nothing. */
+function renderGsi(w, done){
+  var showTrouble=function(msg){
+    var box=w.querySelector('#gsiErr'); if(!box) return;
+    box.hidden=false;
+    box.innerHTML='<p style="font-size:12.5px;line-height:1.5;color:var(--ink-mute);'+
+      'margin:14px 0 0;padding-top:12px;border-top:1px solid var(--rule)">'+
+      esc(msg)+'</p>';
+  };
+  // Google refusing the client is the one failure that looks like nothing
+  // happening: the button renders, the popup opens, and it dies inside Google's
+  // own page with "Error 401: disabled_client". Nothing reaches us, so say what
+  // that means and who can fix it — otherwise the next person concludes the
+  // site is broken.
+  try{
+    google.accounts.id.initialize({
+      client_id:GOOGLE_CLIENT_ID,
+      callback:function(resp){
+        var email=emailFromIdToken(resp&&resp.credential);
+        googleIdToken=(resp&&resp.credential)||'';
+        done({email:email, role:roleForEmail(email)});
+      },
+      error_callback:function(err){
+        console.error('Google sign-in error:',err);
+        showTrouble('Google refused the sign-in. If it said "Error 401: '+
+          'disabled_client", this site’s OAuth client no longer exists — the '+
+          'Operations Officer has to make a new one and paste its ID into '+
+          'GOOGLE_CLIENT_ID. The steps are in SETUP-BACKEND.md §7.');
+      }
+    });
+    google.accounts.id.renderButton(w.querySelector('#gsiBtn'),
+      {theme:'outline',size:'large',text:'signin_with',shape:'pill'});
+  }catch(e){
+    console.error('Google sign-in failed to initialise:',e);
+    showTrouble('Google sign-in could not start on this device. If Google '+
+      'reports "disabled_client", the OAuth client needs replacing — see '+
+      'SETUP-BACKEND.md §7.');
+  }
+}
+
+function finishGoogleLogin(r){
+  if(!r||!r.email) return;
+  if(!r.role){
+    uiAlert('Signed in as '+r.email+', which has no role here. The Operations '+
+            'Officer adds people under Site Settings ▸ People.','No access');
+    return;
+  }
+  // A verified address outranks anything picked locally, so drop the local one
+  // rather than leave two answers to "who am I" in storage.
+  try{ localStorage.setItem(LS_EMAIL,r.email); }catch(e){}
+  try{ localStorage.removeItem(LS_LOCALROLE); }catch(e){}
+  setRole(r.role);
+}
+
+/* Kept for the per-role rows: clicking a role that already has an account
+   behind it has to prove that account rather than just take the role. */
+function googleSignIn(wantRole){
   if(!GOOGLE_CLIENT_ID){
-    uiAlert('Google sign-in is not set up yet. Add the client ID to '+
-            'GOOGLE_CLIENT_ID in index.html — the steps are in SETUP-BACKEND.md.',
-            'Not set up');
+    uiAlert('Google sign-in is not set up on this site yet — see '+
+            'SETUP-BACKEND.md §7.','Not set up');
     return;
   }
   loadGis().then(function(loaded){
     if(!loaded){
-      uiAlert('Could not reach Google. Check the connection and try again.','Sign-in unavailable');
+      uiAlert('Could not reach Google. Check the connection and try again.',
+              'Log in unavailable');
       return;
     }
-    return openModal({
-      title:'Sign in',
+    openModal({
+      title:'Log in as '+ROLE_LABEL[wantRole],
       body:'<div id="gsiBtn" style="display:flex;justify-content:center;padding:8px 0 4px"></div>'+
-           '<div id="gsiErr" hidden></div>'+
-           (LOCAL_MANAGER_UNLOCK?localUnlockHTML():''),
+           '<div id="gsiErr" hidden></div>',
       cancelText:'Close', noOk:true,
-      onOpen:function(w,close){
-        // Google refusing the client is the one failure that looks like nothing
-        // happening: the button renders, the popup opens, and it dies inside
-        // Google's own page with "Error 401: disabled_client". Nothing reaches
-        // us, so say up front what that error means and who can fix it —
-        // otherwise the next person concludes the site is broken.
-        var showTrouble=function(msg){
-          var box=w.querySelector('#gsiErr'); if(!box) return;
-          box.hidden=false;
-          box.innerHTML='<p style="font-size:12.5px;line-height:1.5;color:var(--ink-mute);'+
-            'margin:14px 0 0;padding-top:12px;border-top:1px solid var(--rule)">'+
-            esc(msg)+'</p>';
-        };
-        try{
-          google.accounts.id.initialize({
-            client_id:GOOGLE_CLIENT_ID,
-            callback:function(resp){
-              var email=emailFromIdToken(resp&&resp.credential);
-              googleIdToken=(resp&&resp.credential)||'';
-              close({email:email, role:roleForEmail(email)});
-            },
-            error_callback:function(err){
-              console.error('Google sign-in error:',err);
-              showTrouble('Google refused the sign-in. If it said "Error 401: '+
-                'disabled_client", this site’s OAuth client no longer exists — '+
-                'the Operations Officer has to make a new one and paste its ID '+
-                'into GOOGLE_CLIENT_ID. The steps are in SETUP-BACKEND.md §7.');
-            }
-          });
-          google.accounts.id.renderButton(w.querySelector('#gsiBtn'),
-            {theme:'outline',size:'large',text:'signin_with',shape:'pill'});
-        }catch(e){
-          console.error('Google sign-in failed to initialise:',e);
-          showTrouble('Google sign-in could not start on this device. If Google '+
-            'reports "disabled_client", the OAuth client needs replacing — see '+
-            'SETUP-BACKEND.md §7.');
-        }
+      onOpen:function(w){
+        renderGsi(w, function(res){
+          closeOpenModal();
+          // Your address decides your role, not the row you pressed. Say so if
+          // they differ rather than silently handing over something else.
+          if(res && res.role && res.role!==wantRole && !(res.role==='ops'))
+            uiAlert('That account is the '+ROLE_LABEL[res.role]+', not the '+
+                    ROLE_LABEL[wantRole]+'. Logged in as '+ROLE_LABEL[res.role]+'.',
+                    'Logged in');
+          finishGoogleLogin(res);
+        });
       }
-    }).then(function(r){
-      if(!r||!r.email) return;
-      if(!r.role){
-        uiAlert('Signed in as '+r.email+', which has no role here.','No access');
-        return;
-      }
-      try{ localStorage.setItem(LS_EMAIL,r.email); }catch(e){}
-      setRole(r.role);
     });
   });
 }
