@@ -171,6 +171,18 @@ paste the new ID in. It takes about five minutes and nothing else breaks in the
 meantime: every member-facing form keeps working, because none of them need
 sign-in.
 
+If the whole Google **account** was disabled rather than just the client, the
+client usually comes back with it — check before rebuilding anything. Ask Google
+for the authorise URL with a deliberately wrong `redirect_uri`: a dead client
+answers `disabled_client`, a live one answers `invalid_request` about the URI
+and names the app, because it got far enough to look the app up.
+
+To keep working through an outage of this kind, set `LOCAL_MANAGER_UNLOCK` to
+`true` in `index.html`. It lets anyone pick a manager role for their own device
+— buttons only, never data, since publishing and Restock ticks are still checked
+by the script. Set it back to `false` afterwards; every device drops to member
+on its next load with nothing to clean up.
+
 ### Making the client
 
 1. Go to <https://console.cloud.google.com/> signed in as **the same account

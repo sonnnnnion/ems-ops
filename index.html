@@ -2073,21 +2073,23 @@ var MANAGER_VIEWS={
 var GOOGLE_CLIENT_ID='56106295898-0if2a9uvtsl0815n3hgtdpph93goq0ck.apps.googleusercontent.com';
 var googleIdToken='';
 
-/* ---- TEMPORARY: local manager unlock ---------------------------------------
-   The Google account that owned this credential was disabled on 2026-07-30, so
-   the client above returns `disabled_client` and nobody can sign in at all.
-   While that is true, a manager can pick a role for their own device instead.
+/* ---- local manager unlock: OFF ---------------------------------------------
+   Between 2026-07-30 and 2026-08-05 the Google account that owned the client
+   above was disabled, so nobody could sign in at all and a manager could pick a
+   role for their own device instead. The account came back and the client
+   answers again, so the roles are behind an address once more: every row in the
+   log-in dialog goes to Google and only a listed address gets a role.
 
-   This unlocks BUTTONS, not data. Publishing still posts a Google ID token that
-   the Apps Script verifies against CLIENT_ID server-side, so a locally picked
-   role cannot write shared content — it edits this browser's copy only. That is
-   the same boundary as before; this changes nothing about it.
+   Turn it back to true ONLY to survive another outage of the same kind. While
+   it is on, any visitor can open the manager views — it unlocks buttons, never
+   data, because publishing and Restock ticks are checked by the Apps Script
+   server-side either way. Settings shows a standing reminder whenever it is on,
+   and init() reads the stored local role only while it is on, so flipping this
+   back to false drops every device to member on its next load with nothing to
+   clean up.
 
-   SET THIS BACK TO false once a new OAuth client exists (SETUP-BACKEND.md §7).
-   Leaving it on means every visitor can open the manager views. Acceptable
-   while the site is idle over the summer and the People list is empty; not
-   acceptable once either of those changes. Settings shows a reminder while on. */
-var LOCAL_MANAGER_UNLOCK=true;
+   WEBMASTER is the way back if a real address is ever the thing that breaks. */
+var LOCAL_MANAGER_UNLOCK=false;
 
 function normEmail(e){ return String(e||'').trim().toLowerCase(); }
 
