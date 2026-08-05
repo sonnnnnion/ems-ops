@@ -2560,7 +2560,7 @@ function scheduleAutoPublish(){
 function refreshAccess(){
   var url=(DB.api&&DB.api.url)||'';
   if(!url) return Promise.resolve(false);
-  return fetch(url+(url.indexOf('?')<0?'?':'&')+'content=1&t='+Date.now())
+  return fetch(url+(url.indexOf('?')<0?'?':'&')+'content=1&site=ops&t='+Date.now())
     .then(function(r){ return r.json(); })
     .then(function(j){
       var a=j&&j.content&&j.content.access;
@@ -2584,7 +2584,7 @@ function pullContent(){
   if(!url) return Promise.resolve(false);
   // Cache-busted. Without it the browser can answer this from a copy taken
   // before the last appointment, and the site never learns about the new person.
-  return fetch(url+(url.indexOf('?')<0?'?':'&')+'content=1&t='+Date.now())
+  return fetch(url+(url.indexOf('?')<0?'?':'&')+'content=1&site=ops&t='+Date.now())
     .then(function(r){ return r.json(); })
     .then(function(j){
       if(!j||!j.content) return false;
@@ -2631,13 +2631,17 @@ function publishContent(opts){
   if(msg) msg.textContent='Publishing…';
   fetch(url,{method:'POST', mode:'no-cors',
     headers:{'Content-Type':'text/plain;charset=utf-8'},
-    body:JSON.stringify({form:'__content', idToken:googleIdToken, key:key,
+    // `site` tells the shared script which copy this is. The bike site publishes
+    // through the same deployment, and without this both would write to one slot
+    // and each would wipe the other's entire content — which shows up as a site
+    // silently reverting to its built-in defaults, with no error anywhere.
+    body:JSON.stringify({form:'__content', site:'ops', idToken:googleIdToken, key:key,
                          content:contentPayload()})});
   // no-cors again: the reply is unreadable, so confirm by reading it back and
   // comparing. Announcing success without checking is how a rejected publish gets
   // remembered as a successful one.
   setTimeout(function(){
-    fetch(url+(url.indexOf('?')<0?'?':'&')+'content=1&t='+Date.now())
+    fetch(url+(url.indexOf('?')<0?'?':'&')+'content=1&site=ops&t='+Date.now())
       .then(function(r){ return r.json(); })
       .then(function(j){
         var same=j&&j.content&&JSON.stringify(j.content)===JSON.stringify(contentPayload());

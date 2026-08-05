@@ -58,6 +58,47 @@ var RESTOCK = {
   widths:  [55, 280, 110, 70, 100, 120, 120, 160, 150]
 };
 
+// ---- the bike site's tabs ---------------------------------------------------
+// The Bike Ops site used to write to a spreadsheet of its own, which meant no
+// formula could put a bike check beside a room check and the two sites had to be
+// opened separately to answer one question. Its forms are tabs in THIS file now.
+//
+// Keyed by the id the bike site sends ('jumpkit'/'safety'), not by tab name — the
+// ops forms send their tab name as `form` and these send a short id, so the two
+// naming schemes cannot collide in SHEETS.
+//
+// These rows are built positionally by bikeRow(), not through `keys`, because the
+// bike site posts a different payload shape (firstName/lastName rather than name,
+// arrays rather than pipe-joined strings). Both builders check their own width
+// against the header row before writing.
+var BIKE_SHEETS = {
+  jumpkit: {
+    name: 'Bike Jumpkit Checks', freeze: 3,
+    // Tabs this has been called before, in the standalone file. ensureSheet
+    // renames rather than opening an empty tab beside the old one.
+    was: ['Jumpkit Checks'],
+    headers: ['Date','Time','Name','Andrew ID','Bag','Radio','Result','Missing',
+              'What Was Missing','Expiry Flag','Expiration Dates','Notes','Submission ID'],
+    widths:  [95, 70, 150, 100, 96, 90, 210, 74, 320, 190, 220, 260, 120]
+  },
+  safety: {
+    name: 'Bike Safety Checks', freeze: 3,
+    was: ['Bicycle Checks','Bike Checks','Safety Checks'],
+    headers: ['Date','Time','Name','Andrew ID','Bike','Result','Missing',
+              'What Was Missing','Weather Grounded','Conditions Flagged','Notes','Submission ID'],
+    widths:  [95, 70, 150, 100, 96, 210, 74, 320, 130, 240, 260, 120]
+  }
+};
+
+// Kept apart from 'Restock'. What a bike check asks for is a tire lever, and what
+// a bag check asks for is a bag valve mask; one list of both is a list neither
+// person can shop from. Same machinery, different tab.
+var BIKE_RESTOCK = {
+  name: 'Bike Restock',
+  headers: ['Got','Item','Times Asked','First Reported','Last Reported','Where','Who'],
+  widths:  [55, 320, 100, 120, 120, 120, 150]
+};
+
 function json(o) {
   return ContentService.createTextOutput(JSON.stringify(o))
     .setMimeType(ContentService.MimeType.JSON);
@@ -69,6 +110,15 @@ function json(o) {
 function ensureSheet(conf) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sh = ss.getSheetByName(conf.name);
+  // A tab this form used to write to, under an older name. Rename it rather than
+  // starting a fresh empty one beside it, which would strand every row already in
+  // there where nobody would think to look.
+  if (!sh && conf.was) {
+    for (var w = 0; w < conf.was.length; w++) {
+      var old = ss.getSheetByName(conf.was[w]);
+      if (old) { old.setName(conf.name); sh = old; break; }
+    }
+  }
   if (!sh) {
     sh = ss.insertSheet(conf.name);
     sh.appendRow(conf.headers);
@@ -124,8 +174,17 @@ function alreadySeen(sh, conf, sid) {
 function doPost(e) {
   try {
     var p = JSON.parse(e.postData.contents);
-    if (p.form === '__content') return saveContent(p);
+    // Two sites post here, and they spell a content save differently: the ops
+    // site sends form:'__content', the bike site sends type:'content'. Both are
+    // accepted rather than making one of them change, because a deployment that
+    // silently ignores the other site's publishes is exactly the failure that is
+    // hardest to notice — it looks like the edit saved.
+    if (p.form === '__content' || p.type === 'content') return saveContent(p);
     if (p.form === '__restock') return setRestockGot(p);
+
+    // The bike site's forms, which post a different payload shape.
+    if (BIKE_SHEETS[p.form]) return writeBikeRow(p);
+
     var conf = SHEETS[p.form] || SHEETS['Reports'];
     var sh = ensureSheet(conf);
     if (alreadySeen(sh, conf, p.sid)) return json({ result: 'duplicate ignored' });
@@ -315,6 +374,170 @@ function paintRestock(sh) {
   }
 }
 
+// ---- the bike site's intake -------------------------------------------------
+// Its payload is shaped differently from the ops forms: a first and last name
+// rather than one `name`, arrays where the ops site sends pipe-joined strings,
+// and `submissionId` rather than `sid`. Rather than bend either site to the
+// other, the difference is absorbed here, in the one place that already knows
+// about both.
+
+// 'YES' when any date on the check has passed, blank when none has. Read as a
+// filter, so it is a flag and not a sentence.
+function expiryFlag(expiries) {
+  if (!expiries) return '';
+  var today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  var flagged = false;
+  Object.keys(expiries).forEach(function (k) {
+    var v = String(expiries[k] || '');
+    if (v && v <= today) flagged = true;
+  });
+  return flagged ? 'YES' : '';
+}
+
+function formatExpiries(expiries) {
+  if (!expiries) return '';
+  return Object.keys(expiries)
+    .filter(function (k) { return String(expiries[k] || '') !== ''; })
+    .map(function (k) { return k + ': ' + expiries[k]; })
+    .join('\n');
+}
+
+function writeBikeRow(p) {
+  var conf = BIKE_SHEETS[p.form];
+  var sh = ensureSheet(conf);
+  // Same duplicate guard as the ops forms, reading the bike site's id field.
+  if (alreadySeen(sh, conf, p.submissionId)) return json({ result: 'duplicate ignored' });
+
+  var missing = p.missing || [];
+  var conditions = p.conditions || [];
+  var now = new Date();
+  var tz = Session.getScriptTimeZone();
+  var isJk = p.form === 'jumpkit';
+
+  var row = [
+    Utilities.formatDate(now, tz, 'yyyy-MM-dd'),
+    Utilities.formatDate(now, tz, 'HH:mm'),
+    ((p.firstName || '') + ' ' + (p.lastName || '')).trim(),
+    p.andrewId || '',
+    isJk ? (p.bag || '') : (p.bike || '')
+  ];
+  // Only the jumpkit check asks which radio you are carrying, so only that tab
+  // gets the column. A column that is always empty reads as a question somebody
+  // forgot to answer.
+  if (isJk) row.push(p.radio || '');
+  row = row.concat([
+    p.verdict || '',
+    missing.length,                     // a NUMBER, so it sorts and filters
+    missing.join('\n'),
+    isJk ? expiryFlag(p.expiries) : (conditions.length ? 'YES' : ''),
+    isJk ? formatExpiries(p.expiries) : conditions.join('\n'),
+    p.notes || '',
+    p.submissionId || ''
+  ]);
+
+  // The row and the header row are built in two different places, so they can
+  // drift. When they do, every value lands one column off, which reads as a
+  // data-entry mistake rather than a code one. Refuse instead of writing it.
+  if (row.length !== conf.headers.length) {
+    logError('built ' + row.length + ' values for "' + conf.name + '", which has ' +
+             conf.headers.length + ' columns', JSON.stringify(p));
+    return json({ result: 'column count mismatch, nothing written' });
+  }
+
+  sh.appendRow(row);
+  var bad = missing.length > 0 || /not|fail|ground|out of service/i.test(String(p.verdict || ''));
+  styleRow(sh, sh.getLastRow(), conf, bad, !bad && conditions.length > 0);
+  addToBikeRestock(p, missing);
+  return json({ result: 'saved' });
+}
+
+function ensureBikeRestock() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(BIKE_RESTOCK.name);
+  if (sh) return sh;
+  sh = ss.insertSheet(BIKE_RESTOCK.name);
+  sh.appendRow(BIKE_RESTOCK.headers);
+  sh.getRange(1, 1, 1, BIKE_RESTOCK.headers.length)
+    .setFontWeight('bold').setBackground(BRAND).setFontColor('#ffffff')
+    .setVerticalAlignment('middle');
+  sh.setFrozenRows(1);
+  sh.setRowHeight(1, 34);
+  BIKE_RESTOCK.widths.forEach(function (w, i) { sh.setColumnWidth(i + 1, w); });
+  sh.getRange(1, 1, sh.getMaxRows(), BIKE_RESTOCK.headers.length).createFilter();
+  return sh;
+}
+
+// One row per item, the same way the ops Restock tab works: reporting the same
+// thing again bumps its counter rather than adding a duplicate, so the length of
+// the list is the length of the actual job.
+function addToBikeRestock(p, missing) {
+  if (!missing || !missing.length) return;
+  var sh = ensureBikeRestock();
+  var tz = Session.getScriptTimeZone();
+  var when = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+  var who = ((p.firstName || '') + ' ' + (p.lastName || '')).trim();
+  var where = p.form === 'jumpkit' ? (p.bag || 'Jumpkit') : (p.bike || 'Bike');
+  var n = BIKE_RESTOCK.headers.length;
+
+  var last = sh.getLastRow();
+  var existing = last > 1 ? sh.getRange(2, 1, last - 1, n).getValues() : [];
+  var index = {};
+  for (var i = 0; i < existing.length; i++) index[String(existing[i][1])] = i + 2;
+
+  var fresh = [];
+  missing.forEach(function (item) {
+    if (!item) return;
+    var atRow = index[String(item)];
+    if (atRow && atRow > 0) {
+      var wasDone = sh.getRange(atRow, 1).getValue() === true;
+      var times = Number(sh.getRange(atRow, 3).getValue()) || 0;
+      sh.getRange(atRow, 1).setValue(false);          // reported again: reopen it
+      sh.getRange(atRow, 3).setValue(wasDone ? 1 : times + 1);
+      if (wasDone) sh.getRange(atRow, 4).setValue(when);
+      sh.getRange(atRow, 5).setValue(when);
+      sh.getRange(atRow, 6).setValue(where);
+      sh.getRange(atRow, 7).setValue(who);
+    } else if (!atRow) {
+      fresh.push([false, item, 1, when, when, where, who]);
+      index[String(item)] = -1;   // do not add the same item twice from one payload
+    }
+  });
+
+  if (fresh.length) {
+    var start = sh.getLastRow() + 1;
+    sh.getRange(start, 1, fresh.length, n).setValues(fresh);
+    sh.getRange(start, 1, fresh.length, 1).insertCheckboxes();
+  }
+  paintBikeRestock(sh);
+}
+
+function paintBikeRestock(sh) {
+  var last = sh.getLastRow();
+  if (last < 2) return;
+  var n = BIKE_RESTOCK.headers.length;
+  var vals = sh.getRange(2, 1, last - 1, n).getValues();
+  for (var i = 0; i < vals.length; i++) {
+    var r = i + 2;
+    var done = vals[i][0] === true;
+    sh.getRange(r, 1, 1, n)
+      .setBackground(done ? '#f1f3f4' : '#ffffff')
+      .setFontColor(done ? '#9aa0a6' : '#202124')
+      .setFontLine(done ? 'line-through' : 'none');
+    sh.getRange(r, 3).setHorizontalAlignment('center')
+      .setFontWeight(!done && Number(vals[i][2]) > 1 ? 'bold' : 'normal');
+  }
+}
+
+// Somewhere to put a failure that is not the caller's fault and that nobody is
+// watching for. doPost already refuses to throw; this is where the detail goes.
+function logError(what, body) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var es = ss.getSheetByName('Errors') || ss.insertSheet('Errors');
+    es.appendRow([new Date(), String(what), String(body || '')]);
+  } catch (ignored) {}
+}
+
 // Display names live in the site, so the sheet stays the record and the site
 // stays the vocabulary. The site pushes these with Settings ▸ Send item names.
 // ---- shared content ---------------------------------------------------------
@@ -355,6 +578,45 @@ function verifiedEmail(idToken, clientId) {
 
    If neither is configured, nothing may write. That is the safe default: an
    unauthenticated write here would let any visitor rewrite the site. */
+/* Two sites publish through this one deployment, and each has its own People
+   list and its own body of content. They must not share a storage slot: the ops
+   site's published content and the bike site's are entirely different objects,
+   so one slot would mean each publish wiped the other site's entire copy — and
+   the site that got wiped would show the built-in defaults again with no error
+   anywhere. That is what the `site` field prevents.
+
+   Anything that does not name a site is the ops site. Its content was written
+   under the bare 'CONTENT' key before this split existed, and that key is still
+   read as a fallback so an existing deployment keeps working across the upgrade
+   instead of appearing to lose everything the moment the script is pasted. */
+function siteOf(p) { return String((p && p.site) || '') === 'bike' ? 'bike' : 'ops'; }
+function contentKey(site) { return site === 'bike' ? 'CONTENT_BIKE' : 'CONTENT_OPS'; }
+
+function readContent(site) {
+  var props = PropertiesService.getScriptProperties();
+  var raw = props.getProperty(contentKey(site));
+  if (!raw && site === 'ops') raw = props.getProperty('CONTENT');   // pre-split copy
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch (err) { return null; }
+}
+
+// Every address allowed to publish for one site: the permanent root account, plus
+// whoever that site's own published People list names. Read from that site's slot
+// only — being a bike manager does not make somebody an Operations Officer.
+function allowedFor(site) {
+  var allowed = MANAGER_EMAILS.map(function (e) { return e.toLowerCase(); });
+  var o = readContent(site);
+  var c = (o && o.content && o.content.access) || {};
+  // `officers` is the list; `officer` is the single-address shape it replaced,
+  // and is still read so an older published copy keeps working.
+  (c.officers || []).forEach(function (e) { allowed.push(String(e).toLowerCase()); });
+  if (c.officer) allowed.push(String(c.officer).toLowerCase());
+  (c.people || []).forEach(function (x) {
+    if (x && x.email) allowed.push(String(x.email).toLowerCase());
+  });
+  return allowed;
+}
+
 function writerName(p) {
   var props = PropertiesService.getScriptProperties();
   var key = props.getProperty('PUBLISH_KEY');
@@ -362,29 +624,20 @@ function writerName(p) {
 
   var who = verifiedEmail(p.idToken, props.getProperty('CLIENT_ID'));
   if (!who) return '';
-  var allowed = MANAGER_EMAILS.map(function (e) { return e.toLowerCase(); });
-  // Anyone the site has been told is a manager may publish; the officer address
-  // and the People list travel inside the content itself.
-  var stored = props.getProperty('CONTENT');
-  if (stored) {
-    try {
-      var c = JSON.parse(stored).access || {};
-      // `officers` is the list; `officer` is the single-address shape it replaced
-      // and is still read so an older published copy keeps working.
-      (c.officers || []).forEach(function (e) { allowed.push(String(e).toLowerCase()); });
-      if (c.officer) allowed.push(String(c.officer).toLowerCase());
-      (c.people || []).forEach(function (x) { allowed.push(String(x.email).toLowerCase()); });
-    } catch (err) {}
-  }
-  return allowed.indexOf(who) < 0 ? '' : who;
+  return allowedFor(siteOf(p)).indexOf(who) < 0 ? '' : who;
 }
 
 function saveContent(p) {
   var who = writerName(p);
-  if (!who) return json({ ok: false, error: 'not allowed' });
+  var site = siteOf(p);
+  // Say WHY it was refused. The browser cannot read this reply, but it lands in
+  // the execution log, and "rejected: not on the People list" is the difference
+  // between five minutes and an afternoon.
+  if (!who) return json({ ok: false, error: 'not allowed: no valid publish key, and the signed-in address is not on the ' + site + ' People list' });
   PropertiesService.getScriptProperties()
-    .setProperty('CONTENT', JSON.stringify({ at: Date.now(), by: who, content: p.content }));
-  return json({ ok: true, saved: true });
+    .setProperty(contentKey(site),
+      JSON.stringify({ at: Date.now(), by: who, content: p.content }));
+  return json({ ok: true, saved: true, site: site });
 }
 
 // ---- Restock, read and tick ------------------------------------------------
@@ -519,11 +772,14 @@ function nameMap() {
 function doGet(e) {
   var p = (e && e.parameter) || {};
   if (p.content) {
-    var raw = PropertiesService.getScriptProperties().getProperty('CONTENT');
-    if (!raw) return json({ ok: true, content: null });
-    var o;
-    try { o = JSON.parse(raw); } catch (err) { return json({ ok: true, content: null }); }
-    return json({ ok: true, content: o.content, at: o.at });
+    // ?site=bike for the bike site, anything else for the ops site. Serving one
+    // site the other's content would blank every view it has, so this is read
+    // from the same slot the matching publish wrote to and no other.
+    var o = readContent(siteOf(p));
+    if (!o) return json({ ok: true, content: null });
+    // `updatedAt` as well as `at`: the two sites read a different field name for
+    // the same number, and this endpoint now answers both of them.
+    return json({ ok: true, content: o.content, at: o.at, updatedAt: o.at });
   }
   if (p.report) {
     return json({ ok: true, report: collectReport(p.report) });
@@ -541,8 +797,21 @@ function doGet(e) {
     var sh = ss.getSheetByName(nm);
     out.tabs[nm] = sh ? Math.max(0, sh.getLastRow() - 1) : 0;
   });
+  // The bike tabs answer here too, so "Test connection" on either site proves it
+  // is talking to the one file that holds both.
+  Object.keys(BIKE_SHEETS).forEach(function (k) {
+    var b = ss.getSheetByName(BIKE_SHEETS[k].name);
+    out.tabs[BIKE_SHEETS[k].name] = b ? Math.max(0, b.getLastRow() - 1) : 0;
+  });
+  // The bike site's Test connection reads `serves` and `expects` to catch two
+  // URLs being swapped. One deployment serves both forms now, so say so rather
+  // than letting it report a mismatch against a field that is no longer there.
+  out.serves = ['jumpkit', 'safety'];
+  out.expects = 'jumpkit';
   var rs = ss.getSheetByName(RESTOCK.name);
   out.restock = rs ? Math.max(0, rs.getLastRow() - 1) : 0;
+  var brs = ss.getSheetByName(BIKE_RESTOCK.name);
+  out.bikeRestock = brs ? Math.max(0, brs.getLastRow() - 1) : 0;
   return json(out);
 }
 
@@ -559,6 +828,13 @@ function tidyUp() {
     var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(nm);
     if (sh) formatSheet(sh, SHEETS[nm]);
   });
+  // Bike tabs get the same treatment, and this is also what renames a tab that
+  // came over from the standalone bike file under its old title.
+  Object.keys(BIKE_SHEETS).forEach(function (k) {
+    ensureSheet(BIKE_SHEETS[k]);
+  });
   var rs = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(RESTOCK.name);
   if (rs) paintRestock(rs);
+  var brs = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(BIKE_RESTOCK.name);
+  if (brs) paintBikeRestock(brs);
 }

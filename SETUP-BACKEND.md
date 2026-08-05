@@ -4,8 +4,43 @@ Every form on the site works without this, but nothing is stored anywhere except
 the phone that filled it in. This is how you fix that. Twenty minutes, once.
 
 You end up with **one spreadsheet** holding **one tab per form** — Room Checks,
-Checkouts, Bag Checks, Post-Call and Reports — plus an **Items** tab with one row per item
-and a **Restock** tab the script keeps up to date for you.
+Checkouts, Bag Checks, Post-Call and Reports, plus **Bike Jumpkit Checks** and
+**Bike Safety Checks** from the Bike Ops site — plus an **Items** tab with one row
+per item and **Restock** and **Bike Restock** tabs the script keeps up to date.
+
+---
+
+## Do this first — one paste, five minutes
+
+The script in `apps-script/Code.gs` has changed and **the deployed copy is older
+than it**. Until it is pasted and redeployed, three things are true:
+
+- Bike checks still write to the old separate bike spreadsheet, not this one.
+- The Bike Ops site cannot publish at all — the current deployment has nowhere to
+  put its content and will refuse the write.
+- Anyone appointed under People can be refused when they publish, because the
+  deployed copy checks a stale list.
+
+Steps, in the spreadsheet **CMU EMS Operations**:
+
+1. **Extensions ▸ Apps Script.**
+2. Select everything in `Code.gs` and paste the whole of
+   [`apps-script/Code.gs`](apps-script/Code.gs) over it. Save.
+3. **Deploy ▸ Manage deployments ▸ ✏️ (edit) ▸ Version: New version ▸ Deploy.**
+   Edit the existing deployment rather than making a new one — a new deployment
+   gets a new URL, and every printed QR code and both sites point at the old one.
+4. **Run ▸ tidyUp** once. This creates and formats the two bike tabs, and renames
+   a `Jumpkit Checks` tab brought over from the old bike file rather than leaving
+   its rows stranded.
+
+To confirm it worked, open the Web App URL in a browser. `tabs` should now list
+`Bike Jumpkit Checks` and `Bike Safety Checks` alongside the ops tabs.
+
+Both sites publish through this one deployment and each keeps its own copy,
+chosen by a `site` field in the request — `CONTENT_OPS` and `CONTENT_BIKE` script
+properties. They cannot overwrite one another. An existing `CONTENT` property
+from before this split is still read for the ops site, so nothing is lost in the
+upgrade.
 
 **Nothing is emailed.** Sending mail from Apps Script needs a permission scope
 that makes Google show a warning to whoever deploys it, and the same information
@@ -26,8 +61,10 @@ several Google accounts signed in at once: Drive opens the file as whichever is
 account 0. Use a private window with just the one account, or check the URL for
 `/u/1/` and change it to `/u/0/`.
 
-Make a **separate** spreadsheet for ops rather than adding tabs to a bike file.
-Distinct files make the eventual handover a one-click ownership transfer.
+One spreadsheet holds both sites' forms — **CMU EMS Operations**. Bike checks used
+to go to a file of their own, which meant no formula could put a bike check beside
+a room check, and answering one question meant opening two files. Handover is
+still one ownership transfer, of one file.
 
 ---
 
