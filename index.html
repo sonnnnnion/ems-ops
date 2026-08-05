@@ -1337,7 +1337,11 @@ var DEFAULTS={
   // ONE Apps Script Web App in front of ONE spreadsheet. Every form writes to
   // its own tab in that file, so Equipment and Office data sit side by side and
   // can be cross-referenced with a formula. `form` in the payload picks the tab.
-  api:{url:''},
+  // The live deployment, baked in. Left blank, every visitor had no endpoint at
+  // all: nothing pulled the published content, so everyone saw the built-in
+  // defaults, and nothing could be published back. Site Settings is per-browser,
+  // so pasting it there only ever fixed it for one person.
+  api:{url:'https://script.google.com/macros/s/AKfycbywonXptEPr_o-OKQZvwYv3cAoX8plAjtlT81r2JKPvoEkX6L4EyRYoV_QJo3b52k7b/exec'},
 
   /* ---------- who gets in -----------------------------------------------
      `officer` is the shared operations account. Everything else is assigned by
@@ -1958,6 +1962,7 @@ function saveDB(){
   try{ localStorage.setItem(LS_DB,JSON.stringify(DB)); }
   catch(e){ /* private mode / quota — the site still works, edits just don't persist */ }
   syncNames();
+  scheduleAutoPublish();
 }
 
 /* ---- keeping the sheet's id→name map current --------------------------------
@@ -2388,7 +2393,34 @@ function applyContent(obj){
 function markContentDirty(){
   contentState.dirty=true;
   var b=document.getElementById('pubState');
-  if(b) b.textContent='Unpublished changes on this device.';
+  if(b) b.textContent=canPublish()?'Sending\u2026':'Unpublished changes on this device.';
+}
+
+/* Publishing used to be a button someone had to remember to press. It got
+   forgotten, and a manager's edits sat on one device looking perfectly correct
+   while nobody else saw them — which is indistinguishable from the edit having
+   failed. An edit now publishes itself once it settles.
+
+   Debounced, so typing sends one request when you stop rather than one per
+   keystroke. Silent: it reports into the Site Settings line, never a dialog. */
+var autoPubTimer=null;
+function canPublish(){
+  var url=(DB.api&&DB.api.url)||'';
+  return !!url && (!!googleIdToken || !!((DB.api&&DB.api.key)||''));
+}
+function scheduleAutoPublish(){
+  if(!canPublish()) return;
+  clearTimeout(autoPubTimer);
+  autoPubTimer=setTimeout(function(){
+    // Gate on real divergence, not on having been called. A pull also saves, and
+    // without this that would publish straight back and loop.
+    //
+    // No baseline means this device has never synced, so nothing can be *compared*
+    // and unpublishedKeys() is empty — which is the state a first-time manager is
+    // in, and it silently skipped the one publish that mattered most. Treat it as
+    // everything-to-send. The publish sets a baseline, so this runs once.
+    if(!contentBase||unpublishedKeys().length) publishContent({auto:true});
+  },1500);
 }
 
 function pullContent(){
@@ -2414,7 +2446,8 @@ function pullContent(){
     .catch(function(){ return false; });
 }
 
-function publishContent(){
+function publishContent(opts){
+  opts=opts||{};
   var msg=document.getElementById('pubState');
   var url=(DB.api&&DB.api.url)||'';
   if(!url){ if(msg) msg.textContent='Connect a spreadsheet first.'; return; }
@@ -2423,9 +2456,10 @@ function publishContent(){
   // one of them the request would simply be refused, so say so here rather than
   // firing it off and reporting a success the reply cannot actually confirm.
   if(!googleIdToken && !key){
-    uiAlert('Publishing needs either a Google sign-in or a publish key. Add the '+
-            'key under Site Settings — the steps are in SETUP-BACKEND.md §7.',
-            'Cannot publish yet');
+    if(!opts.auto)
+      uiAlert('Publishing needs either a Google sign-in or a publish key. Add the '+
+              'key under Site Settings — the steps are in SETUP-BACKEND.md §7.',
+              'Cannot publish yet');
     return;
   }
   if(msg) msg.textContent='Publishing…';
@@ -2446,7 +2480,7 @@ function publishContent(){
           // holds something it does not, or the next pull discards the difference.
           setContentBase(j.content);
           contentState.dirty=false;
-          if(msg) msg.textContent='Published. Everyone sees this on their next load.';
+          if(msg) msg.textContent='Saved for everyone.';
         } else if(msg){
           msg.textContent='Sent, but the server copy does not match yet. Try again in a moment.';
         }
