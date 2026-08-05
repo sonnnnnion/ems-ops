@@ -1919,6 +1919,25 @@ var DB={};
 var SEEDED=['rooms','bags','bagUnits','consumables','postCall','officeSupplies',
             'inventory','roles','otherSpaces','radioIds'];
 
+/* Brings one `access` object up to the current shape. Kept as a function with no
+   side effects beyond its argument because it has to run over TWO objects that
+   must agree: the live copy and the sync baseline. Returns true if it changed
+   anything. There used to be exactly one officer, in `officer`; it is now the
+   `officers` list, and the root account is implicit. */
+function migrateAccess(a){
+  if(!a || typeof a!=='object') return false;
+  var changed=false;
+  if(!Array.isArray(a.officers)){ a.officers=[]; changed=true; }
+  if(typeof a.officer==='string'){
+    var legacy=normEmail(a.officer);
+    if(legacy && legacy!==WEBMASTER && a.officers.indexOf(legacy)<0) a.officers.push(legacy);
+    delete a.officer;
+    changed=true;
+  }
+  if(!Array.isArray(a.people)){ a.people=[]; changed=true; }
+  return changed;
+}
+
 function loadDB(){
   var raw=null;
   try{ raw=JSON.parse(localStorage.getItem(LS_DB)||'null'); }catch(e){ raw=null; }
@@ -1939,18 +1958,15 @@ function loadDB(){
   // `access` is never re-seeded — it holds the People list, and wiping that on
   // every content release would be worse than any stale value in it, so its
   // shape changes have to be migrated by hand.
-  if(DB.access){
-    if(!Array.isArray(DB.access.officers)){ DB.access.officers=[]; stale=true; }
-    // There used to be exactly one officer, in `officer`. Carry it into the
-    // list, unless it is the root account, which is now implicit.
-    if(typeof DB.access.officer==='string'){
-      var legacy=normEmail(DB.access.officer);
-      if(legacy && legacy!==WEBMASTER && DB.access.officers.indexOf(legacy)<0)
-        DB.access.officers.push(legacy);
-      delete DB.access.officer;
-      stale=true;
-    }
-  }
+  if(migrateAccess(DB.access)) stale=true;
+  // The SAME migration has to run over the sync baseline, or the shape change
+  // alone makes `access` look locally edited forever: unpublishedKeys() compares
+  // DB.access against contentBase.access, applyContent() then holds the server
+  // copy back to protect what it thinks is unpublished work, and a newly
+  // appointed officer is never picked up on this device. That is the bug that
+  // stopped an appointed Operations Officer signing in — the appointment was on
+  // the server the whole time and this browser refused to read it.
+  if(contentBase) migrateAccess(contentBase.access);
   // Expiry dates used to be keyed by item id alone, which meant one date covered
   // every bag of that kind. Those keys cannot be attributed to a physical bag
   // after the fact — "the red pouch expires in August" does not say whose — so
@@ -2071,7 +2087,44 @@ var MANAGER_VIEWS={
 // Shared with the Bike Ops site on purpose: both are served from
 // sonnnnnion.github.io, which is the only origin the credential authorises.
 var GOOGLE_CLIENT_ID='56106295898-0if2a9uvtsl0815n3hgtdpph93goq0ck.apps.googleusercontent.com';
+
+/* The proof of who you are that every write carries. It used to live only in
+   this variable, which meant it vanished on reload — and THAT is silent in the
+   worst way: the role came back from the saved address, so the manager buttons
+   were all there, but canPublish() was false, so scheduleAutoPublish() returned
+   without doing anything. Edits looked saved, sat in one browser, and reached
+   nobody. Appointing somebody and having it not take is exactly this.
+
+   So it is persisted, with its own expiry respected. Google issues these for
+   about an hour; past that the manager signs in again, which is a prompt rather
+   than silence. */
+var LS_TOKEN='emsops_token_v1';
 var googleIdToken='';
+
+function tokenExpiry(jwt){
+  try{
+    var part=String(jwt).split('.')[1];
+    var b64=part.replace(/-/g,'+').replace(/_/g,'/');
+    while(b64.length%4) b64+='=';
+    return Number(JSON.parse(decodeURIComponent(escape(atob(b64)))).exp)||0;
+  }catch(e){ return 0; }
+}
+function setIdToken(t){
+  googleIdToken=t||'';
+  try{
+    if(googleIdToken) localStorage.setItem(LS_TOKEN,googleIdToken);
+    else localStorage.removeItem(LS_TOKEN);
+  }catch(e){}
+}
+function restoreIdToken(){
+  var t='';
+  try{ t=localStorage.getItem(LS_TOKEN)||''; }catch(e){ return; }
+  if(!t) return;
+  // A minute of slack, so a token with seconds left is not used for a write that
+  // would land after it died and be refused for no visible reason.
+  if(tokenExpiry(t)*1000 > Date.now()+60000) googleIdToken=t;
+  else { try{ localStorage.removeItem(LS_TOKEN); }catch(e){} }
+}
 
 /* ---- local manager unlock: OFF ---------------------------------------------
    Between 2026-07-30 and 2026-08-05 the Google account that owned the client
@@ -2225,6 +2278,9 @@ function openRolePicker(){
         if(!y) return;
         try{ localStorage.removeItem(LS_EMAIL); }catch(e){}
         try{ localStorage.removeItem(LS_LOCALROLE); }catch(e){}
+        // Logging out has to drop the proof too, or the next person at this
+        // device is a member who can still write as whoever left it signed in.
+        setIdToken('');
         setRole('member');
       });
     return;
@@ -2271,8 +2327,13 @@ function renderGsi(w, done){
       client_id:GOOGLE_CLIENT_ID,
       callback:function(resp){
         var email=emailFromIdToken(resp&&resp.credential);
-        googleIdToken=(resp&&resp.credential)||'';
-        done({email:email, role:roleForEmail(email)});
+        setIdToken((resp&&resp.credential)||'');
+        // Re-read the People list from the server before judging this address.
+        // Deciding from the local copy is what told a newly appointed officer she
+        // had no role while the appointment sat on the server, correct, unread.
+        refreshAccess().then(function(fresh){
+          done({email:email, role:roleForEmail(email), fresh:fresh});
+        });
       },
       error_callback:function(err){
         console.error('Google sign-in error:',err);
@@ -2295,6 +2356,16 @@ function renderGsi(w, done){
 function finishGoogleLogin(r){
   if(!r||!r.email) return;
   if(!r.role){
+    // "You are not on the list" and "I could not read the list" look identical
+    // from here and need opposite reactions — one is a job for the Operations
+    // Officer, the other is a job for the network. Saying the first when the
+    // second is true sends somebody to ask for access they already have.
+    if(r.fresh===false){
+      uiAlert('Signed in as '+r.email+', but the list of who has access could not '+
+              'be read just now, so this device cannot tell what role you hold. '+
+              'Check the connection and try again.','Could not check access');
+      return;
+    }
     uiAlert('Signed in as '+r.email+', which has no role here. The Operations '+
             'Officer adds people under Site Settings ▸ People.','No access');
     return;
@@ -2438,8 +2509,25 @@ function canPublish(){
   var url=(DB.api&&DB.api.url)||'';
   return !!url && (!!googleIdToken || !!((DB.api&&DB.api.key)||''));
 }
+/* Raised the first time an edit cannot be sent, and only for somebody who could
+   actually act on it. Once per page: a manager who keeps typing must not be
+   interrupted on every keystroke. */
+var toldCannotPublish=false;
+function warnCannotPublish(){
+  if(toldCannotPublish || ROLE==='member') return;
+  toldCannotPublish=true;
+  var b=document.getElementById('pubState');
+  if(b) b.textContent='Not saved for everyone — sign in again.';
+  uiAlert('This change is saved on this device but has not gone out to everyone, '+
+          'because the sign-in that proves who you are has expired. Log in again '+
+          'and it will send by itself.','Not saved for everyone yet');
+}
+
 function scheduleAutoPublish(){
-  if(!canPublish()) return;
+  // A manager whose token has expired keeps every manager button, so an edit that
+  // goes nowhere looks exactly like an edit that worked. Returning quietly here is
+  // what let a whole afternoon of appointments live in one browser.
+  if(!canPublish()){ warnCannotPublish(); return; }
   clearTimeout(autoPubTimer);
   autoPubTimer=setTimeout(function(){
     // Gate on real divergence, not on having been called. A pull also saves, and
@@ -2453,10 +2541,50 @@ function scheduleAutoPublish(){
   },1500);
 }
 
+/* Who may sign in, straight from the server, immediately before the answer is
+   used. Sign-in used to be judged against whatever `DB.access` happened to hold,
+   which is a copy of the server written at some earlier moment — so appointing
+   somebody worked, and the person appointed was still told they had no role.
+
+   Three things made that copy wrong, and this closes all three: the initial pull
+   is a race the sign-in usually wins, its response could be served from cache,
+   and a held-back key meant the server copy was never adopted at all.
+
+   The server is authoritative here, not merged with the local copy: a merge
+   would mean a browser holding a stale list could restore access to somebody who
+   had just been removed. Adding somebody publishes within moments, so there is
+   no window where a real appointment is missing from the server copy. Resolves
+   true if the list is genuinely fresh, false if the network could not answer —
+   the caller has to say which, because "not on the list" and "could not read the
+   list" call for very different messages. */
+function refreshAccess(){
+  var url=(DB.api&&DB.api.url)||'';
+  if(!url) return Promise.resolve(false);
+  return fetch(url+(url.indexOf('?')<0?'?':'&')+'content=1&t='+Date.now())
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      var a=j&&j.content&&j.content.access;
+      if(!a||typeof a!=='object') return false;
+      a=JSON.parse(JSON.stringify(a));
+      migrateAccess(a);
+      DB.access=a;
+      // The baseline moves with it, or the very next unpublishedKeys() call reads
+      // this adopted copy as a local edit and publishes it straight back.
+      var base=JSON.parse(JSON.stringify(contentBase||{}));
+      base.access=JSON.parse(JSON.stringify(a));
+      setContentBase(base);
+      try{ localStorage.setItem(LS_DB,JSON.stringify(DB)); }catch(e){}
+      return true;
+    })
+    .catch(function(){ return false; });
+}
+
 function pullContent(){
   var url=(DB.api&&DB.api.url)||'';
   if(!url) return Promise.resolve(false);
-  return fetch(url+(url.indexOf('?')<0?'?':'&')+'content=1')
+  // Cache-busted. Without it the browser can answer this from a copy taken
+  // before the last appointment, and the site never learns about the new person.
+  return fetch(url+(url.indexOf('?')<0?'?':'&')+'content=1&t='+Date.now())
     .then(function(r){ return r.json(); })
     .then(function(j){
       if(!j||!j.content) return false;
@@ -2470,6 +2598,14 @@ function pullContent(){
       // this device genuinely ahead of the server, and saying otherwise is how an
       // unpublished change gets forgotten.
       contentState.dirty=unpublishedKeys().length>0;
+      // init() derives the role from the saved address before this lands, so at
+      // that moment the People list is still whatever was cached. Derive it again
+      // now the real list is here: without this an officer appointed since her
+      // last visit opens the site, is silently a member, and has to sign in again
+      // to get the role she already holds. It cuts the other way too — somebody
+      // removed while away drops to member on arrival rather than keeping the
+      // buttons until they happen to sign in.
+      restoreRole();
       if(ok) renderAll();
       return ok;
     })
@@ -4860,12 +4996,11 @@ function renderAll(){
   applyGates();
 }
 
-function init(){
-  loadDB();
-
-  // Re-derive the role from the saved address on every load rather than trusting
-  // a stored role. If the Operations Officer removes someone under People, the
-  // next load drops them back to member instead of leaving the old role stuck.
+/* Work out the role from the saved address rather than trusting a stored role,
+   so removing somebody under People actually takes their buttons away. Called
+   at load AND again once the People list arrives from the server, because at
+   load the list is still whatever this browser had cached. */
+function restoreRole(){
   var saved='member';
   try{
     var e=localStorage.getItem(LS_EMAIL);
@@ -4878,7 +5013,18 @@ function init(){
       if(lr && ROLE_LABEL[lr] && lr!=='member') saved=lr;
     }
   }catch(err){ saved='member'; }
+  // Unconditional: on the first call this is what fills in the role pill and the
+  // log-in button, so skipping it when the role happens to match leaves a member
+  // looking at an empty pill.
   setRole(saved,true);
+}
+
+function init(){
+  loadDB();
+  // Before restoreRole, so a manager who reloads is able to publish straight
+  // away rather than having every edit quietly stay on this device.
+  restoreIdToken();
+  restoreRole();
 
   document.getElementById('nav').addEventListener('click',function(e){
     var b=e.target.closest ? e.target.closest('.sb-item') : null;
