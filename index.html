@@ -2470,7 +2470,29 @@ var contentState={loaded:false, dirty:false, at:0};
 function contentPayload(){
   var out={};
   Object.keys(DEFAULTS).forEach(function(k){ if(!NO_SYNC[k]) out[k]=DB[k]; });
+  // Stamped so the bike site's copy can never be mistaken for this one. Not a
+  // key in DEFAULTS, so nothing reads it into DB.
+  out.__site='ops';
   return out;
+}
+
+/* Both sites publish through one Apps Script deployment now. A copy of that
+   script which does not understand the `site` parameter answers every content
+   request from one slot, so each site can be handed the other's copy. Adopting
+   it would be silent and destructive rather than merely wrong: `access`, `bags`,
+   `inventory`, `videos`, `lectures` and `radioIds` all exist on both sites, with
+   the same types and entirely different meanings. The kit list would become a
+   list of bicycle bags, and the People list would become the bike manager list —
+   so a successful sync would lock the Operations Officer out.
+
+   Content therefore has to say who it belongs to before it is believed. Copies
+   published from here carry `__site`. Anything published before that marker
+   existed is identified by keys only the bike site has ever had. */
+function isOurContent(c){
+  if(!c||typeof c!=='object') return false;
+  if(c.__site) return c.__site==='ops';
+  if('bikes' in c || 'bylawsResponse' in c || 'weather' in c || 'oos' in c) return false;
+  return true;
 }
 
 /* The last content this device knows the server had — either because it pulled it
@@ -2508,6 +2530,14 @@ var applyingContent=false;
 
 function applyContent(obj){
   if(!obj||typeof obj!=='object') return false;
+  // Somebody else's content. Keep what this device has rather than overwrite the
+  // site with the other one's.
+  if(!isOurContent(obj)){
+    console.warn('Ignored shared content that does not belong to the Operations '+
+                 'site. The Apps Script deployment is older than the site and is '+
+                 'answering from one slot — paste the current Code.gs and redeploy.');
+    return false;
+  }
   applyingContent=true;
   try{ return applyContentInner(obj); } finally{ applyingContent=false; }
 }
@@ -2618,7 +2648,11 @@ function refreshAccess(){
   return fetch(url+(url.indexOf('?')<0?'?':'&')+'content=1&site=ops&t='+Date.now())
     .then(function(r){ return r.json(); })
     .then(function(j){
-      var a=j&&j.content&&j.content.access;
+      // Same guard as applyContent: a deployment answering from one slot can hand
+      // back the bike site's list, and taking it would lock the Operations Officer
+      // out while looking like a successful check.
+      if(!j||!isOurContent(j.content)) return false;
+      var a=j.content.access;
       if(!a||typeof a!=='object') return false;
       a=JSON.parse(JSON.stringify(a));
       migrateAccess(a);
