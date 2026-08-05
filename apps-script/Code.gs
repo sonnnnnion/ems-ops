@@ -830,24 +830,67 @@ function doGet(e) {
 
 // Run by hand (Run ▸ tidyUp) after pasting an updated script: reformats every
 // tab that already exists and repaints the restock list.
+/* The order the tabs sit in, left to right. Grouped by whose job it is rather
+   than by when they happen to get created, so the file reads as a table of
+   contents: the operations forms, then the bike forms, then the two worklists,
+   then the machinery nobody opens by choice. */
+var TAB_ORDER = ['Room Checks', 'Checkouts', 'Bag Checks', 'Post-Call', 'Reports',
+                 'Bike Jumpkit Checks', 'Bike Safety Checks',
+                 'Restock', 'Bike Restock', 'Items'];
+
+/* Run by hand (Run ▸ tidyUp) after pasting an updated script.
+
+   Builds EVERY tab, rather than letting each one appear the first time somebody
+   happens to submit that form. A file that grows tabs as it goes gives no way to
+   tell "nobody has filed a room check yet" from "room checks are not set up" —
+   and the second is the one worth worrying about. An empty tab with its headers
+   in place answers that question by existing.
+
+   Safe to run as often as you like: every step below either finds the tab and
+   reformats it, or creates it. Nothing is cleared. */
 function tidyUp() {
-  var it = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(ITEMS.name);
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // The five operations forms. ensureSheet rewrites a header row that no longer
+  // matches this version of the script, which is what stops a newly added column
+  // shifting every later value one place left.
+  Object.keys(SHEETS).forEach(function (nm) {
+    formatSheet(ensureSheet(SHEETS[nm]), SHEETS[nm]);
+  });
+
+  // The two bike forms. This is also what renames a tab carried over from the
+  // standalone bike file under its old title, rather than leaving its rows
+  // stranded beside a new empty one.
+  Object.keys(BIKE_SHEETS).forEach(function (k) {
+    formatSheet(ensureSheet(BIKE_SHEETS[k]), BIKE_SHEETS[k]);
+  });
+
+  // The worklists and the per-item log.
+  ensureItems();
+  var it = ss.getSheetByName(ITEMS.name);
   if (it) {
     it.getRange(1, 1, 1, ITEMS.headers.length)
       .setFontWeight('bold').setBackground(BRAND).setFontColor('#ffffff');
     ITEMS.widths.forEach(function (w, i) { it.setColumnWidth(i + 1, w); });
   }
-  Object.keys(SHEETS).forEach(function (nm) {
-    var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(nm);
-    if (sh) formatSheet(sh, SHEETS[nm]);
+  paintRestock(ensureRestock());
+  paintBikeRestock(ensureBikeRestock());
+
+  orderTabs();
+  return 'All tabs are present. Order: ' + TAB_ORDER.join(', ');
+}
+
+// Puts the tabs in TAB_ORDER. Anything not on that list (an Errors tab, or
+// something added by hand) is left alone at the end rather than moved or removed.
+function orderTabs() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var at = 1;
+  TAB_ORDER.forEach(function (nm) {
+    var sh = ss.getSheetByName(nm);
+    if (!sh) return;
+    ss.setActiveSheet(sh);
+    ss.moveActiveSheet(at++);
   });
-  // Bike tabs get the same treatment, and this is also what renames a tab that
-  // came over from the standalone bike file under its old title.
-  Object.keys(BIKE_SHEETS).forEach(function (k) {
-    ensureSheet(BIKE_SHEETS[k]);
-  });
-  var rs = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(RESTOCK.name);
-  if (rs) paintRestock(rs);
-  var brs = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(BIKE_RESTOCK.name);
-  if (brs) paintBikeRestock(brs);
+  var first = ss.getSheetByName(TAB_ORDER[0]);
+  if (first) ss.setActiveSheet(first);
 }
