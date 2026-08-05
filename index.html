@@ -2332,17 +2332,55 @@ function contentPayload(){
   return out;
 }
 
+/* The last content this device knows the server had — either because it pulled it
+   or because it published it. Persisted, because the question it answers outlives
+   a reload: for each section, is this device's copy the server's copy, or has it
+   been edited here since?
+
+   Without it a pull cannot tell "the server is newer" from "I changed this and
+   have not published yet", so it treats both as stale and overwrites. That made
+   an edit look like it silently refused to save — add someone to the manager
+   list, reload, and they are gone, with nothing said. */
+var LS_BASE='emsops_base_v1';
+var contentBase=(function(){
+  try{ var r=localStorage.getItem(LS_BASE); return r?JSON.parse(r):null; }catch(e){ return null; }
+})();
+function setContentBase(p){
+  contentBase=JSON.parse(JSON.stringify(p||{}));
+  try{ localStorage.setItem(LS_BASE,JSON.stringify(contentBase)); }catch(e){}
+}
+// Sections edited here and not yet published. Derived, never stored — a stored
+// flag and the actual data drift apart, and then it lies in whichever direction
+// is least helpful.
+function unpublishedKeys(){
+  if(!contentBase) return [];
+  return Object.keys(DEFAULTS).filter(function(k){
+    return !NO_SYNC[k] && (k in contentBase) &&
+           JSON.stringify(DB[k])!==JSON.stringify(contentBase[k]);
+  });
+}
+
 function applyContent(obj){
   if(!obj||typeof obj!=='object') return false;
-  var n=0;
+  var n=0, mine=unpublishedKeys();
   Object.keys(DEFAULTS).forEach(function(k){
     if(NO_SYNC[k] || !Object.prototype.hasOwnProperty.call(obj,k)) return;
+    // Edited here since the last sync: keep it. Overwriting would discard work
+    // with no way to get it back.
+    if(mine.indexOf(k)>=0) return;
     // Same per-key type check as loadDB: a wrong shape from the server must not
     // blank a view.
     if(Object.prototype.toString.call(obj[k])===Object.prototype.toString.call(DEFAULTS[k])){
       DB[k]=obj[k]; n++;
     }
   });
+  // Everything not held back is now the server's copy, so that becomes the baseline.
+  var base=JSON.parse(JSON.stringify(contentBase||{}));
+  Object.keys(DEFAULTS).forEach(function(k){
+    if(NO_SYNC[k] || !Object.prototype.hasOwnProperty.call(obj,k)) return;
+    if(mine.indexOf(k)<0) base[k]=obj[k];
+  });
+  setContentBase(base);
   if(n) saveDB();
   return n>0;
 }
@@ -2360,9 +2398,17 @@ function pullContent(){
     .then(function(r){ return r.json(); })
     .then(function(j){
       if(!j||!j.content) return false;
+      // With no baseline yet this adopts the server copy wholesale — unpublishedKeys()
+      // returns nothing without one, since there is no basis to call anything a local
+      // edit. applyContent then writes the baseline. Setting it first would make every
+      // local value look edited and the server copy would never be adopted at all.
       var ok=applyContent(j.content);
       contentState.loaded=true; contentState.at=j.at||0;
-      if(ok){ contentState.dirty=false; renderAll(); }
+      // Derived from the data, not assumed: a pull that held an edit back leaves
+      // this device genuinely ahead of the server, and saying otherwise is how an
+      // unpublished change gets forgotten.
+      contentState.dirty=unpublishedKeys().length>0;
+      if(ok) renderAll();
       return ok;
     })
     .catch(function(){ return false; });
@@ -2387,12 +2433,25 @@ function publishContent(){
     headers:{'Content-Type':'text/plain;charset=utf-8'},
     body:JSON.stringify({form:'__content', idToken:googleIdToken, key:key,
                          content:contentPayload()})});
-  // no-cors again: the reply is unreadable, so confirm by pulling it back.
+  // no-cors again: the reply is unreadable, so confirm by reading it back and
+  // comparing. Announcing success without checking is how a rejected publish gets
+  // remembered as a successful one.
   setTimeout(function(){
-    pullContent().then(function(){
-      if(msg) msg.textContent='Published. Everyone sees this on their next load.';
-      contentState.dirty=false;
-    });
+    fetch(url+(url.indexOf('?')<0?'?':'&')+'content=1&t='+Date.now())
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        var same=j&&j.content&&JSON.stringify(j.content)===JSON.stringify(contentPayload());
+        if(same){
+          // Only on a confirmed match. The baseline must never claim the server
+          // holds something it does not, or the next pull discards the difference.
+          setContentBase(j.content);
+          contentState.dirty=false;
+          if(msg) msg.textContent='Published. Everyone sees this on their next load.';
+        } else if(msg){
+          msg.textContent='Sent, but the server copy does not match yet. Try again in a moment.';
+        }
+      })
+      .catch(function(){ if(msg) msg.textContent='Sent, but could not read it back to confirm.'; });
   },1200);
 }
 
