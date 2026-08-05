@@ -1352,13 +1352,12 @@ var DEFAULTS={
      typing an address that is not theirs. It decides which buttons are on
      screen; it does not protect data. The Apps Script is what does that. */
   access:{
-    // Empty on purpose. This was bikecmuems@gmail.com until Google disabled that
-    // account on 2026-07-30; pointing a role at a dead address is worse than
-    // pointing it at none, because the login dialog then sends you into a Google
-    // flow that cannot succeed and the role becomes unreachable. Set this to the
-    // replacement ops account under Site Settings ▸ People.
-    officer:'',
-    people:[]                      // [{email, role:'equipment'|'office'|'ops'}]
+    // Ships empty, and stays empty in the repo. Officers and managers are real
+    // students, so their addresses live in the spreadsheet's published content
+    // where the site can read them — never in a public git history.
+    // WEBMASTER below is the exception: a shared club account, not a person.
+    officers:[],                   // ['someone@andrew.cmu.edu', …] — all 'ops'
+    people:[]                      // [{email, role:'equipment'|'office'}]
   },
 
   // Locked to the Operations Officer until there is something worth showing.
@@ -1938,13 +1937,19 @@ function loadDB(){
   });
   DB.seed=DEFAULTS.seed;
   // `access` is never re-seeded — it holds the People list, and wiping that on
-  // every content release would be worse than any stale value in it. So this one
-  // dead address has to be retired by hand: Google disabled it on 2026-07-30,
-  // and a role pointed at a dead account is unreachable once the local unlock
-  // goes away. Safe to delete this block once no browser can still be holding it.
-  if(DB.access && String(DB.access.officer||'').toLowerCase()==='bikecmuems@gmail.com'){
-    DB.access.officer='';
-    stale=true;
+  // every content release would be worse than any stale value in it, so its
+  // shape changes have to be migrated by hand.
+  if(DB.access){
+    if(!Array.isArray(DB.access.officers)){ DB.access.officers=[]; stale=true; }
+    // There used to be exactly one officer, in `officer`. Carry it into the
+    // list, unless it is the root account, which is now implicit.
+    if(typeof DB.access.officer==='string'){
+      var legacy=normEmail(DB.access.officer);
+      if(legacy && legacy!==WEBMASTER && DB.access.officers.indexOf(legacy)<0)
+        DB.access.officers.push(legacy);
+      delete DB.access.officer;
+      stale=true;
+    }
   }
   // Expiry dates used to be keyed by item id alone, which meant one date covered
   // every bag of that kind. Those keys cannot be attributed to a physical bag
@@ -2086,6 +2091,30 @@ var LOCAL_MANAGER_UNLOCK=true;
 
 function normEmail(e){ return String(e||'').trim().toLowerCase(); }
 
+/* The one address that is always an Operations Officer and cannot be removed
+   from the site. It is the shared club account rather than a person, so it
+   survives every handover — which is the point: officers graduate, and an
+   access list you can lock yourself out of is one bad afternoon from being
+   unrecoverable. The Apps Script carries the same address in MANAGER_EMAILS so
+   the two ends agree about who the root is. */
+var WEBMASTER='bikecmuems@gmail.com';
+
+function officerList(){
+  var a=DB.access||{};
+  var out=[WEBMASTER];
+  var add=function(e){
+    e=normEmail(e);
+    if(e && e!==WEBMASTER && out.indexOf(e)<0) out.push(e);
+  };
+  (a.officers||[]).forEach(add);
+  // `officer` was a single address before this was a list. Read it here rather
+  // than only migrating it on load: published content arrives from the sheet
+  // AFTER loadDB has run, so a copy published in the old shape would otherwise
+  // come down and quietly leave the actual Operations Officer with no role.
+  if(typeof a.officer==='string') add(a.officer);
+  return out;
+}
+
 // Reads the verified address out of the Google ID token. Decoding a JWT
 // client-side proves nothing on its own — it is what makes the UI show the
 // right buttons. The Apps Script is what actually verifies a token.
@@ -2112,7 +2141,7 @@ function loadGis(){
 function roleForEmail(email){
   var e=normEmail(email);
   if(!e) return null;
-  if(e===normEmail(DB.access&&DB.access.officer)) return 'ops';
+  if(officerList().indexOf(e)>=0) return 'ops';
   var hit=((DB.access&&DB.access.people)||[]).filter(function(p){
     return normEmail(p.email)===e; })[0];
   return hit?hit.role:null;
@@ -2144,8 +2173,7 @@ var LOGIN_ROLES=['equipment','office','ops'];
 var LOGIN_ICON={equipment:'✚', office:'⌂', ops:'◈'};
 
 function roleAccounts(role){
-  var out=[];
-  if(role==='ops' && DB.access && DB.access.officer) out.push(DB.access.officer);
+  var out=(role==='ops') ? officerList().slice() : [];
   ((DB.access&&DB.access.people)||[]).forEach(function(p){
     if(p.role===role && p.email) out.push(p.email);
   });
@@ -4020,12 +4048,24 @@ function delLearn(kind,i){
 /* ---- people ---- */
 function renderPeople(){
   var host=document.getElementById('peopleHost'); if(!host) return;
-  var a=DB.access||{officer:'',people:[]};
-  var h='<div class="card brandtop"><h3>Operations Officer</h3>'+
-    '<div class="field"><label for="officerEmail">Email</label>'+
-    '<input type="text" id="officerEmail" value="'+esc(a.officer||'')+'"></div>'+
-    '<div class="row"><button class="btn solid sm" onclick="saveOfficer()">Save</button>'+
-    '<span id="officerMsg" style="font-size:13px;color:var(--ink-faint)"></span></div></div>';
+  var a=DB.access||{officers:[],people:[]};
+  var offs=officerList();
+  var h='<div class="card brandtop"><h3>Operations Officers</h3>'+
+    '<div class="invwrap"><table class="invtable"><thead><tr>'+
+    '<th>Email</th><th>Role</th><th></th></tr></thead><tbody>';
+  offs.forEach(function(e,i){
+    var root=(e===WEBMASTER);
+    h+='<tr><td>'+esc(e)+'</td>'+
+       '<td>'+(root?'Webmaster':'Operations Officer')+'</td>'+
+       // The root account has no Remove. An officer list you can empty is one
+       // bad afternoon from nobody being able to get back in.
+       '<td>'+(root?'<span style="font-size:12px;color:var(--ink-faint)">Permanent</span>'
+                   :'<button class="btn xs" onclick="delOfficer('+i+')">Remove</button>')+
+       '</td></tr>';
+  });
+  h+='</tbody></table></div>'+
+     '<div class="row mt"><button class="btn ghost sm" onclick="addOfficer()">Add an officer</button>'+
+     '<span id="officerMsg" style="font-size:13px;color:var(--ink-faint)"></span></div></div>';
 
   h+='<div class="card mt"><h3>Managers</h3>';
   if(!(a.people||[]).length){
@@ -4043,11 +4083,52 @@ function renderPeople(){
 
   host.innerHTML=h;
 }
-function saveOfficer(){
-  var v=normEmail(document.getElementById('officerEmail').value);
-  if(!v){ document.getElementById('officerMsg').textContent='Needs an address.'; return; }
-  DB.access.officer=v; saveDB();
-  document.getElementById('officerMsg').textContent='Saved.';
+/* Any officer may add another. That is deliberate: the role turns over every
+   year, and a list only one person can extend is a list that goes stale the
+   moment they hand over. The root account is the backstop if it ever does. */
+function addOfficer(){
+  if(!can('ops')) return;
+  uiForm('Add an officer','',
+    [{key:'email',label:'Email (their Google account)',type:'text',required:true}],
+    {okText:'Add'})
+   .then(function(v){
+     if(!v||!v.email) return;
+     var e=normEmail(v.email);
+     if(!e) return;
+     var msg=document.getElementById('officerMsg');
+     if(e===WEBMASTER){
+       if(msg) msg.textContent='That one is already permanent.';
+       return;
+     }
+     DB.access.officers=(DB.access.officers||[]).filter(function(x){return normEmail(x)!==e;});
+     DB.access.officers.push(e);
+     // Somebody promoted to officer should not also sit in the managers table
+     // claiming a narrower role — roleForEmail checks officers first, so the
+     // leftover row would be a lie about what they can do.
+     DB.access.people=(DB.access.people||[]).filter(function(p){return normEmail(p.email)!==e;});
+     saveDB(); renderPeople();
+     if(msg) msg.textContent='Added. Publish to share it.';
+   });
+}
+
+function delOfficer(i){
+  if(!can('ops')) return;
+  var e=officerList()[i];
+  if(!e || e===WEBMASTER) return;
+  uiConfirm('Remove '+e+' as an Operations Officer?','Remove officer',
+            {okText:'Remove',cancelText:'Keep'})
+    .then(function(y){
+      if(!y) return;
+      DB.access.officers=(DB.access.officers||[])
+        .filter(function(x){ return normEmail(x)!==normEmail(e); });
+      // Might be the legacy single-address field rather than a list entry, in
+      // which case filtering the list alone leaves them still an officer.
+      if(typeof DB.access.officer==='string' &&
+         normEmail(DB.access.officer)===normEmail(e)) delete DB.access.officer;
+      saveDB(); renderPeople();
+      var msg=document.getElementById('officerMsg');
+      if(msg) msg.textContent='Removed. Publish to share it.';
+    });
 }
 function addPerson(){
   uiForm('Add someone','',
@@ -4058,6 +4139,14 @@ function addPerson(){
    .then(function(v){
      if(!v||!v.email) return;
      var e=normEmail(v.email);
+     // roleForEmail checks officers first, so a manager row for someone who is
+     // already an officer would never take effect — it would just read as a
+     // demotion that never happened.
+     if(officerList().indexOf(e)>=0){
+       uiAlert(e+' is an Operations Officer, which already covers both manager '+
+               'roles. Remove them as an officer first.','Already an officer');
+       return;
+     }
      DB.access.people=(DB.access.people||[]).filter(function(p){return normEmail(p.email)!==e;});
      DB.access.people.push({email:e,role:(v.role==='office'?'office':'equipment')});
      saveDB(); renderPeople();

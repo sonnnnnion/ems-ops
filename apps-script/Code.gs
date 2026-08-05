@@ -369,6 +369,9 @@ function writerName(p) {
   if (stored) {
     try {
       var c = JSON.parse(stored).access || {};
+      // `officers` is the list; `officer` is the single-address shape it replaced
+      // and is still read so an older published copy keeps working.
+      (c.officers || []).forEach(function (e) { allowed.push(String(e).toLowerCase()); });
       if (c.officer) allowed.push(String(c.officer).toLowerCase());
       (c.people || []).forEach(function (x) { allowed.push(String(x.email).toLowerCase()); });
     } catch (err) {}

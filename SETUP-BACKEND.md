@@ -216,9 +216,15 @@ these two values disagree.
 ### Who gets in
 
 Signing in only proves which address you are. What it *grants* comes from the
-site: the Operations Officer address and the People list, both under **Site
-Settings ▸ People**. An address that is not on either list signs in fine and is
-told it has no role here.
+site: the Operations Officers list and the Managers list, both under
+**Site Settings ▸ People**. An address on neither signs in fine and is told it
+has no role here.
+
+`bikecmuems@gmail.com` is the **webmaster**: always an Operations Officer, and
+the one row with no Remove button. Officers turn over every year and an access
+list you can empty is one bad afternoon from nobody being able to get back in,
+so there is always a way back. Any officer can add or remove other officers —
+the role changes hands too often for that to run through one person.
 
 `MANAGER_EMAILS` at the top of the script is the bootstrap — the one address
 that can publish before any People list exists. Change it to the ops account
