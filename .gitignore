@@ -12,6 +12,10 @@ Operations Managers/
 # Session notes — internal, may quote raw material
 HANDOFF.md
 
+# Working notes for the editor. Internal, and the repo is public.
+CLAUDE.md
+.claude/
+
 # ---- OS / editor -------------------------------------------------------------
 .DS_Store
 ._*

@@ -16,8 +16,8 @@ is one source of truth per role.
 index.html          the entire app — vanilla HTML/CSS/JS, one file
 assets/bags/        bag and kit reference photos (12)
 assets/rooms/       room reference photos (10)
+apps-script/Code.gs the Google Apps Script behind every form on both sites
 SETUP-BACKEND.md    connecting the forms to a Google Sheet
-.claude/            dev-server config (port 8850)
 ```
 
 ## Running it
