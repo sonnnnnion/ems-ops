@@ -558,7 +558,31 @@ function logError(what, body) {
 // a Google ID token, and the token is verified WITH GOOGLE here rather than
 // trusted from the browser — a forged one is refused. This is the one real
 // permission boundary in the whole system.
+/* Addresses that may always publish, for BOTH sites, whatever the People lists
+   say. This is the way back in when a list is empty or wrong — without it there
+   is a bootstrap trap: nobody can publish the People list until they are on the
+   People list, and a site whose list has never been published has no way to get
+   a first one.
+
+   The club account is hardcoded because it is a shared account rather than a
+   person, so it survives every handover. Real people are added through the
+   ROOT_MANAGERS script property instead of this line, because this file is in a
+   public repo and a student's address does not belong in it.
+
+   To add yourself: Apps Script ▸ Project Settings ▸ Script Properties ▸
+   Add script property, name ROOT_MANAGERS, value a comma-separated list of
+   addresses. Nothing needs redeploying — properties are read live. */
 var MANAGER_EMAILS = ['bikecmuems@gmail.com'];
+
+function rootManagers() {
+  var out = MANAGER_EMAILS.map(function (e) { return String(e).toLowerCase(); });
+  var extra = PropertiesService.getScriptProperties().getProperty('ROOT_MANAGERS') || '';
+  String(extra).split(',').forEach(function (e) {
+    e = String(e).trim().toLowerCase();
+    if (e && out.indexOf(e) < 0) out.push(e);
+  });
+  return out;
+}
 
 function verifiedEmail(idToken, clientId) {
   if (!idToken) return '';
@@ -617,7 +641,7 @@ function readContent(site) {
 // whoever that site's own published People list names. Read from that site's slot
 // only — being a bike manager does not make somebody an Operations Officer.
 function allowedFor(site) {
-  var allowed = MANAGER_EMAILS.map(function (e) { return e.toLowerCase(); });
+  var allowed = rootManagers();
   var o = readContent(site);
   var c = (o && o.content && o.content.access) || {};
   // `officers` is the list; `officer` is the single-address shape it replaced,
@@ -821,6 +845,19 @@ function doGet(e) {
   // than letting it report a mismatch against a field that is no longer there.
   out.serves = ['jumpkit', 'safety'];
   out.expects = 'jumpkit';
+  // It also reads `rows`, for the tab belonging to the form it is asking about.
+  // Without this it printed "undefined rows", which reads as a broken connection
+  // when the connection is fine.
+  var askedFor = BIKE_SHEETS[p.form] ? BIKE_SHEETS[p.form].name
+               : (SHEETS[p.form] ? SHEETS[p.form].name : null);
+  if (askedFor) {
+    var asked = ss.getSheetByName(askedFor);
+    out.rows = asked ? Math.max(0, asked.getLastRow() - 1) : 0;
+    out.sheetTab = askedFor;
+  } else {
+    // No form named: report the whole file rather than a number about nothing.
+    out.rows = Object.keys(out.tabs).reduce(function (n, k) { return n + out.tabs[k]; }, 0);
+  }
   var rs = ss.getSheetByName(RESTOCK.name);
   out.restock = rs ? Math.max(0, rs.getLastRow() - 1) : 0;
   var brs = ss.getSheetByName(BIKE_RESTOCK.name);

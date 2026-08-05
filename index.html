@@ -2741,7 +2741,13 @@ function publishContent(opts){
           contentState.dirty=false;
           if(msg) msg.textContent='Saved for everyone.';
         } else if(msg){
-          msg.textContent='Sent, but the server copy does not match yet. Try again in a moment.';
+          // The POST reply is unreadable (no-cors), so a refusal and a slow write
+          // look identical from here. Naming the overwhelmingly likelier cause
+          // beats "try again in a moment", which is what somebody reads twenty
+          // times while nothing at all is being saved.
+          msg.textContent='The server did not accept this. The address you are '+
+            'signed in with is probably not on the People list — add it there, or '+
+            'set ROOT_MANAGERS in the script (SETUP-BACKEND.md ▸ step 5).';
         }
       })
       .catch(function(){ if(msg) msg.textContent='Sent, but could not read it back to confirm.'; });

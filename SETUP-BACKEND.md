@@ -29,9 +29,24 @@ Steps, in the spreadsheet **CMU EMS Operations**:
 3. **Deploy ▸ Manage deployments ▸ ✏️ (edit) ▸ Version: New version ▸ Deploy.**
    Edit the existing deployment rather than making a new one — a new deployment
    gets a new URL, and every printed QR code and both sites point at the old one.
-4. **Run ▸ tidyUp** once. This creates and formats the two bike tabs, and renames
-   a `Jumpkit Checks` tab brought over from the old bike file rather than leaving
+4. **Run ▸ tidyUp** once. This creates and formats every tab, and renames a
+   `Jumpkit Checks` tab brought over from the old bike file rather than leaving
    its rows stranded.
+5. **Add yourself as a root manager.** Project Settings ▸ Script Properties ▸
+   Add script property:
+
+   | Property | Value |
+   |---|---|
+   | `ROOT_MANAGERS` | your Andrew address, comma-separated for more than one |
+
+   Without this there is a trap you will hit immediately: publishing requires
+   being on a site's People list, and the bike site's list has never been
+   published, so nobody can publish the first one. Anyone listed here may always
+   publish for **both** sites, whatever the People lists say, which is also the
+   way back in if a list is ever emptied by mistake.
+
+   Addresses go here rather than in `Code.gs` because this repo is public. No
+   redeploy is needed — script properties are read live.
 
 To confirm it worked, open the Web App URL in a browser. `tabs` should now list
 `Bike Jumpkit Checks` and `Bike Safety Checks` alongside the ops tabs.
