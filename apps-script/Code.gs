@@ -185,7 +185,20 @@ function doPost(e) {
     // The bike site's forms, which post a different payload shape.
     if (BIKE_SHEETS[p.form]) return writeBikeRow(p);
 
-    var conf = SHEETS[p.form] || SHEETS['Reports'];
+    // Every form on either site names a tab that exists above, so an unknown one
+    // is a mistake and not something to guess at. It used to fall back to
+    // 'Reports', which quietly turned a payload this script did not understand
+    // into a row of mostly empty cells in a real tab — the submission looked
+    // filed and the data was gone. The window this actually matters in is the one
+    // between the bike site being pointed here and this script being redeployed:
+    // a bike check arriving at an older copy is exactly this case.
+    var conf = SHEETS[p.form];
+    if (!conf) {
+      logError('unknown form "' + p.form + '" — nothing written. If this is a bike ' +
+               'check, this deployment predates the merge: paste the current ' +
+               'Code.gs and redeploy.', e && e.postData ? e.postData.contents : '');
+      return json({ result: 'unknown form: ' + p.form });
+    }
     var sh = ensureSheet(conf);
     if (alreadySeen(sh, conf, p.sid)) return json({ result: 'duplicate ignored' });
 
