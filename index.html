@@ -199,6 +199,9 @@
   .btn.danger{background:var(--oos);color:#fff;border-color:var(--oos)}
   .btn.sm{padding:6px 10px;font-size:12.5px}
   .btn.xs{padding:3px 7px;font-size:11px;box-shadow:none}
+  /* "already on the list" — the button IS the confirmation, so it has to read
+     as a state, not as another thing to press. */
+  .btn.on{background:var(--ok-wash);border-color:var(--ok);color:var(--ok);font-weight:700}
   .btn.block{width:100%;justify-content:center}
 
   /* Finger-sized on a touch screen. The manager rows — Remove, Rename, Retire,
@@ -631,6 +634,16 @@
   .expbadge.good{background:var(--ok-wash);color:var(--ok)}
   .expbadge.soon{background:var(--warn-wash);color:var(--warn)}
   .expbadge.bad{background:var(--oos-wash);color:var(--oos);font-weight:700}
+  /* Key for the badge colors, since the badges are the whole signal on the
+     Expiring view and a color with no key is not a signal. */
+  .explegend{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:0 0 14px;
+    font-size:11.5px;color:var(--ink-faint)}
+  .explegend .expbadge{margin-left:9px}
+  .explegend .expbadge:first-child{margin-left:0}
+  /* A date broken across two lines ("2026-06-" / "22") reads as two numbers,
+     and this table is read at a glance. Same for the action. */
+  .exptable td:nth-child(3),.exptable td:nth-child(4),.exptable td:nth-child(5){white-space:nowrap}
+  .exptable td:first-child{min-width:180px}
 
   /* typed usage item: the text box takes the row under the select */
   .urow.typed{grid-template-columns:1fr 110px 1fr 36px}
@@ -771,6 +784,7 @@
     <div class="sb-label" data-need="equipment">Equipment Manager</div>
     <button type="button" class="sb-item" data-need="equipment" data-view="bag-check"><span class="ic">✚</span>Full Contents Check</button>
     <button type="button" class="sb-item" data-need="equipment" data-view="inventory"><span class="ic">▦</span>Equipment Inventory</button>
+    <button type="button" class="sb-item" data-need="equipment" data-view="expiring"><span class="ic">⏳</span>Expiring</button>
     <button type="button" class="sb-item" data-need="equipment" data-view="toget"><span class="ic">▤</span>To Get</button>
 
     <div class="sb-label" data-need="office">Office Manager</div>
@@ -881,13 +895,23 @@
       <div id="restockHost"></div>
     </section>
 
-    <!-- ===== EQUIPMENT INVENTORY (Equipment Manager) ========================= -->
+    <!-- ===== EXPIRING (Equipment Manager) ====================================
+         Expiry dates are typed per bag inside a contents check, so before this
+         view the only way to answer "what expires this month" was to open all
+         six jumpkits and all five event bags one at a time. This reads the same
+         store across every bag at once. -->
+    <section class="view" data-view="expiring">
+      <h2 class="view-title">Expiring <em>soon</em></h2>
+      <div id="expiringHost"></div>
+    </section>
+
     <!-- ===== TO GET (shopping list) ========================================= -->
     <section class="view" data-view="toget">
       <h2 class="view-title">To <em>get</em></h2>
       <div id="togetHost"></div>
     </section>
 
+    <!-- ===== EQUIPMENT INVENTORY (Equipment Manager) ========================= -->
     <section class="view" data-view="inventory">
       <h2 class="view-title">Equipment <em>inventory</em></h2>
       <div id="inventoryHost"></div>
@@ -947,7 +971,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260806190524';
+var BUILD='20260806193104';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -2165,6 +2189,7 @@ function canSeeLearn(){ return !!DB.learnPublic || can('ops'); }
 var MANAGER_VIEWS={
   tracker:'office', restock:'office', rooms:'office',
   inventory:'equipment', 'bag-check':'equipment', toget:'equipment',
+  expiring:'equipment',
   reports:'mgr', log:'mgr', roles:'mgr', qr:'mgr', settings:'mgr',
   people:'ops'
 };
@@ -3002,6 +3027,8 @@ function go(v,fromHash){
   // Paint what we have immediately, then replace it with the sheet's copy when
   // it lands — the list is the same shape either way, so nothing jumps about.
   if(v==='toget'){ renderToGet(); fetchRestock().then(function(){ renderToGet(); }); }
+  // Derived from DB.expiry, which any contents check can have just written.
+  if(v==='expiring') renderExpiring();
   // Arriving at a form is when to fill in who this is. The forms are rendered
   // once at startup and only shown by go(), so doing it at render time meant it
   // ran before anybody had filed anything and never again — the second check of
@@ -4389,6 +4416,113 @@ function toGetDate(t){
   return isNaN(d.getTime())?'—':d.toLocaleDateString();
 }
 
+/* ---- expiring, across every bag ------------------------------------------
+   DB.expiry is keyed `<pick>|<itemId>`, and `pick` is whatever the form that
+   typed the date had selected — a bag TYPE for a contents check, a physical
+   UNIT for a checkout. So both have to resolve here, and neither is assumed.
+   Anything that resolves to nothing is still shown rather than dropped: a date
+   against an item that has since left a bag list is exactly the row somebody
+   needs to see, and hiding it would make a stale date invisible forever. */
+function expiryIndex(){
+  var items={}, places={};
+  (DB.bags||[]).forEach(function(b){
+    places[b.id]=b.name;
+    (b.sections||[]).forEach(function(s){
+      (s.items||[]).forEach(function(it){ items[it.id]=it.label; });
+    });
+  });
+  (DB.bagUnits||[]).forEach(function(u){ places[u.id]=u.name; });
+  (DB.rooms||[]).forEach(function(r){ places[r.id]=r.name; });
+  return {items:items, places:places};
+}
+
+function expiringRows(){
+  var ix=expiryIndex(), rows=[];
+  Object.keys(DB.expiry||{}).forEach(function(k){
+    var cut=k.indexOf('|'); if(cut<0) return;
+    var place=k.slice(0,cut), item=k.slice(cut+1);
+    var iso=DB.expiry[k]; var n=daysUntil(iso);
+    if(n===null) return;
+    var label=ix.items[item]||item;
+    rows.push({key:k, iso:iso, days:n,
+      item:label, known:!!ix.items[item],
+      place:ix.places[place]||place,
+      // Same key wantItem() would mint, so the row can show what the list
+      // already holds instead of silently adding a second time.
+      onList:onToGet('free:'+label.toLowerCase())});
+  });
+  return rows.sort(function(a,b){ return a.days-b.days; });
+}
+
+function onToGet(key){
+  return (DB.toGet||[]).some(function(t){ return t.key===key && !t.done; });
+}
+
+function renderExpiring(){
+  var host=document.getElementById('expiringHost'); if(!host) return;
+  var rows=expiringRows();
+  if(!rows.length){
+    host.innerHTML='<div class="card"><p class="hint" style="margin:0">No expiry dates '+
+      'recorded yet. They are entered on a Full Contents Check, beside any item '+
+      'marked with an expiry, and appear here once saved.</p></div>';
+    return;
+  }
+  var expired=rows.filter(function(r){return r.days<0;});
+  var m30=rows.filter(function(r){return r.days>=0&&r.days<=30;});
+  var m90=rows.filter(function(r){return r.days>30&&r.days<=90;});
+
+  var h='<div class="repgrid">'+
+    '<div class="repstat"><div class="rs-n">'+expired.length+'</div><div class="rs-l">expired</div></div>'+
+    '<div class="repstat"><div class="rs-n">'+m30.length+'</div><div class="rs-l">within 30 days</div></div>'+
+    '<div class="repstat"><div class="rs-n">'+m90.length+'</div><div class="rs-l">31 to 90 days</div></div>'+
+    '</div>';
+
+  h+='<p class="explegend"><span class="expbadge bad">Expired</span> past its date'+
+     '<span class="expbadge soon">60d</span> 60 days or fewer'+
+     '<span class="expbadge good">OK</span> more than 60 days</p>';
+
+  h+='<div class="invwrap"><table class="invtable exptable"><thead><tr>'+
+     '<th>Item</th><th>Bag</th><th>Expires</th><th></th><th></th>'+
+     '</tr></thead><tbody>';
+  rows.forEach(function(r){
+    var cls = r.days<0 ? 'bad' : (r.days<=60 ? 'soon' : 'good');
+    var txt = r.days<0 ? 'Expired' : (r.days<=60 ? r.days+'d' : 'OK');
+    h+='<tr><td>'+esc(r.item)+
+       (r.known?'':'<br><span style="font-size:11px;color:var(--ink-faint)">no longer in this bag’s list</span>')+
+       '</td>'+
+       '<td style="font-size:12px">'+esc(r.place)+'</td>'+
+       '<td style="font-size:12px" class="mono">'+esc(r.iso)+'</td>'+
+       '<td><span class="expbadge '+cls+'">'+esc(txt)+'</span></td>'+
+       '<td>'+(r.onList
+         ? '<button class="btn xs on" onclick="wantExpiring(\''+jsq(r.key)+'\')">✓ On list</button>'
+         : '<button class="btn xs" onclick="wantExpiring(\''+jsq(r.key)+'\')">To Get</button>')+
+       '</td></tr>';
+  });
+  h+='</tbody></table></div>';
+  host.innerHTML=h;
+}
+
+/* Passed by key, never by the displayed name — the name is what a rename
+   changes, and the whole point of the row is that it survives one.
+
+   No confirmation dialog on purpose. This is pressed once per item while
+   standing in a store, so a modal per tap doubles the taps for the one job the
+   view exists to do; the button changing to "On list" is the confirmation, and
+   pressing it again takes the item back off. */
+function wantExpiring(key){
+  var r=expiringRows().filter(function(x){return x.key===key;})[0];
+  if(!r) return;
+  var k='free:'+r.item.toLowerCase();
+  if(r.onList){
+    DB.toGet=(DB.toGet||[]).filter(function(t){ return t.key!==k; });
+  }else{
+    wantItem({name:r.item, cat:'Equipment', where:r.place, by:(readMe()||{}).andrew||''});
+  }
+  saveDB();
+  renderExpiring();
+  renderToGet();
+}
+
 function renderToGet(){
   var host=document.getElementById('togetHost'); if(!host) return;
   var remote=!!remoteRestock;
@@ -5489,6 +5623,7 @@ function renderAll(){
   renderInventory();
   renderReadiness();
   renderToGet();
+  renderExpiring();
   renderLearn();
   renderPeople();
   renderReports();
