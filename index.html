@@ -2667,13 +2667,49 @@ function refreshAccess(){
       if(!a||typeof a!=='object') return false;
       a=JSON.parse(JSON.stringify(a));
       migrateAccess(a);
+
+      /* Somebody appointed here and not yet on the server has to survive this.
+         Overwriting outright is why an appointment did not stick: it saved
+         locally, its publish failed for whatever reason, and then signing out and
+         back in ran this and replaced the list with the server's — which had
+         never received the person. The appointment was destroyed by the very
+         check meant to find them, and nothing said so.
+
+         "Appointed here and not yet sent" is precisely: on this device, absent
+         from the last copy we know the server had, and still absent from the
+         server. A removal does not match that test, because a removed person IS
+         in the baseline — so removals still propagate and cannot be resurrected
+         by a stale device. */
+      var pending=0;
+      var base0=(contentBase&&contentBase.access)||null;
+      if(base0){
+        var seen=function(list,pick){ var m={}; (list||[]).forEach(function(x){
+          var e=normEmail(pick(x)); if(e) m[e]=1; }); return m; };
+        var pickE=function(x){ return x&&x.email; }, pickS=function(x){ return x; };
+        var baseOff=seen(base0.officers,pickS), srvOff=seen(a.officers,pickS);
+        ((DB.access&&DB.access.officers)||[]).forEach(function(e){
+          e=normEmail(e);
+          if(e && !baseOff[e] && !srvOff[e]){ a.officers.push(e); pending++; }
+        });
+        var baseP=seen(base0.people,pickE), srvP=seen(a.people,pickE);
+        ((DB.access&&DB.access.people)||[]).forEach(function(p){
+          var e=normEmail(p&&p.email);
+          if(e && !baseP[e] && !srvP[e]){ a.people.push({email:e,role:p.role}); pending++; }
+        });
+      }
+
       DB.access=a;
-      // The baseline moves with it, or the very next unpublishedKeys() call reads
-      // this adopted copy as a local edit and publishes it straight back.
+      // The baseline is the SERVER's copy, never the merged one — otherwise a
+      // pending appointment would look already-published and never be sent.
+      var srvCopy=JSON.parse(JSON.stringify(j.content.access));
+      migrateAccess(srvCopy);
       var base=JSON.parse(JSON.stringify(contentBase||{}));
-      base.access=JSON.parse(JSON.stringify(a));
+      base.access=srvCopy;
       setContentBase(base);
       try{ localStorage.setItem(LS_DB,JSON.stringify(DB)); }catch(e){}
+      // Anything held back is still owed to the server, so try again now rather
+      // than waiting for the next unrelated edit to carry it.
+      if(pending) scheduleAutoPublish();
       return true;
     })
     .catch(function(){ return false; });
