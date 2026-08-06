@@ -610,6 +610,7 @@
     background:var(--card);padding:14px 16px;box-shadow:var(--shadow-sm)}
   .readycard.warn{border-left-color:var(--warn)}
   .readycard.oos{border-left-color:var(--oos)}
+  .rc-why{font-size:12.5px;color:var(--ink-mute);margin:8px 0 0;line-height:1.5}
   .readycard .rc-top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
   .readycard .rc-top b{font-size:15.5px}
   .readycard .rc-iss{margin:9px 0 0;padding-left:18px;font-size:12.5px;color:var(--ink-mute)}
@@ -946,7 +947,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260806160556';
+var BUILD='20260806190524';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -3636,7 +3637,11 @@ function renderWhoNote(fid){
   var el=document.getElementById(fid+'-whonote'); if(!el) return;
   var me=readMe();
   el.innerHTML = me
-    ? '<span>Filled in for <b>'+esc(me.first+' '+me.last)+'</b>. '+
+    // The Andrew ID, not the name. A name is whatever somebody typed — "Rithik S"
+    // is not what she is called — and it is the ID that lands in the sheet and
+    // has to be right. Showing the thing that matters also lets somebody catch a
+    // typo in it before it is filed again.
+    ? '<span>Filled in for <b>'+esc(me.andrew||(me.first+' '+me.last))+'</b>. '+
       '<button type="button" class="btn xs" onclick="forgetMe(\''+jsq(fid)+'\')">Not you?</button></span>'
     : '';
 }
@@ -4241,6 +4246,15 @@ function renderRoles(){
 function unitStatus(id){
   var open=(DB.issues||[]).filter(function(i){
     return i.open && i.unit===id; });
+  /* Taken out of service by hand, and that outranks everything derived. A bag
+     goes down for reasons nobody files a checkout problem about — it is away
+     being repaired, it is stripped for parts, the seal is gone and the
+     replacement has not arrived. Before this the only way to show that was to
+     invent a fake problem against it, and then somebody "fixed" the fake problem
+     and the bag came back green while still sitting in a cupboard. */
+  var u=(DB.bagUnits||[]).filter(function(x){return x.id===id;})[0];
+  if(u && u.oos) return {cls:'oos', label:'Out of service', issues:open, manual:true,
+                         why:u.oosWhy||''};
   if(!open.length) return {cls:'ok', label:'Ready', issues:[]};
   var blocking=open.filter(function(i){return i.urgency==='Blocking';});
   return blocking.length
@@ -4274,11 +4288,49 @@ function renderReadiness(){
       h+='<div class="row" data-need="equipment" style="margin-top:8px">'+
          '<button class="btn xs" onclick="clearUnit(\''+jsq(u.id)+'\')">Mark fixed</button></div>';
     }
+    // Why it is down, when somebody took it down on purpose. A red tile with no
+    // reason just moves the question to whoever reads the board.
+    if(st.manual && st.why)
+      h+='<p class="rc-why">'+esc(st.why)+'</p>';
+    // Taking a bag out of service, and putting it back. Equipment Manager and
+    // Operations Officer only — `can()` treats ops as a superset of equipment.
+    h+='<div class="row" data-need="equipment" style="margin-top:8px">'+
+       (st.manual
+         ? '<button class="btn xs" onclick="backInService(\''+jsq(u.id)+'\')">Put back in service</button>'
+         : '<button class="btn xs" onclick="takeOutOfService(\''+jsq(u.id)+'\')">Take out of service</button>')+
+       '</div>';
     h+='</div>';
   });
   h+='</div>';
   host.innerHTML=h;
   applyGates(host);
+}
+
+/* Taking a bag out of service by hand. The reason is required, because a bag
+   that is simply red teaches everybody to ignore red — and the person who took
+   it down is not the person who will be standing in front of it at 2am. */
+function takeOutOfService(id){
+  if(!can('equipment')) return;
+  var u=(DB.bagUnits||[]).filter(function(x){return x.id===id;})[0]; if(!u) return;
+  uiPrompt('Why is '+u.name+' out of service? Whoever reads the board will see this.',
+           '', 'Take out of service', {okText:'Take it out'})
+    .then(function(why){
+      if(!why) return;
+      u.oos=true; u.oosWhy=String(why).trim();
+      saveDB(); renderReadiness(); renderAll();
+    });
+}
+
+function backInService(id){
+  if(!can('equipment')) return;
+  var u=(DB.bagUnits||[]).filter(function(x){return x.id===id;})[0]; if(!u) return;
+  uiConfirm(u.name+' goes back on the board as ready, unless something else is '+
+            'still open against it.','Put back in service',{okText:'Put it back'})
+    .then(function(y){
+      if(!y) return;
+      delete u.oos; delete u.oosWhy;
+      saveDB(); renderReadiness(); renderAll();
+    });
 }
 
 function clearUnit(id){
