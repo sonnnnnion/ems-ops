@@ -925,6 +925,40 @@
 </div>
 
 <script>
+/* ============================================================================
+   BUILD STAMP AND SELF-UPDATE
+   ----------------------------------------------------------------------------
+   A phone that is holding an old copy of this page is indistinguishable, from
+   the inside, from a phone whose access has been refused — and it has now cost
+   two rounds of "it does not work for her" where nothing was actually wrong.
+   GitHub Pages caches, iOS holds on longer, and nobody thinks to hard-refresh a
+   website.
+
+   So the page checks itself. On load it re-fetches its own HTML with a
+   cache-busting query, reads the stamp out of it, and if the server has a newer
+   one it reloads ONCE. sessionStorage holds the guard, so a genuinely broken
+   comparison cannot become a reload loop — the worst case is one wasted fetch.
+
+   BUILD is rewritten on every release. Never edit it by hand.
+   ========================================================================== */
+var BUILD='20260806140415';
+
+function checkForUpdate(){
+  var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
+  fetch(url,{cache:'no-store'})
+    .then(function(r){ return r.text(); })
+    .then(function(t){
+      var m=t.match(/var BUILD='(\d+)'/);
+      if(!m || m[1]===BUILD) return;
+      // Newer only. An older stamp on the server means a rollback is in flight,
+      // and reloading into it repeatedly would fight whoever is deploying.
+      if(m[1]<=BUILD) return;
+      var once='__reloaded_for_'+m[1];
+      try{ if(sessionStorage.getItem(once)) return; sessionStorage.setItem(once,'1'); }catch(e){ return; }
+      location.reload();
+    })
+    .catch(function(){ /* offline: keep what we have, it still works */ });
+}
 /* ============================================================
    Bike Ops — CMU EMS
    Single-file static site. All editable content lives in DB and
@@ -2411,14 +2445,29 @@ function finishGoogleLogin(r){
     // from here and need opposite reactions — one is a job for the Operations
     // Officer, the other is a job for the network. Saying the first when the
     // second is true sends somebody to ask for access they already have.
-    if(r.fresh===false){
-      uiAlert('Signed in as '+r.email+', but the list of who has access could not '+
-              'be read just now, so this device cannot tell what role you hold. '+
-              'Check the connection and try again.','Could not check access');
+    // Somebody appointed on the OTHER site hears "you have no role" and reads it
+    // as the appointment having failed — they were added, they watched it save,
+    // and this is the first thing the site says to them. Name the access they do
+    // have and where it works, because that is the actual answer.
+    var onBike=((DB.access&&DB.access.bikeManagers)||[])
+      .map(normEmail).indexOf(normEmail(r.email))>=0;
+    if(onBike){
+      uiAlert('Signed in as '+r.email+'. You are a Bike Manager, which is access to '+
+              'the Bike Ops site — not this one. Nothing has gone wrong: the two '+
+              'sites have separate roles.\n\nTo work on Operations as well, an '+
+              'Operations Officer adds you here under People.','That access is for Bike Ops');
       return;
     }
-    uiAlert('Signed in as '+r.email+', which has no role here. The Operations '+
-            'Officer adds people under Site Settings ▸ People.','No access');
+    if(r.fresh===false){
+      uiAlert('Signed in as '+r.email+', but the list of who has access could not '+
+              'be read just now, so this device cannot tell what role you hold.\n\n'+
+              'If you were only just added, reload this page first — a phone can '+
+              'hold an older copy of the site for a while. Otherwise check the '+
+              'connection and try again.','Could not check access');
+      return;
+    }
+    uiAlert('Signed in as '+r.email+', which has no role here. An Operations '+
+            'Officer adds people under People.','No access');
     return;
   }
   // A verified address outranks anything picked locally, so drop the local one
@@ -5334,6 +5383,10 @@ function init(){
   // Shared content arrives after first paint: the page is usable immediately
   // and updates in place rather than blocking on the network.
   pullContent();
+  // And check we are not a stale copy. Last, and never blocking: if this page is
+  // current it costs one small request, and if it is not, a reload is far better
+  // than somebody being told they have no access by a build that predates them.
+  checkForUpdate();
 }
 
 if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init);
