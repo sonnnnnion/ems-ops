@@ -659,20 +659,48 @@ function readContent(site) {
   try { return JSON.parse(raw); } catch (err) { return null; }
 }
 
-// Every address allowed to publish for one site: the permanent root account, plus
-// whoever that site's own published People list names. Read from that site's slot
-// only — being a bike manager does not make somebody an Operations Officer.
-function allowedFor(site) {
-  var allowed = rootManagers();
-  var o = readContent(site);
-  var c = (o && o.content && o.content.access) || {};
+// Pulls every address out of one site's access object, whichever shape it is in.
+function addressesIn(access) {
+  var c = access || {}, out = [];
   // `officers` is the list; `officer` is the single-address shape it replaced,
   // and is still read so an older published copy keeps working.
-  (c.officers || []).forEach(function (e) { allowed.push(String(e).toLowerCase()); });
-  if (c.officer) allowed.push(String(c.officer).toLowerCase());
+  (c.officers || []).forEach(function (e) { out.push(String(e).toLowerCase()); });
+  if (c.officer) out.push(String(c.officer).toLowerCase());
   (c.people || []).forEach(function (x) {
-    if (x && x.email) allowed.push(String(x.email).toLowerCase());
+    if (x && x.email) out.push(String(x.email).toLowerCase());
   });
+  return out;
+}
+
+/* Every address allowed to publish for one site.
+
+   Three sources, and the third is what stops a site being unable to get started.
+
+   A site's own People list can only authorise a publish once it EXISTS, and it
+   only comes to exist by being published. So a site whose copy has never been
+   written could be edited by nobody except the one hardcoded club account, and
+   the actual answer to "who runs this" was "go and find the shared password" —
+   which is the thing the whole access list is meant to replace.
+
+   So an Operations Officer may publish either site. That is not a special case
+   bolted on; it is the org chart. The Operations Officer runs the agency, the
+   bike program sits under it, and an officer can already publish the operations
+   content that names the officers — so this grants nothing to somebody who was
+   not already trusted at the top. It means appointing people happens in one
+   place, through the site, and the bike program never needs its own password. */
+function allowedFor(site) {
+  var allowed = rootManagers();
+  var own = readContent(site);
+  allowed = allowed.concat(addressesIn(own && own.content && own.content.access));
+
+  if (site !== 'ops') {
+    var ops = readContent('ops');
+    var opsAccess = (ops && ops.content && ops.content.access) || {};
+    // Officers only, not every manager: an Equipment Manager has no business in
+    // the bike program's content, and this list is what an appointment means.
+    (opsAccess.officers || []).forEach(function (e) { allowed.push(String(e).toLowerCase()); });
+    if (opsAccess.officer) allowed.push(String(opsAccess.officer).toLowerCase());
+  }
   return allowed;
 }
 
