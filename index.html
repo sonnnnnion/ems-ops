@@ -2410,6 +2410,17 @@ function finishGoogleLogin(r){
   try{ localStorage.setItem(LS_EMAIL,r.email); }catch(e){}
   try{ localStorage.removeItem(LS_LOCALROLE); }catch(e){}
   setRole(r.role);
+  // Auto-publish only ever fired from saveDB, which means it fired on an EDIT.
+  // So the one case it never covered was the case that has to work first: a
+  // manager signs in to a site whose shared copy does not exist yet, changes
+  // nothing because there is nothing to change, and the People list therefore
+  // never leaves this browser. That is the state where somebody has to be told
+  // to go and press a button, which is exactly what auto-save is for.
+  //
+  // scheduleAutoPublish() only actually sends when there is something to send —
+  // no baseline, or real divergence — so signing in on an already-synced device
+  // costs one comparison and no request.
+  scheduleAutoPublish();
 }
 
 /* Kept for the per-role rows: clicking a role that already has an account

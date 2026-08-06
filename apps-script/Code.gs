@@ -584,18 +584,40 @@ function rootManagers() {
   return out;
 }
 
-function verifiedEmail(idToken, clientId) {
-  if (!idToken) return '';
+/* Checks a Google ID token WITH Google, and says why when it says no.
+
+   The reason matters more than it looks. A refused publish is invisible from the
+   browser — the reply to a no-cors POST cannot be read — so all the site can say
+   is "the server copy does not match yet". Every distinct cause below produces
+   that same sentence, and they need completely different fixes: sign in again,
+   correct a script property, or add somebody to People. Guessing between them
+   from the outside is exactly the loop this is here to end. The answer is written
+   to the Errors tab of this spreadsheet by whoever calls this. */
+function verifyToken(idToken, clientId) {
+  if (!idToken) return { email: '', why: 'no Google sign-in was sent with the request, and no publish key either' };
   try {
     var r = UrlFetchApp.fetch(
       'https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(idToken),
       { muteHttpExceptions: true });
-    if (r.getResponseCode() !== 200) return '';
+    if (r.getResponseCode() !== 200)
+      return { email: '', why: 'Google refused the sign-in token (HTTP ' + r.getResponseCode() +
+                               '). Almost always: it has expired. Sign in again on the site.' };
     var c = JSON.parse(r.getContentText());
-    if (clientId && c.aud !== clientId) return '';        // token for another app
-    if (String(c.email_verified) !== 'true') return '';
-    return String(c.email || '').toLowerCase();
-  } catch (err) { return ''; }
+    if (clientId && c.aud !== clientId)
+      return { email: '', why: 'the token was issued for OAuth client "' + c.aud + '" but the ' +
+                               'CLIENT_ID script property on this script says "' + clientId + '". ' +
+                               'Correct that property, or delete it to stop checking.' };
+    if (String(c.email_verified) !== 'true')
+      return { email: '', why: 'Google does not report ' + (c.email || 'that address') + ' as verified' };
+    return { email: String(c.email || '').toLowerCase(), why: '' };
+  } catch (err) {
+    return { email: '', why: 'could not reach Google to check the token: ' + err };
+  }
+}
+
+// Kept for callers that only want the address.
+function verifiedEmail(idToken, clientId) {
+  return verifyToken(idToken, clientId).email;
 }
 
 /* Who may write manager-level data — publishing content, and ticking Restock.
@@ -654,26 +676,50 @@ function allowedFor(site) {
   return allowed;
 }
 
-function writerName(p) {
+/* Returns {name, why}. `name` is who to record, or '' for refused with `why`
+   saying which of the several very different causes it was. */
+function writerCheck(p) {
   var props = PropertiesService.getScriptProperties();
   var key = props.getProperty('PUBLISH_KEY');
-  if (key && p.key && String(p.key) === String(key)) return 'publish key';
+  if (key && p.key && String(p.key) === String(key)) return { name: 'publish key', why: '' };
 
-  var who = verifiedEmail(p.idToken, props.getProperty('CLIENT_ID'));
-  if (!who) return '';
-  return allowedFor(siteOf(p)).indexOf(who) < 0 ? '' : who;
+  var v = verifyToken(p.idToken, props.getProperty('CLIENT_ID'));
+  if (!v.email) return { name: '', why: v.why };
+
+  var site = siteOf(p);
+  var allowed = allowedFor(site);
+  if (allowed.indexOf(v.email) < 0) {
+    // The commonest real case, and the one whose fix is least obvious: the list
+    // for THIS site is empty because this site has never published, so only the
+    // root account can get in and start it off.
+    var stored = readContent(site);
+    return { name: '', why: 'signed in as ' + v.email + ', which is not on the ' + site +
+      ' access list. That list currently allows: ' + allowed.join(', ') + '.' +
+      (stored ? '' : ' The ' + site + ' site has never published, so its People list does not ' +
+                     'exist yet and only the root account can start it off.') };
+  }
+  return { name: v.email, why: '' };
 }
 
+function writerName(p) { return writerCheck(p).name; }
+
 function saveContent(p) {
-  var who = writerName(p);
+  var c = writerCheck(p);
   var site = siteOf(p);
-  // Say WHY it was refused. The browser cannot read this reply, but it lands in
-  // the execution log, and "rejected: not on the People list" is the difference
-  // between five minutes and an afternoon.
-  if (!who) return json({ ok: false, error: 'not allowed: no valid publish key, and the signed-in address is not on the ' + site + ' People list' });
+  if (!c.name) {
+    // Written where it can actually be read. The browser cannot see this reply,
+    // so without this the only symptom is "the server copy does not match yet",
+    // which is the same sentence for every possible cause.
+    logError('Publish REFUSED for the ' + site + ' site: ' + c.why, '');
+    return json({ ok: false, error: 'not allowed: ' + c.why });
+  }
   PropertiesService.getScriptProperties()
     .setProperty(contentKey(site),
-      JSON.stringify({ at: Date.now(), by: who, content: p.content }));
+      JSON.stringify({ at: Date.now(), by: c.name, content: p.content }));
+  // Successes go to the execution log only. Auto-save publishes whenever an edit
+  // settles, so putting those in the Errors tab would bury the refusals that
+  // actually need reading.
+  console.log('Publish accepted for the ' + site + ' site, by ' + c.name);
   return json({ ok: true, saved: true, site: site });
 }
 
