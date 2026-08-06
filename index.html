@@ -969,7 +969,10 @@
 
 <div class="lightbox" id="lightbox" hidden onclick="closeLightbox()">
   <button class="lbclose" type="button" aria-label="Close">✕</button>
-  <div><img id="lbImg" src="" alt=""><div class="lbcap" id="lbCap"></div></div>
+  <!-- No `src` attribute at all until a photo is opened. `src=""` is not "no
+       image": the browser resolves it against the page and re-requests this
+       document, so an empty lightbox cost a second download of index.html. -->
+  <div><img id="lbImg" alt=""><div class="lbcap" id="lbCap"></div></div>
 </div>
 
 <script>
@@ -989,7 +992,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260806193900';
+var BUILD='20260806194547';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -5666,7 +5669,8 @@ function openLightbox(src,cap){
 }
 function closeLightbox(){
   document.getElementById('lightbox').hidden=true;
-  document.getElementById('lbImg').src='';
+  // removeAttribute, not src='' — see the note on the element itself.
+  document.getElementById('lbImg').removeAttribute('src');
 }
 
 /* ============================================================================
