@@ -618,6 +618,11 @@
   .readycard .rc-top b{font-size:15.5px}
   .readycard .rc-iss{margin:9px 0 0;padding-left:18px;font-size:12.5px;color:var(--ink-mute)}
   .readycard .rc-iss li{margin:2px 0}
+  /* The per-problem tick sits on its own row-end so a long problem still wraps
+     as text and the button stays reachable with a thumb. */
+  .readycard .rc-iss li{display:flex;align-items:flex-start;gap:8px;justify-content:space-between}
+  .readycard .rc-iss li>span{flex:1;min-width:0}
+  .rc-fix{flex:none;line-height:1}
   .legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:6px}
   .legend .item{font-size:12px;color:var(--ink-mute)}
 
@@ -971,7 +976,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260806193104';
+var BUILD='20260806193305';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -4309,11 +4314,21 @@ function renderReadiness(){
        '<b>'+esc(u.name)+'</b>'+
        '<span class="tag '+(st.cls==='ok'?'ok':st.cls==='oos'?'crit':'warn')+'">'+st.label+'</span></div>';
     if(st.issues.length){
-      h+='<ul class="rc-iss">'+st.issues.slice(0,3).map(function(i){
-        return '<li>'+esc(i.what)+'</li>'; }).join('')+
-        (st.issues.length>3?'<li>+'+(st.issues.length-3)+' more</li>':'')+'</ul>';
-      h+='<div class="row" data-need="equipment" style="margin-top:8px">'+
-         '<button class="btn xs" onclick="clearUnit(\''+jsq(u.id)+'\')">Mark fixed</button></div>';
+      // Every open problem, not the first three. The card used to show three and
+      // "+N more" while Mark fixed closed all of them — so a manager who fixed
+      // the gauze saw three lines, pressed one button, and silently signed off a
+      // broken zipper they had never been shown.
+      h+='<ul class="rc-iss">'+st.issues.map(function(i){
+        return '<li><span>'+esc(i.what)+'</span>'+
+          '<button class="btn xs rc-fix" data-need="equipment" title="Mark this one fixed" '+
+          'onclick="resolveConcernUI(\''+jsq(i.what)+'\',\''+jsq(i.where)+'\')">✓</button></li>';
+      }).join('')+'</ul>';
+      // Clearing everything is still the common case — a restock fixes the lot —
+      // so it stays, but it says how many it is about to close.
+      if(st.issues.length>1)
+        h+='<div class="row" data-need="equipment" style="margin-top:8px">'+
+           '<button class="btn xs" onclick="clearUnit(\''+jsq(u.id)+'\')">Mark all '+
+           st.issues.length+' fixed</button></div>';
     }
     // Why it is down, when somebody took it down on purpose. A red tile with no
     // reason just moves the question to whoever reads the board.
@@ -4362,8 +4377,10 @@ function backInService(id){
 
 function clearUnit(id){
   var u=(DB.bagUnits||[]).filter(function(x){return x.id===id;})[0];
-  uiConfirm('Clear every open problem on '+(u?u.name:'this bag')+'?','Mark fixed',
-            {okText:'Clear',cancelText:'Cancel'})
+  var open=(DB.issues||[]).filter(function(i){ return i.open && i.unit===id; });
+  uiConfirm('Close all '+open.length+' open problems on '+(u?u.name:'this bag')+'?\n\n'+
+            open.map(function(i){return '• '+i.what;}).join('\n'),'Mark all fixed',
+            {okText:'Close all '+open.length,cancelText:'Cancel'})
     .then(function(y){
       if(!y) return;
       (DB.issues||[]).forEach(function(i){ if(i.unit===id) i.open=false; });
