@@ -2598,6 +2598,11 @@ function canPublish(){
 /* Raised the first time an edit cannot be sent, and only for somebody who could
    actually act on it. Once per page: a manager who keeps typing must not be
    interrupted on every keystroke. */
+/* True from the moment a publish is sent until a readback agrees with it. While
+   it is true this device does not actually know what the server holds, so the
+   "has anything changed since the last sync" test cannot be trusted to decide
+   whether to send. */
+var publishUnconfirmed=false;
 var toldCannotPublish=false;
 function warnCannotPublish(){
   if(toldCannotPublish || ROLE==='member') return;
@@ -2633,7 +2638,22 @@ function scheduleAutoPublish(){
     // and unpublishedKeys() is empty — which is the state a first-time manager is
     // in, and it silently skipped the one publish that mattered most. Treat it as
     // everything-to-send. The publish sets a baseline, so this runs once.
-    if(!contentBase||unpublishedKeys().length) publishContent({auto:true});
+    //
+    // publishUnconfirmed is the third case, and it is the one that bit. An earlier
+    // publish went out and was never confirmed, so the baseline still describes
+    // the state BEFORE it. Undo that edit and local content matches the stale
+    // baseline exactly — nothing "differs", nothing is sent, and the removal never
+    // reaches a server that may well have accepted the addition. Somebody stays an
+    // Operations Officer after being removed. So while the last publish is
+    // unconfirmed, always send.
+    if(!contentBase||unpublishedKeys().length||publishUnconfirmed){
+      publishContent({auto:true});
+      return;
+    }
+    // Nothing to send. Say so — markContentDirty() has already written "Sending…"
+    // optimistically, and leaving it there is a spinner that never finishes.
+    var b=document.getElementById('pubState');
+    if(b && b.textContent==='Sending…') b.textContent='Saved for everyone.';
   },1500);
 }
 
@@ -2765,6 +2785,15 @@ function publishContent(opts){
     return;
   }
   if(msg) msg.textContent='Publishing…';
+  // Snapshot what is actually being sent. The readback used to compare against a
+  // FRESHLY computed payload, so any change at all between the send and the check
+  // — another edit, a render touching DB — made a perfectly good publish look
+  // rejected. Compare like with like.
+  var sent=contentPayload();
+  // Until the readback agrees, this device cannot claim to know what the server
+  // holds. Recorded so the next publish goes ahead even when local content
+  // happens to match the stale baseline. See scheduleAutoPublish.
+  publishUnconfirmed=true;
   fetch(url,{method:'POST', mode:'no-cors',
     headers:{'Content-Type':'text/plain;charset=utf-8'},
     // `site` tells the shared script which copy this is. The bike site publishes
@@ -2772,7 +2801,7 @@ function publishContent(opts){
     // and each would wipe the other's entire content — which shows up as a site
     // silently reverting to its built-in defaults, with no error anywhere.
     body:JSON.stringify({form:'__content', site:'ops', idToken:googleIdToken, key:key,
-                         content:contentPayload()})});
+                         content:sent})});
   // no-cors again: the reply is unreadable, so confirm by reading it back and
   // comparing. Announcing success without checking is how a rejected publish gets
   // remembered as a successful one.
@@ -2780,12 +2809,13 @@ function publishContent(opts){
     fetch(url+(url.indexOf('?')<0?'?':'&')+'content=1&site=ops&t='+Date.now())
       .then(function(r){ return r.json(); })
       .then(function(j){
-        var same=j&&j.content&&JSON.stringify(j.content)===JSON.stringify(contentPayload());
+        var same=j&&j.content&&JSON.stringify(j.content)===JSON.stringify(sent);
         if(same){
           // Only on a confirmed match. The baseline must never claim the server
           // holds something it does not, or the next pull discards the difference.
           setContentBase(j.content);
           contentState.dirty=false;
+          publishUnconfirmed=false;
           if(msg) msg.textContent='Saved for everyone.';
         } else if(msg){
           // The POST reply is unreadable (no-cors), so a refusal and a slow write
