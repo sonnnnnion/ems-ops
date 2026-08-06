@@ -261,6 +261,11 @@
   .video .meta small{color:var(--ink-faint);font-size:12px}/* Advisory, not an alarm — it appears on every view, so it stays quiet:
      no monospace, no full-width slab, sits inline like a footnote. */
   .placeholder{border:1px solid var(--rule-strong);border-radius:var(--r-sm);background:var(--card-2);color:var(--ink-mute);font-size:13px;padding:9px 12px;margin-top:10px}
+  /* Says whose name the form filled in, and offers the way out. Quiet: it is a
+     confirmation, not a warning, and it appears on every form every time. */
+  .whonote{font-size:12.5px;color:var(--ink-mute);margin:-4px 0 14px;
+    display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .whonote:empty{display:none;margin:0}
   .draftnote{border:1px solid #E8D3A8;border-radius:var(--r-sm);background:var(--warn-wash);color:#7a4d00;font-size:12.5px;padding:8px 11px;margin-bottom:14px}
   .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
   .mt{margin-top:20px}/* ---------- expiry badges ---------- */
@@ -941,7 +946,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260806155350';
+var BUILD='20260806160556';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -2996,6 +3001,11 @@ function go(v,fromHash){
   // Paint what we have immediately, then replace it with the sheet's copy when
   // it lands — the list is the same shape either way, so nothing jumps about.
   if(v==='toget'){ renderToGet(); fetchRestock().then(function(){ renderToGet(); }); }
+  // Arriving at a form is when to fill in who this is. The forms are rendered
+  // once at startup and only shown by go(), so doing it at render time meant it
+  // ran before anybody had filed anything and never again — the second check of
+  // a shift still asked for a name it already knew.
+  if(FORMS[v] && !formDone[v]){ fillMe(v); renderWhoNote(v); }
 
   closeNav();
   window.scrollTo(0,0);
@@ -3111,6 +3121,7 @@ function renderCheck(fid){
   var h='';
 
   h+='<div id="'+fid+'-draftnote"></div>';
+  h+='<div id="'+fid+'-whonote" class="whonote"></div>';
 
   /* --- who --- */
   h+='<div class="card brandtop"><h3>Who is filing this?</h3>';
@@ -3216,6 +3227,10 @@ function renderCheck(fid){
   applyGates(host);
   if(c.usage) renderUsage(fid);
   restoreDraft(fid);
+  // After the draft, never over it: a half-finished form is what this person
+  // was actually doing, and the remembered name is only a starting point.
+  fillMe(fid);
+  renderWhoNote(fid);
   calcCheck(fid);
 }
 
@@ -3585,6 +3600,57 @@ function onFormInput(fid){ renderAndrewMsg(fid); paintExpiry(fid); calcCheck(fid
 function readDrafts(){ try{ return JSON.parse(localStorage.getItem(LS_DRAFT)||'{}'); }catch(e){ return {}; } }
 function writeDrafts(d){ try{ localStorage.setItem(LS_DRAFT,JSON.stringify(d)); }catch(e){} }
 
+/* WHO IS HOLDING THIS PHONE
+   ----------------------------------------------------------------------------
+   Every form asks for a first name, a last name and an Andrew ID, and submitting
+   clears the draft — so a member filing a room check and then a checkout types
+   all three twice, and over a semester hundreds of times. It is the single most
+   repeated action on the site, and it is also where the data goes wrong: a
+   mistyped Andrew ID lands in the sheet looking like a real person and cannot be
+   matched back to anyone.
+
+   So the device remembers. Kept apart from the draft, which is per-form and
+   wiped on submit, and apart from DB, which syncs and exports — this is one
+   person's own name on their own phone and must never travel. Nothing here is
+   secret, and it is cleared from the form with one tap by whoever it is not. */
+var LS_ME='emsops_me_v1';
+function readMe(){
+  try{ return JSON.parse(localStorage.getItem(LS_ME)||'null')||null; }catch(e){ return null; }
+}
+function saveMe(s){
+  if(!s||!s.first||!s.last) return;
+  try{ localStorage.setItem(LS_ME,JSON.stringify(
+    {first:s.first,last:s.last,andrew:s.andrew||'',callsign:s.callsign||''})); }catch(e){}
+}
+function forgetMe(fid){
+  try{ localStorage.removeItem(LS_ME); }catch(e){}
+  ['fn','ln','aid','cs'].forEach(function(k){
+    var el=document.getElementById(fid+'-'+k); if(el) el.value='';
+  });
+  renderWhoNote(fid);
+  var f=document.getElementById(fid+'-fn'); if(f) f.focus();
+}
+/* Says whose name is in the boxes, and offers the way out. Without the way out
+   this is a trap for the second person to borrow a shared phone. */
+function renderWhoNote(fid){
+  var el=document.getElementById(fid+'-whonote'); if(!el) return;
+  var me=readMe();
+  el.innerHTML = me
+    ? '<span>Filled in for <b>'+esc(me.first+' '+me.last)+'</b>. '+
+      '<button type="button" class="btn xs" onclick="forgetMe(\''+jsq(fid)+'\')">Not you?</button></span>'
+    : '';
+}
+/* Pre-fills the identity boxes from the device, without ever overwriting
+   something already typed or restored from a draft. */
+function fillMe(fid){
+  var me=readMe(); if(!me) return;
+  var set=function(sfx,v){
+    var el=document.getElementById(fid+'-'+sfx);
+    if(el && !el.value && v) el.value=v;
+  };
+  set('fn',me.first); set('ln',me.last); set('aid',me.andrew); set('cs',me.callsign);
+}
+
 function saveDraft(fid){
   var c=fcfg(fid), host=document.getElementById(c.host); if(!host) return;
   var d=readDrafts(), s=readCheck(fid), ticked=[];
@@ -3871,6 +3937,10 @@ function doSubmit(fid,s){
 
   lastResult[fid]={sent:sent, url:!!url, s:s, tab:c.tab};
   formDone[fid]=true;
+  // Remember who filed it. Here, and not on every keystroke, because by this
+  // point the name and Andrew ID have passed validation — storing a half-typed
+  // one would pre-fill the next form with a mistake.
+  saveMe(s);
   clearDraft(fid);
   formPick[fid]=null;
   usageRows[fid]=null;
