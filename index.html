@@ -151,7 +151,7 @@
      swipe sideways. It must NOT simply be hidden — QR codes are scanned on phones,
      so a member landing on a form deep link needs a way to reach everything else. */
   @media(max-width:820px){
-    .cols-2,.cols-3{grid-template-columns:1fr}
+    .cols-2{grid-template-columns:1fr}
     #app{grid-template-columns:1fr}
     .navtoggle{display:flex}
     .navscrim{display:block}
@@ -187,11 +187,8 @@
      mode because member view has no buttons and reads fine as a two-column row. */
   @media (max-width:620px){
     body.is-web .kv{flex-direction:column;align-items:stretch;gap:6px;padding:10px 0}
-    body.is-web .kv .kvval{justify-content:space-between;text-align:left;gap:8px}
-    body.is-web .kv .kvval>span:first-child{flex:1}
   }
-  /* Role summary paragraph on Role & Boundaries. */
-  .rolesum{font-size:13.5px;color:var(--ink-mute);line-height:1.6;margin:0 0 12px}/* Part headings on the Bylaws page. */
+/* Part headings on the Bylaws page. */
   .mt-lg{margin-top:34px}
 
   .btn{display:inline-flex;align-items:center;gap:8px;font-family:var(--font-body);font-weight:600;font-size:14.5px;padding:10px 16px;border:1.5px solid var(--rule-strong);background:var(--chip);color:var(--ink);cursor:pointer;border-radius:var(--radius);box-shadow:var(--shadow-sm)}
@@ -206,7 +203,6 @@
   .btn.ghost{box-shadow:none;background:transparent}
   .btn:disabled{opacity:.45;cursor:not-allowed;transform:none;box-shadow:var(--shadow-sm)}
   body.is-web .webonly{display:inline-flex}
-  body.is-web .webonly.blockonly{display:block}
   /* `.webonly` was only ever designed for inline controls, so revealing it forces
      inline-flex. On a card that turned the whole panel into a flex row and dealt
      its heading, text and button out as columns.
@@ -289,22 +285,16 @@
      left edge the way a printed governing document does. */
   .acc .accbody ol.clauses{margin:0;padding:0;list-style:none}
   .acc .accbody ol.clauses li{display:flex;gap:11px;align-items:baseline;margin-bottom:9px;line-height:1.55}
-  .acc .accbody .cnum{font-family:var(--font-mono);font-size:11.5px;color:var(--brand);
-    flex:0 0 auto;min-width:34px;font-weight:600}
-  .acc .accbody .ctext{flex:1}
   .acc .accbody textarea{min-height:130px;font-size:13px;font-family:var(--font-body)}/* ---------- lectures ---------- */
-  .module.open .mbody{display:block}
   .module .embed iframe{width:100%;height:100%;border:0;display:block}/* Compact notice, NOT 16/9 — an unlinked module shouldn't open into a
      screen-tall empty box just because a real slide deck would be that shape. *//* ---------- CMU EMS logo blocks ---------- */
   .herobar .htxt b{display:block;font-size:20px;font-weight:800;letter-spacing:-.01em}
   .herobar .htxt span{font-size:13px;color:var(--ink-faint)}/* ---------- bike diagram (out-of-service) ---------- */
   @media(max-width:640px){.views{grid-template-columns:1fr}}
-  .viewbox{border:1.5px solid var(--rule);background:var(--card-2);padding:10px 12px 12px}
   .bikeviz .part *{vector-effect:non-scaling-stroke}
   .bikeviz .part.solid{fill:var(--ink);stroke:none}
   .bikeviz .part.solid.flag{fill:var(--oos);stroke:none}
   @keyframes partpulse{0%,100%{opacity:.82}50%{opacity:1}}
-  .flagchips{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;align-items:center;min-height:24px}
   @media(prefers-reduced-motion:reduce){.bikeviz .part.flag{animation:none}}
 
   /* ============================================================
@@ -313,10 +303,10 @@
      authored against the old brutalist tokens (hard 2px rules, zero radius);
      rather than rewrite each one, they are re-cornered and lightened here.
      ============================================================ */
-  .verdict,.qr,.video,.module,.herobar,.grounded,.expblock,.acc,.diagram-wrap{
+  .verdict,.qr,.video,.herobar,.grounded,.expblock,.acc{
     border-radius:var(--r-md);border-width:1px}
-  .video .thumb,.module>:first-child{border-top-left-radius:var(--r-md);border-top-right-radius:var(--r-md)}
-  .expbadge,.tag,.flagchip{border-radius:999px;border-width:1px}
+  .video .thumb{border-top-left-radius:var(--r-md);border-top-right-radius:var(--r-md)}
+  .expbadge,.tag{border-radius:999px;border-width:1px}
 
   /* Sentence case for anything a person actually reads. The global label rule
      is uppercase for form field names; checkbox rows are prose and were
@@ -632,10 +622,6 @@
   .repgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:16px 0}
   .repstat{border:1px solid var(--rule);border-radius:var(--r-md);background:var(--card);padding:15px 17px;
     box-shadow:var(--shadow-sm)}
-  .dashstat{cursor:pointer;text-align:left;font:inherit;width:100%;display:block;
-    transition:border-color .16s var(--ease),transform .16s var(--ease)}
-  .dashstat:hover{border-color:var(--brand);transform:translateY(-1px)}
-  .dashstat:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
   .repstat .rs-n{font-family:var(--font-display);font-size:26px;font-weight:700;line-height:1;color:var(--brand)}
   .repstat .rs-l{font-size:11.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-faint);margin-top:6px}
   .periodbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
@@ -2840,7 +2826,7 @@ function publishContent(opts){
 // it — flagged bags on What's Ready, concerns on Reported Problems.
 function homeFor(){ return 'checkout'; }
 function navIsOpen(){ return document.body.classList.contains('nav-open'); }
-function navIsDrawer(){ return window.matchMedia('(max-width:820px)').matches; }
+
 function setNav(open){
   document.body.classList.toggle('nav-open',!!open);
   var t=document.getElementById('navToggle');
@@ -3812,14 +3798,8 @@ function reopenConcernUI(what,where){
   unresolveConcern(what,where); renderLog(); renderReports(); renderReadiness();
 }
 
-function resolveIssue(id){
-  DB.issues.forEach(function(i){ if(i.id===id) i.open=false; });
-  saveDB(); renderLog();
-}
-function reopenIssue(id){
-  DB.issues.forEach(function(i){ if(i.id===id) i.open=true; });
-  saveDB(); renderLog();
-}
+
+
 
 
 /* ============================================================================
