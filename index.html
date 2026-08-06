@@ -941,7 +941,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260806140415';
+var BUILD='20260806155350';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -2459,11 +2459,22 @@ function finishGoogleLogin(r){
       return;
     }
     if(r.fresh===false){
-      uiAlert('Signed in as '+r.email+', but the list of who has access could not '+
-              'be read just now, so this device cannot tell what role you hold.\n\n'+
-              'If you were only just added, reload this page first — a phone can '+
-              'hold an older copy of the site for a while. Otherwise check the '+
-              'connection and try again.','Could not check access');
+      // Offer the retry rather than describing one. This is somebody standing in
+      // a stairwell holding a phone, and "try again" as instructions means going
+      // back through the Google prompt; as a button it means pressing a button.
+      uiConfirm('Signed in as '+r.email+', but the list of who has access could not '+
+              'be read — the connection dropped or timed out.\n\n'+
+              'Your sign-in is fine. This is only the check against the list.',
+              'Could not check access',{okText:'Try again',cancelText:'Not now'})
+        .then(function(again){
+          if(!again) return;
+          refreshAccess().then(function(fresh2){
+            var role2=roleForEmail(r.email);
+            // Hand back through the same path, so every outcome — in, refused,
+            // still unreachable — is worded in exactly one place.
+            finishGoogleLogin({email:r.email, role:role2, fresh:fresh2});
+          });
+        });
       return;
     }
     uiAlert('Signed in as '+r.email+', which has no role here. An Operations '+
@@ -2738,11 +2749,41 @@ function scheduleAutoPublish(){
    true if the list is genuinely fresh, false if the network could not answer —
    the caller has to say which, because "not on the list" and "could not read the
    list" call for very different messages. */
+/* One fetch, but not one CHANCE. The Apps Script sits behind a redirect and can
+   take the better part of a second from a good connection; from a phone in a
+   basement it can take far longer or simply drop. Sign-in used to hang the whole
+   answer on a single attempt, so one stumble on a bad signal became "could not
+   check access" and a dead end — which is exactly what an Operations Officer hit
+   on her phone while the same request from the same device succeeded elsewhere.
+
+   Three tries, backing off, each with its own deadline so a request that will
+   never answer cannot hold the dialog open for ever. Every attempt is
+   cache-busted, so a retry cannot be served the failure that came before it. */
+function fetchJSONTries(url, tries, timeoutMs){
+  tries=tries||3; timeoutMs=timeoutMs||7000;
+  var attempt=function(n){
+    return new Promise(function(resolve,reject){
+      var done=false;
+      var timer=setTimeout(function(){ if(!done){ done=true; reject(new Error('timeout')); } },timeoutMs);
+      fetch(url+(url.indexOf('?')<0?'?':'&')+'t='+Date.now()+'.'+n)
+        .then(function(r){ return r.json(); })
+        .then(function(j){ if(!done){ done=true; clearTimeout(timer); resolve(j); } })
+        .catch(function(e){ if(!done){ done=true; clearTimeout(timer); reject(e); } });
+    }).catch(function(e){
+      if(n>=tries) throw e;
+      // 400ms, then 1200ms. Long enough to outlast a hiccup, short enough that
+      // somebody holding a phone does not conclude the button is broken.
+      return new Promise(function(res){ setTimeout(res, n*400+ (n-1)*400); })
+        .then(function(){ return attempt(n+1); });
+    });
+  };
+  return attempt(1);
+}
+
 function refreshAccess(){
   var url=(DB.api&&DB.api.url)||'';
   if(!url) return Promise.resolve(false);
-  return fetch(url+(url.indexOf('?')<0?'?':'&')+'content=1&site=ops&t='+Date.now())
-    .then(function(r){ return r.json(); })
+  return fetchJSONTries(url+(url.indexOf('?')<0?'?':'&')+'content=1&site=ops')
     .then(function(j){
       // Same guard as applyContent: a deployment answering from one slot can hand
       // back the bike site's list, and taking it would lock the Operations Officer
