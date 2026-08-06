@@ -200,6 +200,19 @@
   .btn.sm{padding:6px 10px;font-size:12.5px}
   .btn.xs{padding:3px 7px;font-size:11px;box-shadow:none}
   .btn.block{width:100%;justify-content:center}
+
+  /* Finger-sized on a touch screen. The manager rows — Remove, Rename, Retire,
+     Edit contents — are 24px tall at this size, which is a coin toss to hit on a
+     phone, and these are the controls that DELETE things. Keyed to the pointer
+     rather than the width, so a small laptop keeps the compact buttons and a
+     tablet does not. Padding grows rather than font size, so nothing reflows. */
+  @media (pointer:coarse){
+    .btn.xs{min-height:38px;padding-left:12px;padding-right:12px}
+    .btn.sm{min-height:38px}
+    /* Square icon buttons (✕ and the like) need width as well as height, or they
+       stay a 25px sliver however tall they get. */
+    .btn.xs:not(.block){min-width:38px;justify-content:center}
+  }
   .btn.ghost{box-shadow:none;background:transparent}
   .btn:disabled{opacity:.45;cursor:not-allowed;transform:none;box-shadow:var(--shadow-sm)}
   body.is-web .webonly{display:inline-flex}
@@ -650,7 +663,7 @@
     display:flex;flex-direction:column;align-items:center}
   .qrcard .qrkicker{font-size:10px;text-transform:uppercase;letter-spacing:.16em;
     color:var(--brand);font-weight:700}
-  .qrcard h4{margin:6px 0 3px;font-family:var(--font-display);font-size:19px;line-height:1.2;color:#111}
+  .qrcard h3{margin:6px 0 3px;font-family:var(--font-display);font-size:19px;line-height:1.2;color:#111}
   .qrcard .qrwho{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#666;
     margin-bottom:14px}
   .qrcard .qrframe{padding:10px;background:#fff;border:1px solid var(--rule);border-radius:10px}
@@ -685,7 +698,7 @@
     /* No trailing blank sheet after the last sticker. */
     .qrcard:last-child{break-after:auto;page-break-after:auto}
     .qrcard .qrkicker{font-size:12.5px;letter-spacing:.24em}
-    .qrcard h4{font-size:42px;margin:12px 0 8px}
+    .qrcard h3{font-size:42px;margin:12px 0 8px}
     .qrcard .qrwho{font-size:15px;letter-spacing:.1em;margin-bottom:32px;color:#333}
     .qrcard .qrframe{border:0;padding:0}
     .qrcard .qrsvg{width:4.5in;height:4.5in}
@@ -3587,7 +3600,10 @@ function submitCheck(fid){
     var a=andrewState(s.andrew);
     if(!a.ok){
       renderAndrewMsg(fid);
-      uiAlert(a.empty ? 'Your Andrew ID is needed — 8 characters.' : a.msg,'Check your Andrew ID');
+      // Was "8 characters", left over from when this demanded exactly 8 and
+      // refused rithik, leyuanc and cebruno. The rule is at most 8; saying a
+      // number here would send somebody padding a correct ID to reach it.
+      uiAlert(a.empty ? 'Your Andrew ID is needed.' : a.msg,'Check your Andrew ID');
       var el=document.getElementById(fid+'-aid'); if(el) el.focus();
       return;
     }
@@ -3605,7 +3621,19 @@ function submitCheck(fid){
   doSubmit(fid,s);
 }
 
+/* One submission at a time, per form. The script drops a REPEAT of a submission
+   id it has already seen — but a second tap runs this again and mints a NEW id,
+   so the server has no way to know the two are the same check and writes both.
+   A phone on patchy wifi is exactly where somebody taps twice, and the result is
+   the Equipment Manager reading two checkouts of one bag. */
+var submitting={};
+
 function doSubmit(fid,s){
+  if(submitting[fid]) return;
+  submitting[fid]=true;
+  // Released once the run is over — the completion panel has replaced the form
+  // by then, so the only way back to a submit button is to start a new check.
+  setTimeout(function(){ submitting[fid]=false; },4000);
   var c=fcfg(fid);
   var payload={
     form:c.tab, date:s.date, submitted:new Date().toISOString(),
@@ -4576,7 +4604,7 @@ function renderQR(){
     var url=base+'#'+t.view;
     h+='<div class="qrcard">'+
        '<div class="qrkicker">CMU EMS · Operations</div>'+
-       '<h4>'+esc(t.title)+'</h4>'+
+       '<h3>'+esc(t.title)+'</h3>'+
        '<div class="qrwho">'+esc(t.who)+'</div>'+
        '<div class="qrframe">'+qrSVG(url,230)+'</div>'+
        '<div class="qrhow">Point your phone camera at this code.</div>'+
