@@ -2754,11 +2754,19 @@ function pullContent(){
     .catch(function(){ return false; });
 }
 
+/* Writes into the status line, finding it fresh each time. Anything that renders
+   Site Settings replaces that element, so a reference captured before the
+   readback ends up detached and the result is written into nothing — leaving the
+   line blank after a save that had actually worked. */
+function setPubMsg(t){
+  var el=document.getElementById('pubState');
+  if(el) el.textContent=t;
+}
+
 function publishContent(opts){
   opts=opts||{};
-  var msg=document.getElementById('pubState');
   var url=(DB.api&&DB.api.url)||'';
-  if(!url){ if(msg) msg.textContent='Connect a spreadsheet first.'; return; }
+  if(!url){ setPubMsg('Connect a spreadsheet first.'); return; }
   var key=(DB.api&&DB.api.key)||'';
   // Either route will do, and the script checks whichever one arrives. Without
   // one of them the request would simply be refused, so say so here rather than
@@ -2770,7 +2778,7 @@ function publishContent(opts){
               'Cannot publish yet');
     return;
   }
-  if(msg) msg.textContent='Publishing…';
+  setPubMsg('Publishing…');
   // Snapshot what is actually being sent. The readback used to compare against a
   // FRESHLY computed payload, so any change at all between the send and the check
   // — another edit, a render touching DB — made a perfectly good publish look
@@ -2802,18 +2810,16 @@ function publishContent(opts){
           setContentBase(j.content);
           contentState.dirty=false;
           publishUnconfirmed=false;
-          if(msg) msg.textContent='Saved for everyone.';
-        } else if(msg){
+          setPubMsg('Saved for everyone.');
+        } else {
           // The POST reply is unreadable (no-cors), so a refusal and a slow write
-          // look identical from here. Naming the overwhelmingly likelier cause
-          // beats "try again in a moment", which is what somebody reads twenty
-          // times while nothing at all is being saved.
-          msg.textContent='The server did not accept this. The address you are '+
-            'signed in with is probably not on the People list — add it there, or '+
-            'set ROOT_MANAGERS in the script (SETUP-BACKEND.md ▸ step 5).';
+          // look identical from here. The script writes the real reason into the
+          // spreadsheet, which beats guessing at it from this side.
+          setPubMsg('The server did not accept this. Check the Errors tab of the '+
+            'spreadsheet — it records exactly which address was refused and why.');
         }
       })
-      .catch(function(){ if(msg) msg.textContent='Sent, but could not read it back to confirm.'; });
+      .catch(function(){ setPubMsg('Sent, but could not read it back to confirm.'); });
   },1200);
 }
 

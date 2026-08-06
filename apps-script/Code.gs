@@ -574,6 +574,25 @@ function logError(what, body) {
    addresses. Nothing needs redeploying — properties are read live. */
 var MANAGER_EMAILS = ['bikecmuems@gmail.com'];
 
+/* The OAuth client both sites sign in with. Kept HERE, in the file, rather than
+   in a script property.
+
+   It used to be read from a CLIENT_ID property, and that property had drifted to
+   a different client than the sites actually use. The effect was total and
+   invisible: every publish, from every account, on both sites, was refused —
+   because the token was real, the address was real, and only the audience field
+   disagreed. Nothing said so, and it looked exactly like an access-list problem,
+   which is where the time went.
+
+   A property that must match a value in another file is a thing that can drift.
+   This cannot: the constant sits beside the code that uses it and matches
+   GOOGLE_CLIENT_ID in both sites' index.html. It is not a secret either — it
+   ships in the page source of a public site by design.
+
+   Verify with: the value below must equal GOOGLE_CLIENT_ID in ems-ops and
+   bike-ops index.html. All three are the same string. */
+var OAUTH_CLIENT_ID = '56106295898-0if2a9uvtsl0815n3hgtdpph93goq0ck.apps.googleusercontent.com';
+
 function rootManagers() {
   var out = MANAGER_EMAILS.map(function (e) { return String(e).toLowerCase(); });
   var extra = PropertiesService.getScriptProperties().getProperty('ROOT_MANAGERS') || '';
@@ -604,9 +623,10 @@ function verifyToken(idToken, clientId) {
                                '). Almost always: it has expired. Sign in again on the site.' };
     var c = JSON.parse(r.getContentText());
     if (clientId && c.aud !== clientId)
-      return { email: '', why: 'the token was issued for OAuth client "' + c.aud + '" but the ' +
-                               'CLIENT_ID script property on this script says "' + clientId + '". ' +
-                               'Correct that property, or delete it to stop checking.' };
+      return { email: '', why: 'the token was issued for OAuth client "' + c.aud + '" but this ' +
+                               'script expects "' + clientId + '". The two sites and OAUTH_CLIENT_ID ' +
+                               'near the top of this file must all name the same client — copy the ' +
+                               'value out of GOOGLE_CLIENT_ID in the sites and paste it there.' };
     if (String(c.email_verified) !== 'true')
       return { email: '', why: 'Google does not report ' + (c.email || 'that address') + ' as verified' };
     return { email: String(c.email || '').toLowerCase(), why: '' };
@@ -711,7 +731,10 @@ function writerCheck(p) {
   var key = props.getProperty('PUBLISH_KEY');
   if (key && p.key && String(p.key) === String(key)) return { name: 'publish key', why: '' };
 
-  var v = verifyToken(p.idToken, props.getProperty('CLIENT_ID'));
+  // The constant, not a script property. A property that has to match a value in
+  // another file is a thing that can drift, and when it drifted every publish on
+  // both sites was refused with nothing on screen to say why.
+  var v = verifyToken(p.idToken, OAUTH_CLIENT_ID);
   if (!v.email) return { name: '', why: v.why };
 
   var site = siteOf(p);
