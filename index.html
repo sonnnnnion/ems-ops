@@ -542,6 +542,14 @@
   .tracker td.slot{width:78px;height:38px}
   .tracker tr.high td.slot{background:var(--card)}
   .tracker tr.high th{background:var(--brand-tint)}
+  /* Key for the shading above. The swatch has to carry a border as well as a
+     fill: browsers drop background colors when printing unless told not to, and
+     this sheet exists to be printed, so a fill-only swatch would key nothing on
+     the one copy anybody actually reads. */
+  .trackkey{margin:12px 0 0;align-items:center}
+  .keyswatch{display:inline-block;width:15px;height:11px;vertical-align:-1px;margin-right:6px;
+    border:1px solid var(--rule-strong);background:var(--card)}
+  .keyswatch.high{background:var(--brand-tint);border-color:var(--brand)}
   .trackhead{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;
     border-bottom:2px solid var(--ink);padding-bottom:10px;margin-bottom:4px}
   .trackhead .th-t{font-family:var(--font-display);font-size:21px;font-weight:700}
@@ -705,6 +713,11 @@
     body{background:#fff}
     .card,.invwrap{box-shadow:none;border-color:#999;break-inside:avoid}
     .tracker th,.tracker td{border-color:#000}
+    /* The shading is the only thing marking a priority room, and browsers drop
+       background colors on paper by default — so ask for it explicitly on the
+       one sheet whose entire purpose is to be printed. */
+    .tracker tr.high th,.keyswatch,.keyswatch.high{
+      -webkit-print-color-adjust:exact;print-color-adjust:exact}
 
     @page{size:letter portrait;margin:0.5in}
     /* Nothing above the first sticker: a page heading would print on sheet one
@@ -976,7 +989,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260806193305';
+var BUILD='20260806193655';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -4995,6 +5008,19 @@ function renderTracker(){
 
   h+='<div class="trackhead mt"><div class="th-t">CMU EMS Room Check Tracker</div>'+
      '<div class="th-dp">DP: <b>&nbsp;</b></div></div>';
+
+  // The shaded rows carried the whole "these take three people" signal with
+  // nothing saying so, and the count of how many call signs a duty period needs
+  // was only ever available by adding the slots up by hand — on the printed
+  // sheet, every week. Both are one line.
+  var slots=DB.rooms.reduce(function(n,r){ return n+(r.slots||0); },0);
+  var high=DB.rooms.filter(function(r){ return r.tier==='high'; }).length;
+  h+='<div class="legend trackkey">'+
+     '<span class="item"><span class="keyswatch high"></span>Priority room, 3 call signs &mdash; '+high+'</span>'+
+     '<span class="item"><span class="keyswatch"></span>2 call signs &mdash; '+(DB.rooms.length-high)+'</span>'+
+     '<span class="item"><b>'+DB.rooms.length+'</b> rooms, <b>'+slots+'</b> call-sign slots</span>'+
+     '</div>';
+
   h+='<table class="tracker"><thead><tr><th>Room / task</th>';
   for(var i=1;i<=maxSlots;i++) h+='<th>Call sign '+i+'</th>';
   h+='</tr></thead><tbody>';
