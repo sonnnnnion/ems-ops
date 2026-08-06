@@ -720,6 +720,10 @@ function allowedFor(site) {
     // the bike program's content, and this list is what an appointment means.
     (opsAccess.officers || []).forEach(function (e) { allowed.push(String(e).toLowerCase()); });
     if (opsAccess.officer) allowed.push(String(opsAccess.officer).toLowerCase());
+    // Bike Managers appointed on the operations People screen. Added to the bike
+    // site's own list rather than replacing it, so somebody already added over
+    // there keeps working and there is nothing to migrate.
+    (opsAccess.bikeManagers || []).forEach(function (e) { allowed.push(String(e).toLowerCase()); });
   }
   return allowed;
 }

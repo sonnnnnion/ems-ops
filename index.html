@@ -1378,7 +1378,19 @@ var DEFAULTS={
     // where the site can read them — never in a public git history.
     // WEBMASTER below is the exception: a shared club account, not a person.
     officers:[],                   // ['someone@andrew.cmu.edu', …] — all 'ops'
-    people:[]                      // [{email, role:'equipment'|'office'}]
+    people:[],                     // [{email, role:'equipment'|'office'}]
+    /* Who may open manager mode on the BIKE OPS site. Deliberately its own list
+       rather than another entry in `people`.
+
+       A role in `people` would be read by roleForEmail(), which sets ROLE, and
+       can() answers `need==='mgr'` with `ROLE!=='member'` — so a bike manager
+       would pass every manager gate on THIS site and see the whole Operations
+       toolset. That is the leak class this project has shipped twice. Keeping
+       the list separate means nothing here reads it: no role, no ROLE, no gate.
+
+       It rides along in the published content because it lives under `access`,
+       and the bike site and the Apps Script both read it from there. */
+    bikeManagers:[]                // ['someone@andrew.cmu.edu', …]
   },
 
   // Locked to the Operations Officer until there is something worth showing.
@@ -1956,6 +1968,11 @@ function migrateAccess(a){
     changed=true;
   }
   if(!Array.isArray(a.people)){ a.people=[]; changed=true; }
+  // Added after the first release, so every stored copy predates it. Run over
+  // the sync baseline as well as the live copy — that pairing is what stops the
+  // shape change alone reading as an unpublished local edit and making
+  // applyContent hold the server's access list back for ever.
+  if(!Array.isArray(a.bikeManagers)){ a.bikeManagers=[]; changed=true; }
   return changed;
 }
 
@@ -4388,7 +4405,72 @@ function renderPeople(){
   }
   h+='<div class="row mt"><button class="btn ghost sm" onclick="addPerson()">Add someone</button></div></div>';
 
+  /* Bike Managers. A separate card, and separate wording, because these people
+     get nothing at all on this site — the list is published for the Bike Ops
+     site to read. Saying so here is the difference between an officer
+     understanding what they just granted and assuming it is another manager
+     role. */
+  var bm=(a.bikeManagers||[]);
+  h+='<div class="card mt"><h3>Bike Managers</h3>'+
+     '<p style="font-size:13px;color:var(--ink-mute);margin:0 0 12px">'+
+     'These people can open manager mode on the <b>Bike Ops</b> site. They get '+
+     'nothing on this one. Anyone added on the Bike Ops site itself still works '+
+     'too — the two lists are read together, so neither replaces the other.</p>';
+  if(!bm.length){
+    h+='<p class="hint" style="margin:0 0 10px">Nobody added yet.</p>';
+  }else{
+    h+='<div class="invwrap"><table class="invtable"><thead><tr>'+
+       '<th>Email</th><th>Can open</th><th></th></tr></thead><tbody>';
+    bm.forEach(function(e,i){
+      h+='<tr><td>'+esc(e)+'</td><td>Bike Ops manager mode</td>'+
+         '<td><button class="btn xs" onclick="delBikeManager('+i+')">Remove</button></td></tr>';
+    });
+    h+='</tbody></table></div>';
+  }
+  h+='<div class="row mt"><button class="btn ghost sm" onclick="addBikeManager()">Add someone</button></div>'+
+     '<p id="bikeMgrMsg" class="hint" style="margin:8px 0 0"></p></div>';
+
   host.innerHTML=h;
+}
+
+/* Appointing somebody to the bike program. Same shape as addOfficer, and
+   deliberately NOT routed through addPerson: `people` carries a role that
+   roleForEmail reads, and putting a bike manager in there would hand them the
+   Operations manager views on this site. */
+function addBikeManager(){
+  if(!can('ops')) return;
+  uiForm('Add a Bike Manager',
+    'They will be able to open manager mode on the Bike Ops site. This gives them nothing here.',
+    [{key:'email',label:'Email (their Google account)',type:'text',required:true}],
+    {okText:'Add'})
+   .then(function(v){
+     if(!v||!v.email) return;
+     var e=normEmail(v.email);
+     if(!e) return;
+     var msg=document.getElementById('bikeMgrMsg');
+     if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)){
+       if(msg) msg.textContent='That does not look like an email address.';
+       return;
+     }
+     DB.access.bikeManagers=(DB.access.bikeManagers||[])
+       .filter(function(x){ return normEmail(x)!==e; });
+     DB.access.bikeManagers.push(e);
+     saveDB(); renderPeople();
+     var m2=document.getElementById('bikeMgrMsg');
+     if(m2) m2.textContent='Added. It saves for everyone by itself.';
+   });
+}
+
+function delBikeManager(i){
+  var e=(DB.access.bikeManagers||[])[i];
+  if(!e) return;
+  uiConfirm(e+' will no longer be able to open manager mode on the Bike Ops site, '+
+            'unless they are also on that site’s own list.','Remove this Bike Manager?',
+            {okText:'Remove',danger:true}).then(function(yes){
+    if(!yes) return;
+    DB.access.bikeManagers.splice(i,1);
+    saveDB(); renderPeople();
+  });
 }
 /* Any officer may add another. That is deliberate: the role turns over every
    year, and a list only one person can extend is a list that goes stale the
