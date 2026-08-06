@@ -989,7 +989,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260806193655';
+var BUILD='20260806193900';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -5370,14 +5370,27 @@ function renderReports(){
     h+='<p class="hint" style="margin:0">Nothing reported in this period.</p>';
   }else{
     var badge={Blocking:'crit',Soon:'warn',Whenever:'brand'};
-    h+='<ul class="isslist">'+d.issuesOpen.map(function(i){
+    // Same row shape as the log, open or resolved, because the only difference
+    // that matters is which way the button goes. Mark resolved used to be a
+    // one-way door here — the resolved ones collapsed into a count with nothing
+    // to press, so a mis-tap could only be undone from a different view.
+    var crow=function(i,isOpen){
       return '<li><span class="tag '+(badge[i.urgency]||'brand')+'">'+esc(i.urgency)+'</span>'+
         '<b>'+esc(i.what)+'</b>'+(i.where?' <span style="color:var(--ink-faint)">— '+esc(i.where)+'</span>':'')+
-        '<button class="issx" onclick="clearReportConcern(\''+jsq(i.what)+'\',\''+
-        jsq(i.where||'')+'\')">Mark resolved</button></li>';
-    }).join('')+'</ul>';
-    var closed=d.issuesAll.length-d.issuesOpen.length;
-    if(closed) h+='<p class="hint">'+closed+' more were reported and resolved in this period.</p>';
+        '<button class="issx" onclick="'+(isOpen?'clearReportConcern':'reopenReportConcern')+
+        '(\''+jsq(i.what)+'\',\''+jsq(i.where||'')+'\')">'+
+        (isOpen?'Mark resolved':'Reopen')+'</button></li>';
+    };
+    h+= d.issuesOpen.length
+      ? '<ul class="isslist">'+d.issuesOpen.map(function(i){return crow(i,true);}).join('')+'</ul>'
+      : '<p class="noissues">Nothing open.</p>';
+    var closedList=d.issuesAll.filter(function(i){ return !i.open; });
+    if(closedList.length)
+      h+='<div class="acc mt"><button type="button" class="acchead" onclick="toggleAcc(this)">'+
+         '<span class="num">'+closedList.length+'</span><span>Resolved in this period</span>'+
+         '<span class="chev">▾</span></button>'+
+         '<div class="accbody"><ul class="isslist">'+
+         closedList.slice(0,50).map(function(i){return crow(i,false);}).join('')+'</ul></div></div>';
   }
   h+='</div>';
 
@@ -5402,7 +5415,11 @@ function renderReports(){
 
 function clearReportConcern(what,where){
   resolveConcern(what,where);
-  renderReports(); renderLog(); 
+  renderReports(); renderLog(); renderReadiness();
+}
+function reopenReportConcern(what,where){
+  unresolveConcern(what,where);
+  renderReports(); renderLog(); renderReadiness();
 }
 
 function reportText(){
