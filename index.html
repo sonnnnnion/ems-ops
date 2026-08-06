@@ -3384,16 +3384,23 @@ function calcCheck(fid){
         'they are filed as missing or not done so someone can follow up.')+'</div></div>';
 }
 
-/* An Andrew ID is exactly 8 characters. Anything else is a typo, and a typo here
-   is worse than a blank: it lands in the sheet looking like a real person and
-   nobody can match it back. Warn while the field is still on screen. */
+/* An Andrew ID is UP TO 8 characters, not exactly 8 — they are built from the
+   name and truncated, so most are shorter. This used to demand exactly 8 and
+   refuse anything else, which blocked real people: rithik is 6, leyuanc and
+   cebruno are 7. Every one of them is on the People list, and not one of them
+   could have filed a single check.
+
+   A typo here is still worse than a blank, because it lands in the sheet looking
+   like a real person and nobody can match it back. So the checks that remain are
+   the ones that are actually true: not empty, no more than 8, letters and digits
+   only, and starting with a letter. */
 function andrewState(v){
   v=String(v||'').trim();
   if(!v) return {ok:false, empty:true, msg:''};
-  if(v.length!==8) return {ok:false, empty:false,
-    msg:'Andrew IDs are 8 characters — this one is '+v.length+'.'};
-  if(!/^[a-z0-9]+$/i.test(v)) return {ok:false, empty:false,
-    msg:'Letters and numbers only.'};
+  if(v.length>8) return {ok:false, empty:false,
+    msg:'Andrew IDs are at most 8 characters — this one is '+v.length+'.'};
+  if(!/^[a-z][a-z0-9]*$/i.test(v)) return {ok:false, empty:false,
+    msg:'An Andrew ID starts with a letter and uses only letters and numbers.'};
   return {ok:true, empty:false, msg:''};
 }
 
