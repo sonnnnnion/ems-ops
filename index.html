@@ -634,6 +634,24 @@
   .legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:6px}
   .legend .item{font-size:12px;color:var(--ink-mute)}
 
+  /* ---------- room checklist review state ---------- */
+  .roomtally{font-size:12.5px;color:var(--ink-mute);margin:10px 0 2px}
+  .roomtally b{color:var(--ink);font-family:var(--font-display);font-size:15px}
+  /* `margin-left:auto` pushes the chip to the right of the accordion head and
+     keeps the chevron last, without giving .acchead a second layout rule. */
+  .roomchip{margin-left:auto;margin-right:10px;font-size:10.5px;font-weight:700;
+    text-transform:uppercase;letter-spacing:.06em;padding:3px 9px;border-radius:999px;
+    border:1px solid transparent;white-space:nowrap}
+  .roomchip.todo{background:var(--bg-2);color:var(--ink-faint);border-color:var(--rule-strong)}
+  .roomchip.ok{background:var(--ok-wash);color:var(--ok);border-color:var(--ok)}
+  .roomchip.stale{background:var(--warn-wash);color:var(--warn);border-color:var(--warn)}
+  .roomnote{font-size:12px;color:var(--ink-faint);margin:10px 0 0}
+  @media(max-width:520px){
+    /* On a phone the head is already tight; the chip drops under the name
+       rather than squeezing it to two characters. */
+    .roomchip{margin-left:0;font-size:9.5px;padding:2px 7px}
+  }
+
   /* ---------- one big printable code ---------- */
   @media print{
   }
@@ -992,7 +1010,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260806194547';
+var BUILD='20260806200219';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -2027,7 +2045,29 @@ var DEFAULTS={
   issues:[],
   // The shopping list. One entry per ITEM, not per report — asking again bumps
   // the count instead of adding a duplicate line.
-  toGet:[]
+  toGet:[],
+
+  /* WHICH ROOM CHECKLISTS HAVE ACTUALLY BEEN REVIEWED
+     ------------------------------------------------------------------------
+     The per-room task lists were drafted from the Office Manager role
+     description and the room photos — they are the one piece of content on this
+     site that was never transcribed from a document. Nothing on the page said
+     so, so they read as settled fact to whoever opened them.
+
+     A notice saying "these are drafts" was the wrong fix: it is prose in an
+     agent's register about content the Office Manager owns, and it would still
+     be sitting there a year after she had read every line. This is the state
+     instead — she ticks a room when she has actually been through it, and the
+     ones she has not are visibly outstanding rather than quietly asserted.
+
+     roomId -> {by, at, sig}. `sig` is a signature of the task list AS
+     CONFIRMED, so editing a list afterwards shows as "changed since" rather
+     than leaving a stale tick vouching for text nobody approved.
+
+     Deliberately in neither SEEDED nor NO_SYNC: it must survive a content
+     re-seed (it is her work, not shipped content) and it must reach everyone
+     else (a confirmation only she can see answers nothing). */
+  roomConfirmed:{}
 };
 
 
@@ -4114,19 +4154,71 @@ function renderRooms(){
   }
 
   h+='<h3 class="mt-lg" style="font-family:var(--font-display);font-size:19px">Every room, and what its check covers</h3>';
+
+  // How much of this the Office Manager has actually been through, as a number
+  // rather than as a claim. Only shown to whoever can act on it.
+  var done=DB.rooms.filter(function(r){ return roomState(r).state==='ok'; }).length;
+  h+='<p class="roomtally" data-need="office"><b>'+done+'</b> of <b>'+DB.rooms.length+
+     '</b> checked over by the Office Manager</p>';
+
   DB.rooms.forEach(function(r,i){
+    var st=roomState(r);
     h+='<div class="acc"><button type="button" class="acchead" onclick="toggleAcc(this)">'+
        '<span class="num">'+(r.tier==='high'?'3':'2')+'</span>'+
-       '<span>'+esc(r.name)+'</span><span class="chev">▾</span></button>'+
+       '<span>'+esc(r.name)+'</span>'+
+       '<span class="roomchip '+st.cls+'" data-need="office">'+esc(st.chip)+'</span>'+
+       '<span class="chev">▾</span></button>'+
        '<div class="accbody"><ul>'+
        r.tasks.map(function(t){return '<li>'+esc(t)+'</li>';}).join('')+
        '</ul>'+
+       (st.note?'<p class="roomnote" data-need="office">'+esc(st.note)+'</p>':'')+
        '<div class="row" data-need="office" style="margin-top:10px">'+
-       '<button class="btn xs" onclick="editRoomTasks(\''+esc(r.id)+'\')">Edit this list</button></div>'+
-       '</div></div>';
+       '<button class="btn xs" onclick="editRoomTasks(\''+esc(r.id)+'\')">Edit this list</button>'+
+       (st.state==='ok'
+         ? '<button class="btn xs" onclick="unconfirmRoomTasks(\''+esc(r.id)+'\')">Undo</button>'
+         : '<button class="btn xs on" onclick="confirmRoomTasks(\''+esc(r.id)+'\')">This list is right</button>')+
+       '</div></div></div>';
   });
   host.innerHTML=h;
   applyGates(host);
+}
+
+/* A signature of the task list as it stands, so a confirmation stops vouching
+   for text that changed after it was given. Small on purpose: this syncs. */
+function tasksSig(r){
+  var s=(r.tasks||[]).join(''), n=0;
+  for(var i=0;i<s.length;i++){ n=((n<<5)-n+s.charCodeAt(i))|0; }
+  return (n>>>0).toString(36)+'.'+(r.tasks||[]).length;
+}
+
+/* Three states, not two. "Confirmed, then edited" is its own answer — treating
+   it as confirmed would vouch for the edit, and treating it as never-confirmed
+   would throw away the fact that somebody has been through it. */
+function roomState(r){
+  var c=(DB.roomConfirmed||{})[r.id];
+  if(!c) return {state:'new', cls:'todo', chip:'Not checked over', note:''};
+  if(c.sig && c.sig!==tasksSig(r))
+    return {state:'stale', cls:'stale', chip:'Edited since',
+            note:'Checked over by '+(c.by||'a manager')+' on '+
+                 new Date(c.at).toLocaleDateString()+', and edited since then.'};
+  return {state:'ok', cls:'ok', chip:'Checked over',
+          note:'Checked over by '+(c.by||'a manager')+' on '+
+               new Date(c.at).toLocaleDateString()+'.'};
+}
+
+function confirmRoomTasks(id){
+  if(!can('office')) return;
+  var r=DB.rooms.filter(function(x){return x.id===id;})[0]; if(!r) return;
+  DB.roomConfirmed=DB.roomConfirmed||{};
+  var me=readMe()||{};
+  DB.roomConfirmed[id]={by:me.andrew||ROLE_LABEL[ROLE], at:Date.now(), sig:tasksSig(r)};
+  saveDB(); renderRooms();
+}
+function unconfirmRoomTasks(id){
+  if(!can('office')) return;
+  DB.roomConfirmed=DB.roomConfirmed||{};
+  delete DB.roomConfirmed[id];
+  saveDB(); renderRooms();
 }
 
 function toggleAcc(btn){ btn.parentNode.classList.toggle('open'); }
