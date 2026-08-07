@@ -202,6 +202,13 @@
   /* "already on the list" — the button IS the confirmation, so it has to read
      as a state, not as another thing to press. */
   .btn.on{background:var(--ok-wash);border-color:var(--ok);color:var(--ok);font-weight:700}
+  /* A role row whose account list has not been read yet. Dimmed rather than
+     disabled: pressing it explains and offers a retry, which is more use than
+     a dead button. */
+  .loginrole.waiting{opacity:.62}
+  .loginwait{font-size:12px;line-height:1.55;color:var(--ink-faint);
+    margin:12px 0 0;padding-top:11px;border-top:1px solid var(--rule)}
+  .loginwait .btn{margin-left:4px;vertical-align:baseline}
   .btn.block{width:100%;justify-content:center}
 
   /* Finger-sized on a touch screen. The manager rows — Remove, Rename, Retire,
@@ -1010,7 +1017,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260806200219';
+var BUILD='20260807000739';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -2152,6 +2159,28 @@ function loadDB(){
       if(k.indexOf('|')<0){ delete DB.expiry[k]; stale=true; }
     });
   }
+  /* AN EMPTY ENDPOINT IS A DEVICE THAT VISITED TOO EARLY
+     ------------------------------------------------------------------------
+     The Web App URL now ships in DEFAULTS.api, but it did not always. A browser
+     that first opened this site before then stored `{url:''}`, and it keeps it
+     forever: the type check above accepts it because the SHAPE is right, and
+     `api` is in neither SEEDED nor the sync payload, so nothing ever replaces
+     it. Site Settings would fix it, but that view is manager-only — and the
+     person who cannot log in is by definition not a manager yet.
+
+     The effect is total and completely silent. No endpoint means no content,
+     which means an empty People list, which the login dialog then reports as
+     "No account linked — cannot log in" for every real manager while the
+     Operations Officer row still reads as linked, because that one counts the
+     hardcoded root account. That is the exact screen this was diagnosed from.
+
+     So adopt the shipped endpoint whenever the stored one is blank. A URL that
+     was deliberately changed is not blank, so this cannot undo one. */
+  if(!(DB.api&&DB.api.url) && DEFAULTS.api && DEFAULTS.api.url){
+    DB.api=DB.api||{};
+    DB.api.url=DEFAULTS.api.url;
+    stale=true;
+  }
   if(stale) saveDB();
 }
 function saveDB(){
@@ -2412,19 +2441,56 @@ function roleAccounts(role){
   return out;
 }
 
+/* "Nobody is appointed" and "I have not managed to ask yet" are opposite facts
+   with opposite fixes, and this dialog used to print the first whenever the
+   second was true — because both look like an empty DB.access from in here.
+   The Operations Officer row hid it: it counts the hardcoded root account, so
+   it read "linked" while the two real managers read "No account linked", which
+   is precisely the shape of the bug rather than of a missing appointment. */
+function accessKnown(){ return !!contentState.loaded; }
+
 function loginOptionsHTML(){
+  var known=accessKnown();
   return '<div class="loginlist">'+LOGIN_ROLES.map(function(r){
     var n=roleAccounts(r).length;
     // The count, never the addresses — anyone can open this dialog.
-    var note = LOCAL_MANAGER_UNLOCK
-      ? (n?'Opens without a password for now':'No account linked yet')
-      : (n?(n===1?'Log in with the linked account':'Log in with a linked account')
-          :'No account linked — cannot log in');
-    return '<button type="button" class="loginrole" onclick="loginAs(\''+jsq(r)+'\')">'+
+    var note;
+    if(LOCAL_MANAGER_UNLOCK) note = n?'Opens without a password for now':'No account linked yet';
+    else if(!known)          note = 'Still checking who is appointed…';
+    else if(n)               note = n===1?'Log in with the linked account':'Log in with a linked account';
+    else                     note = 'No account linked — cannot log in';
+    return '<button type="button" class="loginrole'+(known?'':' waiting')+
+      '" onclick="loginAs(\''+jsq(r)+'\')">'+
       '<span class="lr-ic">'+esc(LOGIN_ICON[r]||'◈')+'</span>'+
       '<span class="lr-t"><b>'+esc(ROLE_LABEL[r])+'</b><small>'+esc(note)+'</small></span>'+
       '</button>';
-  }).join('')+'</div>';
+  }).join('')+'</div>'+
+  (known?'':'<p class="loginwait">'+
+    esc(contentState.error
+      ? 'The list of who is appointed could not be read — '+contentState.error+'.'
+      : 'Reading the list of who is appointed…')+
+    ' <button type="button" class="btn xs" onclick="retryAccess()">Try again</button></p>');
+}
+
+/* Rebuilds the open login dialog in place. Safe to call when no dialog is open
+   and safe to call repeatedly — it only ever replaces the list it finds. */
+function refreshLoginDialog(){
+  var host=document.querySelector('.modal .loginlist');
+  if(!host||!host.parentNode) return;
+  var wrap=host.parentNode;
+  var old=wrap.querySelector('.loginwait');
+  var tmp=document.createElement('div');
+  tmp.innerHTML=loginOptionsHTML();
+  wrap.replaceChild(tmp.firstChild, host);
+  if(old) old.remove();
+  var note=tmp.querySelector('.loginwait');
+  if(note) wrap.appendChild(note);
+}
+
+function retryAccess(){
+  contentState.error='';
+  refreshLoginDialog();
+  pullContent();
 }
 
 function loginAs(role){
@@ -2433,6 +2499,17 @@ function loginAs(role){
   // the flag off and the linked roles go back to requiring that account.
   if(!LOCAL_MANAGER_UNLOCK){
     if(roleAccounts(role).length) return googleSignIn(role);
+    // Same distinction as the row's own label: refusing with "nobody is
+    // appointed" while the list is still unread sends somebody to ask the
+    // officer for access they already have.
+    if(!accessKnown()){
+      uiConfirm('The list of who is appointed has not been read yet'+
+                (contentState.error?' — '+contentState.error:'')+
+                '.\n\nThis is a connection problem, not a missing appointment.',
+                'Still checking',{okText:'Try again',cancelText:'Not now'})
+        .then(function(again){ if(again) retryAccess(); });
+      return;
+    }
     uiAlert('Nobody is linked to '+ROLE_LABEL[role]+' yet. The Operations Officer '+
             'adds people under Site Settings ▸ People.','Not set up');
     return;
@@ -2644,7 +2721,9 @@ function googleSignIn(wantRole){
    each other. The spreadsheet is the record for those.
    ========================================================================== */
 var NO_SYNC={api:1, issues:1, usage:1, toGet:1, expiry:1, version:1, seed:1};
-var contentState={loaded:false, dirty:false, at:0};
+// `error` carries WHY the last content read failed, so the login dialog can say
+// it instead of presenting a failed request as an empty People list.
+var contentState={loaded:false, dirty:false, at:0, error:''};
 
 function contentPayload(){
   var out={};
@@ -2721,13 +2800,34 @@ function applyContent(obj){
   try{ return applyContentInner(obj); } finally{ applyingContent=false; }
 }
 
+/* Is this device's access list empty of every actual person?
+
+   Holding back a locally-edited `access` is right when it holds work. When it
+   holds NOBODY it is not work — you cannot appoint nobody on purpose — and the
+   hold-back then does something far worse than losing an edit: the server's real
+   People list is ignored on this device permanently, so every manager reads as
+   "No account linked", the officer's address resolves to no role, and the site
+   says the appointments failed when they are sitting on the server, correct and
+   unread. There is no way out from the UI either, because the view that could
+   fix it is manager-only and nobody can become a manager.
+
+   An empty list is therefore always safe to overwrite with a non-empty one. */
+function accessIsEmpty(a){
+  if(!a || typeof a!=='object') return true;
+  return !((a.people||[]).length || (a.officers||[]).length || (a.bikeManagers||[]).length);
+}
+
 function applyContentInner(obj){
   var n=0, mine=unpublishedKeys();
   Object.keys(DEFAULTS).forEach(function(k){
     if(NO_SYNC[k] || !Object.prototype.hasOwnProperty.call(obj,k)) return;
     // Edited here since the last sync: keep it. Overwriting would discard work
     // with no way to get it back.
-    if(mine.indexOf(k)>=0) return;
+    if(mine.indexOf(k)>=0){
+      if(!(k==='access' && accessIsEmpty(DB.access) && !accessIsEmpty(obj.access))) return;
+      // Fall through: take the server's list, and stop calling it a local edit.
+      mine=mine.filter(function(x){ return x!=='access'; });
+    }
     // Same per-key type check as loadDB: a wrong shape from the server must not
     // blank a view.
     if(Object.prototype.toString.call(obj[k])===Object.prototype.toString.call(DEFAULTS[k])){
@@ -2875,7 +2975,9 @@ function fetchJSONTries(url, tries, timeoutMs){
 function refreshAccess(){
   var url=(DB.api&&DB.api.url)||'';
   if(!url) return Promise.resolve(false);
-  return fetchJSONTries(url+(url.indexOf('?')<0?'?':'&')+'content=1&site=ops')
+  // Matches pullContent: 4 tries, 12s. This runs the instant Google hands back a
+  // token, which on a phone is the moment the radio is busiest.
+  return fetchJSONTries(url+(url.indexOf('?')<0?'?':'&')+'content=1&site=ops', 4, 12000)
     .then(function(j){
       // Same guard as applyContent: a deployment answering from one slot can hand
       // back the bike site's list, and taking it would lock the Operations Officer
@@ -2935,13 +3037,28 @@ function refreshAccess(){
 
 function pullContent(){
   var url=(DB.api&&DB.api.url)||'';
-  if(!url) return Promise.resolve(false);
-  // Cache-busted. Without it the browser can answer this from a copy taken
-  // before the last appointment, and the site never learns about the new person.
-  return fetch(url+(url.indexOf('?')<0?'?':'&')+'content=1&site=ops&t='+Date.now())
-    .then(function(r){ return r.json(); })
+  // Never silent again. This returned false with no explanation, which looked
+  // identical to a server that answered with an empty list.
+  if(!url){
+    contentState.error='this device has no spreadsheet address saved';
+    refreshLoginDialog();
+    return Promise.resolve(false);
+  }
+  /* Retried, and patient, because this one call decides whether anybody can log
+     in. It is the ONLY thing that fills DB.access at boot, and it used to be a
+     bare fetch() with no timeout and no retry whose every failure became
+     `return false` — so a single hiccup on a phone left that device with an
+     empty access list for the whole session, and the login dialog then reported
+     the two managers as "No account linked" because from here that is
+     indistinguishable from nobody being appointed. It said the appointment had
+     failed when the truth was that the request had.
+
+     12s not 7s: this is 25 KB from an Apps Script container that cold-starts
+     after every new deployment, fetched over campus cellular. */
+  contentState.error='';
+  return fetchJSONTries(url+(url.indexOf('?')<0?'?':'&')+'content=1&site=ops', 4, 12000)
     .then(function(j){
-      if(!j||!j.content) return false;
+      if(!j||!j.content){ contentState.error='the server answered without any content'; return false; }
       // With no baseline yet this adopts the server copy wholesale — unpublishedKeys()
       // returns nothing without one, since there is no basis to call anything a local
       // edit. applyContent then writes the baseline. Setting it first would make every
@@ -2961,9 +3078,19 @@ function pullContent(){
       // buttons until they happen to sign in.
       restoreRole();
       if(ok) renderAll();
+      // The login dialog is built from DB.access at the moment it opens and
+      // does not watch it. Somebody who taps "Log in" before this lands — which
+      // on a phone is most people — reads a list that is empty for timing
+      // reasons and is told nobody is appointed. Rebuild it in place instead.
+      refreshLoginDialog();
       return ok;
     })
-    .catch(function(){ return false; });
+    .catch(function(e){
+      contentState.error='could not reach the spreadsheet ('+
+        (e&&e.message==='timeout'?'timed out':'connection failed')+')';
+      refreshLoginDialog();
+      return false;
+    });
 }
 
 /* Writes into the status line, finding it fresh each time. Anything that renders
@@ -3511,8 +3638,14 @@ function checkBody(fid){
         // type's item ids, so a single date per item made one kit's expiry date
         // appear on all six and hid a genuinely expired pouch behind a fresh one.
         var known=(DB.expiry||{})[expiryKey(fid,it.id)]||'';
-        h+='<div class="exprow"><label for="x-'+esc(it.id)+'">Expires</label>'+
-           '<input type="date" id="x-'+esc(it.id)+'" data-exp="'+esc(it.id)+'" value="'+esc(known)+'" '+
+        // Scoped to the form. A checkout shows its unit's TYPE contents and a
+        // contents check shows the same type, so both render the same item ids —
+        // and an unscoped "x-<item>" then appears twice in one document. The
+        // date fields still worked (paintExpiry queries inside the form host),
+        // but the <label for> in the second form pointed at the FIRST form's
+        // input, so tapping "Expires" focused a field in a different check.
+        h+='<div class="exprow"><label for="x-'+esc(fid)+'-'+esc(it.id)+'">Expires</label>'+
+           '<input type="date" id="x-'+esc(fid)+'-'+esc(it.id)+'" data-exp="'+esc(it.id)+'" value="'+esc(known)+'" '+
            'onchange="setExpiry(\''+jsq(fid)+'\',\''+jsq(it.id)+'\',this.value);onFormInput(\''+fid+'\')">'+
            '<span class="expbadge" data-expbadge="'+esc(it.id)+'"></span></div>';
       }
