@@ -693,8 +693,14 @@
     font-family:var(--font-mono);border:1px solid var(--rule-strong);border-radius:8px;
     background:var(--card);color:var(--ink)}
   .stockin::placeholder{color:var(--ink-faint)}
-  .linksel{max-width:190px;padding:5px 7px;font-size:12px;border:1px solid var(--rule);
-    border-radius:8px;background:var(--card);color:var(--ink-soft)}
+  /* Quiet until it is set: an unlinked row is a job nobody has done, not a
+     problem, so it should not shout from 24 rows at once. */
+  .linkline{margin-top:5px}
+  .linkline .linksel{max-width:100%;padding:2px 4px;font-size:11px;line-height:1.3;
+    border:0;background:transparent;color:var(--ink-faint);cursor:pointer;
+    text-overflow:ellipsis}
+  .linkline.on .linksel{color:var(--ok);font-weight:600}
+  .linkline .linksel:hover{color:var(--brand)}
   .urefill{display:flex;align-items:center;gap:6px;grid-column:1/-1;margin-top:2px;
     font-size:12.5px;text-transform:none;letter-spacing:0;color:var(--ink-mute)}
   .urefill input{width:auto;margin:0}
@@ -1086,7 +1092,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260808091217';
+var BUILD='20260808094837';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -5612,9 +5618,9 @@ function renderPeople(){
      Managers on it reads as a complete list of what you can appoint. Michaela
      went looking for supervisors, did not find a card, and correctly concluded
      there was no way to add one. A control nobody can find is not a control. */
-  h+=peopleCard('Supervisors','supervisor',
-      'Everything an Operations Officer can do, including appointing people.',
-      'Add a supervisor');
+  // No line of explanation under the heading. The card is called Supervisors and
+  // the button says Add a supervisor; anything more is my register on her page.
+  h+=peopleCard('Supervisors','supervisor','','Add a supervisor');
   h+=peopleCard('Managers',['equipment','office'],'','Add a manager');
 
   /* Bike Managers. A separate card, and separate wording, because these people
@@ -6025,12 +6031,16 @@ function addSupply(){
    wrong shelf. Set once, by the person who knows which is which. */
 function consumableSelect(rowId){
   var cur=(DB.stockLink||{})[rowId]||'';
-  return '<select class="linksel" aria-label="Which used item this refills" '+
+  // Sits under the item name as a second line, so it reads as a fact about that
+  // shelf item rather than as a control queued up next to the row's button.
+  return '<div class="linkline'+(cur?' on':'')+'">'+
+    '<select class="linksel" aria-label="What members use that takes this off the shelf" '+
     'onchange="setStockLink(\''+jsq(rowId)+'\',this.value)">'+
-    '<option value="">— nothing yet —</option>'+
+    '<option value="">Counts down: never, only when typed</option>'+
     (DB.consumables||[]).map(function(c){
-      return '<option value="'+esc(c.id)+'"'+(cur===c.id?' selected':'')+'>'+esc(c.name)+'</option>';
-    }).join('')+'</select>';
+      return '<option value="'+esc(c.id)+'"'+(cur===c.id?' selected':'')+
+             '>Counts down with: '+esc(c.name)+'</option>';
+    }).join('')+'</select></div>';
 }
 function setStockLink(rowId,cid){
   DB.stockLink=DB.stockLink||{};
@@ -6074,28 +6084,28 @@ function renderInventory(){
   // "Uses" said nothing on its own, and "— not linked —" read like an error
   // rather than a job. Both now say what the column is for and what pressing it
   // achieves, because this is the one control that makes the counts move.
-  h+='<p class="invhow">Link a shelf item to what members pick on a post-call and '+
-     'its count drops by itself when that item is used. Unlinked rows still work — '+
-     'their count is only ever what somebody types.</p>';
+  /* The link belongs with the ITEM, not in a column of its own. As a seventh
+     column it sat immediately beside the Restocked button, so a dropdown and a
+     button that have nothing to do with each other read as one control — and
+     the row had seven things competing across it. It is a property of the shelf
+     item, so it lives under the item's name and the row keeps one action. */
   h+='<div class="invwrap"><table class="invtable"><thead><tr>'+
-     '<th>Item</th><th>Category</th><th>Have</th><th>Par</th><th></th>'+
-     '<th>Goes down when members use</th><th></th>'+
+     '<th>Item</th><th>Category</th><th>Have</th><th>Par</th><th></th><th></th>'+
      '</tr></thead><tbody>';
   Object.keys(groups).forEach(function(loc){
-    h+='<tr class="grp"><td colspan="7">'+esc(loc)+'</td></tr>';
+    h+='<tr class="grp"><td colspan="6">'+esc(loc)+'</td></tr>';
     groups[loc].forEach(function(i){
       var cur=stockOf(i.id), low=belowPar(i);
       var cls = cur==null ? '' : (low?'bad':'good');
       var txt = cur==null ? '—' : (low?'Short':'OK');
       // The count is typed straight into the row. A dialog per item is four taps
       // for a number somebody is reading off a shelf with the box still in hand.
-      h+='<tr><td>'+esc(i.item)+'</td><td>'+esc(i.cat)+'</td>'+
+      h+='<tr><td>'+esc(i.item)+consumableSelect(i.id)+'</td><td>'+esc(i.cat)+'</td>'+
          '<td class="num"><input class="stockin" type="number" min="0" step="1" inputmode="numeric" '+
            'value="'+(cur==null?'':esc(String(cur)))+'" placeholder="—" aria-label="How many of '+
            esc(i.item)+'" onchange="setStock(\''+jsq(i.id)+'\',this.value)"></td>'+
          '<td class="num">'+esc(String(i.par))+'</td>'+
          '<td><span class="expbadge '+cls+'">'+esc(txt)+'</span></td>'+
-         '<td>'+consumableSelect(i.id)+'</td>'+
          '<td><button class="btn xs'+(low?' on':'')+'" onclick="restocked(\''+jsq(i.id)+'\')">Restocked</button></td>'+
          '</tr>';
     });
