@@ -678,6 +678,15 @@
   .dpwho{margin-top:12px;font-size:12px;color:var(--ink-faint)}
   .dpwho summary{cursor:pointer}
   .dpwho ul{margin:8px 0 0;padding-left:18px}
+  /* The tracker page stacks a card, two control rows and a printed grid. Left
+     to the default margins they sat at four different distances from each
+     other, which is what "the spacing looks awkward" was. One rhythm now. */
+  .trackpick{align-items:center;gap:10px;margin:22px 0 12px}
+  .trackpick label{margin:0}
+  .trackpick select{width:auto;min-width:190px}
+  .trackhead{margin-top:26px}
+  .tracker .slot.done{font-family:var(--font-mono);font-size:12px;text-align:center;
+    color:var(--ink);background:var(--ok-wash)}
 
   /* ---------- stock ---------- */
   .stockin{width:70px;padding:5px 7px;font-size:13px;text-align:right;
@@ -804,6 +813,22 @@
     .qrcard .qrlink{font-size:11px;padding-top:26px}
   }
 </style>
+
+<!-- GoatCounter. Counts are Michaela's own, at mbocksta.goatcounter.com.
+
+     Chosen over the obvious alternative on purpose: it sets no cookies, records
+     no advertising identifier, and keeps no per-person profile — which matters
+     because the people counted here are students filing a duty-period task, not
+     an audience, and they cannot meaningfully consent to being measured. Nothing
+     it stores can be traced back to a member.
+
+     `data-goatcounter-settings` turns OFF the automatic pageview: this is a
+     hash-routed single page, so the automatic one fires once on load and then
+     never again, which would report every session as a single visit to whatever
+     view happened to be first. go() reports each view instead. -->
+<script data-goatcounter="https://mbocksta.goatcounter.com/count"
+        data-goatcounter-settings='{"no_onload":true,"allow_local":false}'
+        async src="//gc.zgo.at/count.js"></script>
 </head>
 
 <body>
@@ -1061,7 +1086,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260808090729';
+var BUILD='20260808091217';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -3347,6 +3372,7 @@ function go(v,fromHash){
   if(v==='expiring') renderExpiring();
   // Derived from DB.dutyPeriods, which every room check writes to.
   if(v==='tracker') renderTracker();
+  countView(v);
   // Arriving at a form is when to fill in who this is. The forms are rendered
   // once at startup and only shown by go(), so doing it at render time meant it
   // ran before anybody had filed anything and never again — the second check of
@@ -4616,6 +4642,53 @@ function renderRooms(){
 }
 
 /* ============================================================================
+   COUNTING USE — GoatCounter
+   ==========================================================================*/
+
+/* One count per view arrived at, because a hash-routed page otherwise reports a
+   whole shift as a single visit to whatever loaded first.
+
+   What is deliberately NOT sent: the role, the call sign, the Andrew ID, the
+   duty period, or anything else identifying. GoatCounter would happily take it
+   and it would answer better questions — but the people being counted are
+   students doing a required task, and a site that quietly records which member
+   opened which room's checklist is a different thing from a site that counts
+   how many checks got filed. The path and nothing else. */
+function countView(v){
+  try{
+    if(!window.goatcounter || !window.goatcounter.count) return;
+    window.goatcounter.count({path:'/'+(v||'home'), title:'Ops · '+(v||'home'), event:false});
+  }catch(e){}
+}
+
+/* How long a visit lasted, bucketed. Sent once, on the way out.
+
+   Bucketed rather than exact for the same reason as above: "somebody was on the
+   site for 2–5 minutes" is the answer to the question, and a precise duration
+   next to a precise arrival time starts to identify a person. `sendBeacon` via
+   GoatCounter's own endpoint, because a normal request is cancelled when the
+   page goes away — and only on the FIRST hide, since a phone backgrounds and
+   returns many times in one shift. */
+var visitStart=Date.now(), visitReported=false;
+function reportVisitLength(){
+  if(visitReported) return;
+  visitReported=true;
+  try{
+    if(!window.goatcounter || !window.goatcounter.count) return;
+    var s=Math.round((Date.now()-visitStart)/1000);
+    var b = s<10?'under-10s' : s<60?'10-60s' : s<300?'1-5min' : s<900?'5-15min' : 'over-15min';
+    window.goatcounter.count({path:'session/'+b, title:'Session length', event:true});
+  }catch(e){}
+}
+if(typeof window!=='undefined'){
+  // pagehide fires on mobile Safari where unload does not.
+  window.addEventListener('pagehide', reportVisitLength);
+  document.addEventListener('visibilitychange', function(){
+    if(document.visibilityState==='hidden') reportVisitLength();
+  });
+}
+
+/* ============================================================================
    DUTY PERIODS
    ==========================================================================*/
 
@@ -5843,6 +5916,12 @@ function dpDelete(key){
     });
 }
 
+/* Which duty period the printable grid is filled in from. Deliberately NOT in
+   DB: it is which sheet this person is looking at right now, not site content,
+   and it must not travel to anybody else or land in an export. */
+var trackerDP='';
+function setTrackerDP(k){ trackerDP=k||''; renderTracker(); }
+
 function renderTracker(){
   var host=document.getElementById('trackerHost'); if(!host) return;
   var maxSlots=0; DB.rooms.forEach(function(r){ if(r.slots>maxSlots) maxSlots=r.slots; });
@@ -5853,11 +5932,25 @@ function renderTracker(){
   // mid-shift. The paper one is now a fallback rather than the only record.
   h+='<div class="noprint">'+dutyPeriodsHTML()+'</div>';
 
+  /* The grid can now be printed against a duty period rather than blank, so the
+     sheet that goes on the wall already shows who has done what. A blank one is
+     still the default at the start of a period, and still what you want if the
+     board is being filled in by hand. */
+  var keys=dpKeysThisYear();
+  if(trackerDP && keys.indexOf(trackerDP)<0) trackerDP='';
+  h+='<div class="row noprint trackpick"><label for="trackDp">Show</label>'+
+     '<select id="trackDp" onchange="setTrackerDP(this.value)">'+
+     '<option value="">A blank sheet</option>'+
+     keys.map(function(k){
+       return '<option value="'+esc(k)+'"'+(trackerDP===k?' selected':'')+'>'+esc(dpLabel(k))+'</option>';
+     }).join('')+'</select></div>';
+
   h+='<div class="row noprint"><button class="btn solid" onclick="window.print()">Print tracker</button>'+
      '<button class="btn ghost" onclick="go(\'qr\')">Get the QR code</button></div>';
 
-  h+='<div class="trackhead mt"><div class="th-t">CMU EMS Room Check Tracker</div>'+
-     '<div class="th-dp">DP: <b>&nbsp;</b></div></div>';
+  var fill=trackerDP?dpGet(trackerDP):null;
+  h+='<div class="trackhead"><div class="th-t">CMU EMS Room Check Tracker</div>'+
+     '<div class="th-dp">DP: <b>'+(fill?esc(String(dpParse(trackerDP).n)):'&nbsp;')+'</b></div></div>';
 
   // The shaded rows carried the whole "these take three people" signal with
   // nothing saying so, and the count of how many call signs a duty period needs
@@ -5875,10 +5968,16 @@ function renderTracker(){
   for(var i=1;i<=maxSlots;i++) h+='<th>Call sign '+i+'</th>';
   h+='</tr></thead><tbody>';
   DB.rooms.forEach(function(r){
+    var got=fill?((fill.rooms||{})[r.id]||[]):[];
     h+='<tr class="'+(r.tier==='high'?'high':'')+'"><th scope="row">'+esc(r.name)+'</th>';
     for(var k=1;k<=maxSlots;k++){
-      h+= k<=r.slots ? '<td class="slot"></td>'
-                     : '<td class="slot" style="background:var(--bg-2)"></td>';
+      if(k>r.slots){ h+='<td class="slot" style="background:var(--bg-2)"></td>'; continue; }
+      // The call sign of whoever took that slot, which is exactly what somebody
+      // writes in the box by hand. Extra checks past the slot count are not
+      // shown here — the grid has as many boxes as the room has slots, and an
+      // override is visible on the card above rather than by growing the table.
+      var e=got[k-1];
+      h+='<td class="slot'+(e?' done':'')+'">'+(e?esc(e.cs||'✓'):'')+'</td>';
     }
     h+='</tr>';
   });
@@ -5928,7 +6027,7 @@ function consumableSelect(rowId){
   var cur=(DB.stockLink||{})[rowId]||'';
   return '<select class="linksel" aria-label="Which used item this refills" '+
     'onchange="setStockLink(\''+jsq(rowId)+'\',this.value)">'+
-    '<option value="">— not linked —</option>'+
+    '<option value="">— nothing yet —</option>'+
     (DB.consumables||[]).map(function(c){
       return '<option value="'+esc(c.id)+'"'+(cur===c.id?' selected':'')+'>'+esc(c.name)+'</option>';
     }).join('')+'</select>';
@@ -5972,8 +6071,15 @@ function renderInventory(){
      '<span class="expbadge good">OK</span> at or over par'+
      '<span class="expbadge">—</span> never counted</p>';
 
+  // "Uses" said nothing on its own, and "— not linked —" read like an error
+  // rather than a job. Both now say what the column is for and what pressing it
+  // achieves, because this is the one control that makes the counts move.
+  h+='<p class="invhow">Link a shelf item to what members pick on a post-call and '+
+     'its count drops by itself when that item is used. Unlinked rows still work — '+
+     'their count is only ever what somebody types.</p>';
   h+='<div class="invwrap"><table class="invtable"><thead><tr>'+
-     '<th>Item</th><th>Category</th><th>Have</th><th>Par</th><th></th><th>Uses</th><th></th>'+
+     '<th>Item</th><th>Category</th><th>Have</th><th>Par</th><th></th>'+
+     '<th>Goes down when members use</th><th></th>'+
      '</tr></thead><tbody>';
   Object.keys(groups).forEach(function(loc){
     h+='<tr class="grp"><td colspan="7">'+esc(loc)+'</td></tr>';
