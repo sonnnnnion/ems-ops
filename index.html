@@ -721,15 +721,10 @@
   .qrcard .qrkicker{font-size:10px;text-transform:uppercase;letter-spacing:.16em;
     color:var(--brand);font-weight:700}
   .qrcard h3{margin:6px 0 3px;font-family:var(--font-display);font-size:19px;line-height:1.2;color:#111}
-  .qrcard .qrwho{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#666;
-    margin-bottom:14px}
-  .qrcard .qrframe{padding:10px;background:#fff;border:1px solid var(--rule);border-radius:10px}
+  .qrcard .qrframe{margin-top:14px;padding:10px;background:#fff;border:1px solid var(--rule);border-radius:10px}
   .qrcard .qrsvg{max-width:100%;height:auto;display:block}
-  .qrcard .qrhow{font-size:12px;color:#444;margin-top:12px}
   .qrcard .qrlink{font-family:var(--font-mono);font-size:10px;color:#777;word-break:break-all;
-    margin-top:8px}
-  .qrcard .qrfoot{margin-top:auto;padding-top:12px;font-size:10px;letter-spacing:.12em;
-    text-transform:uppercase;color:#999}
+    margin-top:auto;padding-top:12px}
 
   @media print{
     .sidebar,.topbar,.navtoggle,.noprint,.navscrim{display:none !important}
@@ -761,12 +756,9 @@
     .qrcard:last-child{break-after:auto;page-break-after:auto}
     .qrcard .qrkicker{font-size:12.5px;letter-spacing:.24em}
     .qrcard h3{font-size:42px;margin:12px 0 8px}
-    .qrcard .qrwho{font-size:15px;letter-spacing:.1em;margin-bottom:32px;color:#333}
-    .qrcard .qrframe{border:0;padding:0}
+    .qrcard .qrframe{border:0;padding:0;margin-top:32px}
     .qrcard .qrsvg{width:4.5in;height:4.5in}
-    .qrcard .qrhow{font-size:17px;margin-top:30px;color:#222}
-    .qrcard .qrlink{font-size:11px;margin-top:14px}
-    .qrcard .qrfoot{margin-top:34px;padding-top:0;font-size:11px}
+    .qrcard .qrlink{font-size:11px;padding-top:26px}
   }
 </style>
 </head>
@@ -1017,7 +1009,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260807000739';
+var BUILD='20260807210205';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -1476,7 +1468,7 @@ var DEFAULTS={
      older seed, so a corrected bag list actually reaches people instead of
      sitting behind whatever they cached weeks ago. Their own data — submissions,
      the To Get list, the spreadsheet link, who has access — is never touched. */
-  seed:8,
+  seed:9,
 
   // ONE Apps Script Web App in front of ONE spreadsheet. Every form writes to
   // its own tab in that file, so Equipment and Office data sit side by side and
@@ -1485,7 +1477,12 @@ var DEFAULTS={
   // all: nothing pulled the published content, so everyone saw the built-in
   // defaults, and nothing could be published back. Site Settings is per-browser,
   // so pasting it there only ever fixed it for one person.
-  api:{url:'https://script.google.com/macros/s/AKfycbywonXptEPr_o-OKQZvwYv3cAoX8plAjtlT81r2JKPvoEkX6L4EyRYoV_QJo3b52k7b/exec'},
+  // `url` is the Web App that receives every submission. `sheet` is only a
+  // convenience link for managers — it opens the spreadsheet those rows land in,
+  // and it shipped empty, so "Open the spreadsheet" answered "Not linked" on
+  // every device including the officer's.
+  api:{url:'https://script.google.com/macros/s/AKfycbywonXptEPr_o-OKQZvwYv3cAoX8plAjtlT81r2JKPvoEkX6L4EyRYoV_QJo3b52k7b/exec',
+       sheet:'https://docs.google.com/spreadsheets/d/10tSeuadmMoUvt-JdCYXktzFY88n9b64DzK1UkNtwV3U/edit'},
 
   /* ---------- who gets in -----------------------------------------------
      `officer` is the shared operations account. Everything else is assigned by
@@ -1699,7 +1696,7 @@ var DEFAULTS={
      ]},
 
     /* ---- Blue Bag: bagcontents.pdf ---- */
-    {id:'blue', name:'Blue Bag', active:true, where:'Equipment room',
+    {id:'blue', name:'Blue Bag', active:true, where:'Squad car trunk',
      photos:['bluebag-aed','bluebag-open'], note:'',
      sections:[
        {name:'Front', items:[
@@ -1872,7 +1869,10 @@ var DEFAULTS={
     {id:'ev-4', name:'Event Bag 4', type:'event', active:true},
     {id:'ev-5', name:'Event Bag 5', type:'event', active:true},
     {id:'u-medpod', ready:false, name:'CC Pod', type:'medpod', active:true},
-    {id:'u-blue', name:'Blue Bag', type:'blue', active:true},
+    // ready:false like the other three supervisor-checked kits. It is not taken
+    // out on a shift, so a readiness board that listed it was answering a
+    // question nobody asks and burying the bags that are.
+    {id:'u-blue', ready:false, name:'Blue Bag', type:'blue', active:true},
     {id:'u-specialty', ready:false, name:'Specialty Bag', type:'specialty', active:true},
     {id:'u-mci', ready:false, name:'MCI Bag', type:'mci', active:true},
     {id:'u-squad', ready:false, name:'Squad Car', type:'squad', active:true, need:'equipment'}
@@ -2176,11 +2176,13 @@ function loadDB(){
 
      So adopt the shipped endpoint whenever the stored one is blank. A URL that
      was deliberately changed is not blank, so this cannot undo one. */
-  if(!(DB.api&&DB.api.url) && DEFAULTS.api && DEFAULTS.api.url){
-    DB.api=DB.api||{};
-    DB.api.url=DEFAULTS.api.url;
-    stale=true;
-  }
+  DB.api=DB.api||{};
+  ['url','sheet'].forEach(function(slot){
+    if(!DB.api[slot] && DEFAULTS.api && DEFAULTS.api[slot]){
+      DB.api[slot]=DEFAULTS.api[slot];
+      stale=true;
+    }
+  });
   if(stale) saveDB();
 }
 function saveDB(){
@@ -3252,12 +3254,14 @@ var FORMS={
     pick:{key:'unit', label:'Which one are you taking?', from:'units'},
     extras:[{id:'detail', label:'Anything damaged or not working?'}]
   },
-  // The deeper audit: same engine, picks a kit TYPE and adds the seal field.
+  // The deeper audit: same engine, but picks a kit TYPE rather than a unit.
   'bag-check':{
     host:'bagCheckHost', tab:'Bag Checks',
     who:{callsign:true,name:true,andrew:true},
     pick:{key:'bag', label:'Which kit?', from:'bags'},
-    extras:[{id:'seal', label:'Seal number, if this kit is sealed', hint:'Squad car kits only.'}]
+    // No seal field: the agency does not seal its kits, so it asked every
+    // contents check for a number that does not exist.
+    extras:[]
   },
   'post-call':{
     host:'postCallHost', tab:'Post-Call',
@@ -3265,10 +3269,15 @@ var FORMS={
     fixed:'postCall',
     // The structured bit. Item, how many, which unit it came out of — all
     // picked, none typed, so the buy-list can actually be summed.
-    usage:{label:'What did you use, and from where?'+
-                'so a rough count is far more useful than a blank.'},
+    usage:{label:'What did you use, and from where?'},
+    // "Anything you could not replace?" assumed the member restocks the bag.
+    // They do not — the Equipment Manager does — so it was asking everybody to
+    // account for something that was never their job, and the honest answer was
+    // always "all of it". Asked the other way round and optional: naming what
+    // you DID put back is the exception worth recording, and it is what keeps
+    // that item off the buy list.
     extras:[{id:'callnum', label:'Call number',  short:true},
-            {id:'short', label:'Anything you could not replace?'}]
+            {id:'replaced', label:'Anything you replaced yourself? (optional)'}]
   },
   'report':{
     host:'reportHost', tab:'Reports',
@@ -4151,14 +4160,27 @@ function doSubmit(fid,s){
       });
     }
     // Free text is always a real report, on every form — somebody chose to type it.
-    [['restock','Office'],['maint','Office'],['short','Equipment']].forEach(function(pair){
+    [['restock','Office'],['maint','Office']].forEach(function(pair){
       var v=s.extras[pair[0]];
       if(!v) return;
       var ar=(c.tab==='Room Checks')?pair[1]:area;
       addIssue({area:ar, urgency:'Soon', what:v, where:s.pickName, unit:unitId, by:openedBy});
-      // "restock" and "could not replace" are both requests to buy something.
+      // A restock request is a request to buy something. Maintenance is not.
       if(pair[0]!=='maint') wantItem({name:v, cat:ar, where:s.pickName, by:openedBy});
     });
+    /* `replaced` is the OPPOSITE of the field it grew out of. `short` meant
+       "could not replace", so it was a request to buy; this names what the
+       member already put back, so it must never reach the buy list — adding it
+       would order a second one of the only thing that is not missing.
+
+       It is still worth recording: it is the sole account of stock moving
+       without the Equipment Manager touching it, and it is what Stage 5 reads
+       to leave that item's count alone. Logged, not bought. */
+    if(s.extras.replaced){
+      addIssue({area:'Equipment', urgency:'Whenever',
+                what:'Replaced after a call: '+s.extras.replaced,
+                where:s.pickName, unit:unitId, by:openedBy});
+    }
   }
 
   lastResult[fid]={sent:sent, url:!!url, s:s, tab:c.tab};
@@ -5183,10 +5205,14 @@ function delPerson(i){
 // Every one of these lands on a MEMBER-visible view. A code that opens a view a
 // member cannot reach would send whoever scanned it to the home page, which
 // reads as a broken sticker.
+/* No hang-location line. It was printed ON the sticker, which tells somebody
+   where to put a thing they are already standing in front of — and on a code
+   that has to be read at arm's length, every line that is not the title or the
+   address is competing with the two that are. */
 var QR_TARGETS=[
-  {view:'checkout',   title:'Check Out a Bag',   who:'Radio room, and the equipment room shelf'},
-  {view:'room-check', title:'Room Check',        who:'Post on the tracker board'},
-  {view:'post-call',  title:'After a Call',      who:'Radio room, by the kit shelf'}
+  {view:'checkout',   title:'Check Out a Bag'},
+  {view:'room-check', title:'Room Check'},
+  {view:'post-call',  title:'After a Call'}
 ];
 
 function renderQR(){
@@ -5209,11 +5235,12 @@ function renderQR(){
     h+='<div class="qrcard">'+
        '<div class="qrkicker">CMU EMS · Operations</div>'+
        '<h3>'+esc(t.title)+'</h3>'+
-       '<div class="qrwho">'+esc(t.who)+'</div>'+
        '<div class="qrframe">'+qrSVG(url,230)+'</div>'+
-       '<div class="qrhow">Point your phone camera at this code.</div>'+
+       // Nothing under the code but the address it encodes. "Point your phone
+       // camera at this code" and "no app, and no login" were both telling a
+       // reader something they already know from seeing a QR code, on a sticker
+       // where every line competes with the one thing it is for.
        '<div class="qrlink">'+esc(url)+'</div>'+
-       '<div class="qrfoot">No app, and no login, to file one</div>'+
        '</div>';
   });
   h+='</div>';
@@ -5761,6 +5788,9 @@ function renderSettings(){
     // "do it again" for when the script has been redeployed, not a step.
     '<div class="row"><button class="btn solid" onclick="saveApi()">Save</button>'+
     '<button class="btn ghost" onclick="testApi()">Test connection</button>'+
+    // The link is two clicks away otherwise: read the field, copy it, paste it.
+    // This is the view a manager is already on when they want the sheet.
+    '<button class="btn ghost" onclick="openSheet()">Open the spreadsheet</button>'+
     '<button class="btn ghost" onclick="pushNames()">Resend item names</button>'+
     '<span id="apiMsg" style="font-size:13px"></span></div></div>';
 

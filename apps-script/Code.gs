@@ -25,14 +25,20 @@ var SHEETS = {
   },
   'Bag Checks': {
     name: 'Bag Checks', freeze: 3,
-    keys:    ['date','time','name','andrew','subject','result','missingCount','expired','expiringSoon','seal','sid'],
-    headers: ['Date','Time','Name','Andrew ID','Bag','Result','Missing','Expired','Expiring Soon','Seal','Submission ID'],
-    widths:  [95, 70, 150, 100, 150, 150, 80, 220, 220, 100, 120]
+    // No Seal column: the agency does not seal its kits, so the form stopped
+    // asking for a number that does not exist.
+    keys:    ['date','time','name','andrew','subject','result','missingCount','expired','expiringSoon','sid'],
+    headers: ['Date','Time','Name','Andrew ID','Bag','Result','Missing','Expired','Expiring Soon','Submission ID'],
+    widths:  [95, 70, 150, 100, 150, 150, 80, 220, 220, 120]
   },
   'Post-Call': {
     name: 'Post-Call', freeze: 3,
-    keys:    ['date','time','name','callnum','result','usageCount','usageText','short','usageJson','sid'],
-    headers: ['Date','Time','Name','Call Number','Result','Units Used','What Was Used','Could Not Replace','Used (data)','Submission ID'],
+    // `replaced` reverses the old `short` ("Could Not Replace"). Members do not
+    // restock, so the old column asked everybody to account for something that
+    // was never their job and the honest answer was always "all of it". This
+    // records the exception instead: what they put back themselves.
+    keys:    ['date','time','name','callnum','result','usageCount','usageText','replaced','usageJson','sid'],
+    headers: ['Date','Time','Name','Call Number','Result','Units Used','What Was Used','Replaced By Member','Used (data)','Submission ID'],
     widths:  [95, 70, 150, 110, 150, 90, 380, 260, 200, 120]
   },
   'Reports': {
