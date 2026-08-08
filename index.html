@@ -678,6 +678,24 @@
   .dpwho{margin-top:12px;font-size:12px;color:var(--ink-faint)}
   .dpwho summary{cursor:pointer}
   .dpwho ul{margin:8px 0 0;padding-left:18px}
+
+  /* ---------- stock ---------- */
+  .stockin{width:70px;padding:5px 7px;font-size:13px;text-align:right;
+    font-family:var(--font-mono);border:1px solid var(--rule-strong);border-radius:8px;
+    background:var(--card);color:var(--ink)}
+  .stockin::placeholder{color:var(--ink-faint)}
+  .linksel{max-width:190px;padding:5px 7px;font-size:12px;border:1px solid var(--rule);
+    border-radius:8px;background:var(--card);color:var(--ink-soft)}
+  .urefill{display:flex;align-items:center;gap:6px;grid-column:1/-1;margin-top:2px;
+    font-size:12.5px;text-transform:none;letter-spacing:0;color:var(--ink-mute)}
+  .urefill input{width:auto;margin:0}
+  /* Small, quiet, and next to the thing it refers to. Loud enough to find,
+     never loud enough to compete with the item itself. */
+  .lowbtn{font:inherit;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;
+    padding:1px 7px;margin-left:6px;border:1px solid var(--rule-strong);border-radius:999px;
+    background:var(--card);color:var(--ink-faint);cursor:pointer;vertical-align:middle}
+  .lowbtn:hover{border-color:var(--warn);color:var(--warn)}
+  @media(max-width:640px){ .lowbtn{min-height:26px;padding:2px 10px} }
   @media(max-width:520px){
     /* On a phone the head is already tight; the chip drops under the name
        rather than squeezing it to two characters. */
@@ -1043,7 +1061,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260807213137';
+var BUILD='20260807214017';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -2143,7 +2161,30 @@ var DEFAULTS={
      In neither SEEDED nor NO_SYNC: it is the record of a term's work, so it
      must survive a content re-seed and it must reach everyone — the whole point
      is that the next person on can see what is left. */
-  dutyPeriods:{}
+  dutyPeriods:{},
+
+  /* WHAT IS ACTUALLY ON THE SHELF
+     ------------------------------------------------------------------------
+     `stock` is inventoryRowId -> count. Par lives on the inventory row, which
+     is shipped content; the COUNT never is. The repo is public, so a live
+     medication count cannot go in it — this is user data, synced through the
+     Apps Script like every other shared key, and it is why counts are typed on
+     the site rather than committed to it.
+
+     In neither SEEDED nor NO_SYNC: it must survive a content re-seed and it
+     must reach everyone, or two managers hold different numbers for one shelf.
+
+     `stockLink` is inventoryRowId -> consumable id, and it ships EMPTY on
+     purpose. A post-call names what was used from the CONSUMABLES list; the
+     inventory is a different list, written by somebody else, and the two share
+     not one name between them — 0 of 24 rows match, checked rather than
+     assumed. Guessing that "Naloxone syringes 2 mg / 2 mL" is the same row as
+     "Naloxone" is exactly the kind of invention that put a jumpkit photo on a
+     trauma bag. So the Equipment Manager maps them once, from the inventory
+     screen, and the shelf count starts moving by itself the moment they do.
+     An unmapped row simply does not auto-decrement; nothing breaks. */
+  stock:{},
+  stockLink:{}
 };
 
 
@@ -3362,14 +3403,12 @@ var FORMS={
     // The structured bit. Item, how many, which unit it came out of — all
     // picked, none typed, so the buy-list can actually be summed.
     usage:{label:'What did you use, and from where?'},
-    // "Anything you could not replace?" assumed the member restocks the bag.
-    // They do not — the Equipment Manager does — so it was asking everybody to
-    // account for something that was never their job, and the honest answer was
-    // always "all of it". Asked the other way round and optional: naming what
-    // you DID put back is the exception worth recording, and it is what keeps
-    // that item off the buy list.
-    extras:[{id:'callnum', label:'Call number',  short:true},
-            {id:'replaced', label:'Anything you replaced yourself? (optional)'}]
+    // No free-text "did you replace anything?" here. It began as "anything you
+    // could not replace", which assumed the member restocks the bag — they do
+    // not — and asking it the other way round still could not say WHICH of four
+    // items went back, so nothing could act on the answer. It is a tick against
+    // each item instead, on the usage row itself. See `refilled`.
+    extras:[{id:'callnum', label:'Call number',  short:true}]
   },
   'report':{
     host:'reportHost', tab:'Reports',
@@ -3604,6 +3643,14 @@ function renderUsage(fid){
       '<select aria-label="Where from" onchange="setUsage(\''+fid+'\','+i+',\'from\',this.value)">'+unitOpts+'</select>'+
       '<button class="btn xs" type="button" aria-label="Remove this row" '+
         'onclick="delUsageRow(\''+fid+'\','+i+')">✕</button>'+
+      /* Per row, not one box for the whole form. "Did you replace anything?" as
+         a single free-text field cannot say WHICH of four items went back, so
+         nothing could act on the answer. A tick against the item itself is the
+         thing the buy-list needs: refilled means do not order it and do not
+         take it off the shelf count. */
+      '<label class="urefill"><input type="checkbox"'+(r.refilled?' checked':'')+
+        ' onchange="setUsage(\''+fid+'\','+i+',\'refilled\',this.checked)">'+
+        '<span>Refilled it</span></label>'+
     '</div>';
   }).join('');
 }
@@ -3615,7 +3662,8 @@ var USAGE_MAX=999;
 function setUsage(fid,i,k,v){
   var rows=usageState(fid);
   if(!rows[i]) return;
-  rows[i][k] = (k==='qty') ? Math.min(USAGE_MAX,Math.max(1,parseInt(v,10)||1)) : v;
+  rows[i][k] = (k==='qty') ? Math.min(USAGE_MAX,Math.max(1,parseInt(v,10)||1))
+             : (k==='refilled') ? !!v : v;
   // Re-render on item change (the unit label depends on it) but NOT while
   // someone is typing a custom name, or the field loses focus each keystroke.
   if(k==='item') renderUsage(fid);
@@ -3821,11 +3869,11 @@ function readCheck(fid){
       var txt=(r.other||'').trim();
       // Keyed by the text itself, so two people typing the same thing still sum.
       return {item:'free:'+txt.toLowerCase(), itemName:txt, qty:r.qty||1,
-              unit:'', from:r.from, fromName:un.name||r.from};
+              unit:'', from:r.from, fromName:un.name||r.from, refilled:!!r.refilled};
     }
     var it=(DB.consumables||[]).filter(function(x){return x.id===r.item;})[0]||{};
     return {item:r.item, itemName:it.name||r.item, qty:r.qty||1,
-            unit:it.unit||'', from:r.from, fromName:un.name||r.from};
+            unit:it.unit||'', from:r.from, fromName:un.name||r.from, refilled:!!r.refilled};
   });
   return out;
 }
@@ -4253,6 +4301,10 @@ function doSubmit(fid,s){
     payload.usageJson=JSON.stringify(s.usage.map(function(r){
       return {i:r.item,q:r.qty,f:r.from}; }));
     payload.usageCount=s.usage.reduce(function(a,r){return a+r.qty;},0);
+    // The sheet's "Replaced By Member" column, built from the ticks rather than
+    // from a free-text box, so it names actual items.
+    payload.replaced=s.usage.filter(function(r){return r.refilled;})
+      .map(function(r){ return r.itemName+(r.qty>1?' x'+r.qty:''); }).join(' | ');
     // Local mirror, so reports work before the backend exists.
     var stamp=Date.now();
     s.usage.forEach(function(r){
@@ -4261,11 +4313,23 @@ function doSubmit(fid,s){
         call:s.extras.callnum||'', by:(s.first+' '+s.last).trim()||s.callsign||''});
     });
     if(DB.usage.length>2000) DB.usage.length=2000;
-    // Anything used is something to replace, so it goes straight on the list.
+    // Anything used is something to replace — unless the member already put it
+    // back, which is the one case where ordering another would be wrong.
     s.usage.forEach(function(r){
+      if(r.refilled) return;
       wantItem({item:r.item, name:r.itemName, qty:r.qty, unit:r.unit, cat:'Equipment',
         where:r.fromName, by:(s.first+' '+s.last).trim()||s.callsign||''});
     });
+    /* Only a REFILL takes anything off the shelf, and this is the only moment
+       the site can know it did. If the member did not put it back, the bag is
+       short and the store is untouched — decrementing there too would invent a
+       second shortage from one call and order twice for it.
+
+       A refill is not the shortage disappearing, it is the shortage moving:
+       the bag is whole and the shelf is now N down, which is what the par
+       sweep below then picks up. */
+    s.usage.forEach(function(r){ if(r.refilled) stockUse(r.item, r.qty||1); });
+    stockSweep((s.first+' '+s.last).trim()||s.callsign||'');
     saveDB();
   }
 
@@ -4384,17 +4448,14 @@ function doSubmit(fid,s){
       // A restock request is a request to buy something. Maintenance is not.
       if(pair[0]!=='maint') wantItem({name:v, cat:ar, where:s.pickName, by:openedBy});
     });
-    /* `replaced` is the OPPOSITE of the field it grew out of. `short` meant
-       "could not replace", so it was a request to buy; this names what the
-       member already put back, so it must never reach the buy list — adding it
-       would order a second one of the only thing that is not missing.
-
-       It is still worth recording: it is the sole account of stock moving
-       without the Equipment Manager touching it, and it is what Stage 5 reads
-       to leave that item's count alone. Logged, not bought. */
-    if(s.extras.replaced){
+    /* What the member put back themselves, named per item rather than as free
+       text. Logged and never bought: ordering another of the one thing that is
+       not missing is the mistake this whole flag exists to prevent. */
+    var putBack=(s.usage||[]).filter(function(r){return r.refilled;});
+    if(putBack.length){
       addIssue({area:'Equipment', urgency:'Whenever',
-                what:'Replaced after a call: '+s.extras.replaced,
+                what:'Replaced after a call: '+putBack.map(function(r){
+                  return r.itemName+(r.qty>1?' x'+r.qty:''); }).join(', '),
                 where:s.pickName, unit:unitId, by:openedBy});
     }
   }
@@ -4712,6 +4773,25 @@ function editRoomTasks(id){
 /* "Last checked" for one kit type, or nothing at all if it never has been.
    Never invents a date: a kit nobody has opened says so, because "no date" and
    "checked a long time ago" need different reactions. */
+/* One tap, from wherever the item is listed. Files it as a concern AND puts it
+   on the buy list, because "we are nearly out" is both a thing to fix and a
+   thing to order — and going through the Report a Problem form to say four
+   words is why it does not get said. */
+function flagLow(bagId,itemId){
+  var b=(DB.bags||[]).filter(function(x){return x.id===bagId;})[0];
+  var label=itemId;
+  (b?(b.sections||[]):[]).forEach(function(s){
+    (s.items||[]).forEach(function(it){ if(it.id===itemId) label=it.label; });
+  });
+  var me=readMe()||{};
+  var by=(me.first?(me.first+' '+(me.last||'')).trim():'')||me.callsign||'Anonymous';
+  addIssue({area:'Equipment', urgency:'Soon', what:'Running low: '+label,
+            where:b?b.name:'', by:by});
+  wantItem({name:label, cat:'Equipment', where:b?b.name:'', by:by});
+  saveDB(); renderToGet();
+  uiAlert(label+' is flagged as low and on the To Get list.','Thanks');
+}
+
 function lastCheckedLine(bagId){
   var c=(DB.lastChecked||{})[bagId];
   if(!c||!c.at)
@@ -4756,7 +4836,14 @@ function renderBags(){
     (b.sections||[]).forEach(function(s){
       h+='<b style="display:block;margin:10px 0 4px;font-size:13px">'+esc(s.name)+'</b><ul>';
       (s.items||[]).forEach(function(it){
-        h+='<li>'+esc(it.label)+(it.qty&&it.qty!=='—'?' <span class="mono" style="font-size:12px;color:var(--ink-faint)">'+esc(it.qty)+'</span>':'')+'</li>';
+        // Anyone may say something is low, from the list they are reading while
+        // standing at the bag. Ungated on purpose: the person who notices is
+        // whoever opened it, and making them find a form is how it gets
+        // forgotten between the shelf and the door.
+        h+='<li>'+esc(it.label)+
+           (it.qty&&it.qty!=='—'?' <span class="mono" style="font-size:12px;color:var(--ink-faint)">'+esc(it.qty)+'</span>':'')+
+           ' <button class="lowbtn" title="Flag this as low" '+
+           'onclick="flagLow(\''+jsq(b.id)+'\',\''+jsq(it.id)+'\')">low</button></li>';
       });
       h+='</ul>';
     });
@@ -5031,6 +5118,69 @@ function toGetDate(t){
   if(t.remote) return String(t.last);
   var d=new Date(t.last);
   return isNaN(d.getTime())?'—':d.toLocaleDateString();
+}
+
+/* ============================================================================
+   STOCK — what is on the shelf, against what should be
+   ==========================================================================*/
+
+function invRow(id){ return (DB.inventory||[]).filter(function(r){return r.id===id;})[0]||null; }
+function stockOf(id){
+  var v=(DB.stock||{})[id];
+  return (typeof v==='number' && isFinite(v)) ? v : null;   // null = never counted
+}
+function stockSet(id,n){
+  DB.stock=DB.stock||{};
+  if(n==null || n==='') delete DB.stock[id];
+  else DB.stock[id]=Math.max(0,Math.floor(Number(n)||0));
+}
+
+/* Which inventory rows a consumable feeds. Many-to-one on purpose: the same
+   item is stocked in the CC Pod and the Blue Bag and the equipment room, and
+   using one out of a bag is a hole in whichever shelf refills it. */
+function rowsForConsumable(cid){
+  if(!cid) return [];
+  return Object.keys(DB.stockLink||{})
+    .filter(function(rid){ return DB.stockLink[rid]===cid; })
+    .map(invRow).filter(Boolean);
+}
+
+/* Take `qty` off the shelf for whatever was used. Silent when nothing is mapped
+   or nothing has ever been counted — an unmapped item is not an error, it is a
+   row the Equipment Manager has not linked yet, and inventing a starting count
+   for it would be worse than leaving it alone. */
+function stockUse(consumableId,qty){
+  var rows=rowsForConsumable(consumableId);
+  if(!rows.length) return false;
+  var touched=false;
+  rows.forEach(function(r){
+    var cur=stockOf(r.id);
+    if(cur==null) return;
+    stockSet(r.id, cur-(qty||1));
+    touched=true;
+  });
+  return touched;
+}
+
+function belowPar(r){
+  var cur=stockOf(r.id);
+  return cur!=null && typeof r.par==='number' && cur<r.par;
+}
+
+/* Everything under par goes on the buy list. Runs after a post-call rather than
+   on a timer, because that is when the numbers just changed; wantItem() sums by
+   key, so a row that is still short after a second call bumps its count instead
+   of appearing twice. */
+function stockSweep(by){
+  var n=0;
+  (DB.inventory||[]).forEach(function(r){
+    if(!belowPar(r)) return;
+    var cur=stockOf(r.id);
+    wantItem({name:r.item, cat:r.cat||'Equipment', qty:Math.max(1,(r.par||0)-cur),
+              where:r.loc||'', by:by||''});
+    n++;
+  });
+  return n;
 }
 
 /* ---- expiring, across every bag ------------------------------------------
@@ -5737,6 +5887,40 @@ function addSupply(){
 }
 
 /* ---- equipment inventory ---- */
+/* Which consumable this shelf row refills. Ships unset for every row, because
+   the two lists share no names and a guess here would silently decrement the
+   wrong shelf. Set once, by the person who knows which is which. */
+function consumableSelect(rowId){
+  var cur=(DB.stockLink||{})[rowId]||'';
+  return '<select class="linksel" aria-label="Which used item this refills" '+
+    'onchange="setStockLink(\''+jsq(rowId)+'\',this.value)">'+
+    '<option value="">— not linked —</option>'+
+    (DB.consumables||[]).map(function(c){
+      return '<option value="'+esc(c.id)+'"'+(cur===c.id?' selected':'')+'>'+esc(c.name)+'</option>';
+    }).join('')+'</select>';
+}
+function setStockLink(rowId,cid){
+  DB.stockLink=DB.stockLink||{};
+  if(cid) DB.stockLink[rowId]=cid; else delete DB.stockLink[rowId];
+  saveDB(); renderInventory();
+}
+function setStock(rowId,v){
+  stockSet(rowId, v===''?null:v);
+  saveDB(); renderInventory(); renderToGet();
+}
+/* Back to par, which is what restocking means. Typing a different number is one
+   more tap for the case where the box that arrived was not a full one. */
+function restocked(rowId){
+  var r=invRow(rowId); if(!r) return;
+  uiPrompt('How many are on the shelf now?', String(r.par||0),
+           'Restocked '+r.item, {okText:'Save'})
+    .then(function(v){
+      if(v==null) return;
+      stockSet(rowId, v);
+      saveDB(); renderInventory(); renderToGet();
+    });
+}
+
 function renderInventory(){
   var host=document.getElementById('inventoryHost'); if(!host) return;
   var h='';
@@ -5744,12 +5928,36 @@ function renderInventory(){
   var groups={};
   DB.inventory.forEach(function(i){ (groups[i.loc]=groups[i.loc]||[]).push(i); });
 
+  var short=(DB.inventory||[]).filter(belowPar).length;
+  var counted=(DB.inventory||[]).filter(function(r){return stockOf(r.id)!=null;}).length;
+  h+='<div class="repgrid">'+
+     '<div class="repstat"><div class="rs-n">'+short+'</div><div class="rs-l">below par</div></div>'+
+     '<div class="repstat"><div class="rs-n">'+counted+' / '+(DB.inventory||[]).length+
+     '</div><div class="rs-l">counted</div></div></div>';
+  h+='<p class="explegend"><span class="expbadge bad">Short</span> under par'+
+     '<span class="expbadge good">OK</span> at or over par'+
+     '<span class="expbadge">—</span> never counted</p>';
+
   h+='<div class="invwrap"><table class="invtable"><thead><tr>'+
-     '<th>Item</th><th>Category</th><th>Par</th></tr></thead><tbody>';
+     '<th>Item</th><th>Category</th><th>Have</th><th>Par</th><th></th><th>Uses</th><th></th>'+
+     '</tr></thead><tbody>';
   Object.keys(groups).forEach(function(loc){
-    h+='<tr class="grp"><td colspan="3">'+esc(loc)+'</td></tr>';
+    h+='<tr class="grp"><td colspan="7">'+esc(loc)+'</td></tr>';
     groups[loc].forEach(function(i){
-      h+='<tr><td>'+esc(i.item)+'</td><td>'+esc(i.cat)+'</td><td class="num">'+esc(String(i.par))+'</td></tr>';
+      var cur=stockOf(i.id), low=belowPar(i);
+      var cls = cur==null ? '' : (low?'bad':'good');
+      var txt = cur==null ? '—' : (low?'Short':'OK');
+      // The count is typed straight into the row. A dialog per item is four taps
+      // for a number somebody is reading off a shelf with the box still in hand.
+      h+='<tr><td>'+esc(i.item)+'</td><td>'+esc(i.cat)+'</td>'+
+         '<td class="num"><input class="stockin" type="number" min="0" step="1" inputmode="numeric" '+
+           'value="'+(cur==null?'':esc(String(cur)))+'" placeholder="—" aria-label="How many of '+
+           esc(i.item)+'" onchange="setStock(\''+jsq(i.id)+'\',this.value)"></td>'+
+         '<td class="num">'+esc(String(i.par))+'</td>'+
+         '<td><span class="expbadge '+cls+'">'+esc(txt)+'</span></td>'+
+         '<td>'+consumableSelect(i.id)+'</td>'+
+         '<td><button class="btn xs'+(low?' on':'')+'" onclick="restocked(\''+jsq(i.id)+'\')">Restocked</button></td>'+
+         '</tr>';
     });
   });
   h+='</tbody></table></div>';
