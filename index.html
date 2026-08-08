@@ -653,6 +653,8 @@
   .roomchip.ok{background:var(--ok-wash);color:var(--ok);border-color:var(--ok)}
   .roomchip.stale{background:var(--warn-wash);color:var(--warn);border-color:var(--warn)}
   .roomnote{font-size:12px;color:var(--ink-faint);margin:10px 0 0}
+  .lastcheck{font-size:12px;color:var(--ink-faint);margin:2px 0 0}
+  .lastcheck.none{font-style:italic}
   @media(max-width:520px){
     /* On a phone the head is already tight; the chip drops under the name
        rather than squeezing it to two characters. */
@@ -1009,7 +1011,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260807210205';
+var BUILD='20260807210908';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -2074,7 +2076,22 @@ var DEFAULTS={
      Deliberately in neither SEEDED nor NO_SYNC: it must survive a content
      re-seed (it is her work, not shipped content) and it must reach everyone
      else (a confirmation only she can see answers nothing). */
-  roomConfirmed:{}
+  roomConfirmed:{},
+
+  /* WHEN EACH KIT WAS LAST GONE THROUGH
+     ------------------------------------------------------------------------
+     Keyed by bag TYPE id, because that is what a Full Contents Check picks.
+
+     The four supervisor-checked kits — Blue Bag, Specialty, MCI and the Squad
+     Car — are deliberately off the readiness board and deliberately outside the
+     duty-period system, which between them meant nothing on the site could
+     answer "has anybody opened the MCI bag this term". A date is the whole
+     answer and it is free: a contents check already knows which kit it just
+     finished.
+
+     In neither SEEDED nor NO_SYNC, like roomConfirmed: it records work that was
+     done, so it must survive a content re-seed and it must reach everyone. */
+  lastChecked:{}
 };
 
 
@@ -2254,11 +2271,24 @@ function resetDB(){
    is the Apps Script, which checks a real Google token server-side.
    ========================================================================== */
 var ROLE='member';
-var ROLE_LABEL={member:'Member view',equipment:'Equipment Manager',office:'Office Manager',ops:'Operations Officer'};
+/* `supervisor` carries exactly the permissions of `ops`. The difference is duty,
+   not privilege: a supervisor oversees what the agency does without running it,
+   and they are the ones who check the squad car and the three kits that live in
+   it. Michaela's call that they may appoint people too — they are senior to the
+   officer, so a gate that stopped them would be backwards.
+
+   Unlike Bike Managers, a supervisor IS a role in `access.people`. That is safe
+   here for the reason it is unsafe there: everything `can()` grants a non-member
+   is something a supervisor is meant to have. */
+var ROLE_LABEL={member:'Member view',equipment:'Equipment Manager',office:'Office Manager',
+                supervisor:'Supervisor',ops:'Operations Officer'};
 
 function can(need){
   if(!need) return true;
-  if(ROLE==='ops') return true;                    // the officer sees everything
+  // The officer and a supervisor both see everything, including `need==='ops'`
+  // — appointing people is the one thing that would otherwise be denied to a
+  // supervisor, and they are senior to the officer.
+  if(ROLE==='ops'||ROLE==='supervisor') return true;
   if(need==='mgr') return ROLE!=='member';
   return need.split(/\s+/).indexOf(ROLE)>=0;
 }
@@ -2432,8 +2462,8 @@ function setRole(r,quiet){
    under People — or the officer address is set — that role stops being free
    and starts requiring the account behind it. Same dialog either way; the
    difference is data, so nothing here changes when the accounts arrive. */
-var LOGIN_ROLES=['equipment','office','ops'];
-var LOGIN_ICON={equipment:'✚', office:'⌂', ops:'◈'};
+var LOGIN_ROLES=['equipment','office','supervisor','ops'];
+var LOGIN_ICON={equipment:'✚', office:'⌂', supervisor:'★', ops:'◈'};
 
 function roleAccounts(role){
   var out=(role==='ops') ? officerList().slice() : [];
@@ -2694,7 +2724,10 @@ function googleSignIn(wantRole){
           closeOpenModal();
           // Your address decides your role, not the row you pressed. Say so if
           // they differ rather than silently handing over something else.
-          if(res && res.role && res.role!==wantRole && !(res.role==='ops'))
+          // An officer or a supervisor already covers every role, so pressing
+          // somebody else's row is not a mismatch worth interrupting them for.
+          if(res && res.role && res.role!==wantRole &&
+             res.role!=='ops' && res.role!=='supervisor')
             uiAlert('That account is the '+ROLE_LABEL[res.role]+', not the '+
                     ROLE_LABEL[wantRole]+'. Logged in as '+ROLE_LABEL[res.role]+'.',
                     'Logged in');
@@ -4123,6 +4156,12 @@ function doSubmit(fid,s){
         where:unit.name, unit:r.from, by:openedBy});
     });
   }
+  // A contents check is the only thing that knows a whole kit was just gone
+  // through. `s.pick` is the bag TYPE id, which is what this form picks.
+  if(c.tab==='Bag Checks' && s.pick){
+    DB.lastChecked=DB.lastChecked||{};
+    DB.lastChecked[s.pick]={at:Date.now(), by:s.callsign||openedBy};
+  }
   if(false){
     // A checkout only raises a problem when the member says there is one.
     if(s.radios.condition && s.radios.condition!=='Complete'){
@@ -4390,6 +4429,20 @@ function editRoomTasks(id){
 }
 
 /* ---- bag contents ---- */
+/* "Last checked" for one kit type, or nothing at all if it never has been.
+   Never invents a date: a kit nobody has opened says so, because "no date" and
+   "checked a long time ago" need different reactions. */
+function lastCheckedLine(bagId){
+  var c=(DB.lastChecked||{})[bagId];
+  if(!c||!c.at)
+    return '<p class="lastcheck none">Not checked on the site yet</p>';
+  var d=new Date(c.at), n=daysUntil(d.getFullYear()+'-'+
+        String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'));
+  var ago = n===0 ? 'today' : (n===-1 ? 'yesterday' : Math.abs(n)+' days ago');
+  return '<p class="lastcheck">Last checked '+esc(ago)+
+         (c.by?' by '+esc(c.by):'')+'</p>';
+}
+
 function renderBags(){
   var host=document.getElementById('bagsHost'); if(!host) return;
   var h='';
@@ -4400,7 +4453,11 @@ function renderBags(){
        '<p style="font-size:13.5px;color:var(--ink-mute);margin:0 0 4px">'+esc(b.note||'')+'</p>'+
        // A bag with no fixed home says nothing, rather than "Lives in:" and a gap.
        (b.where?'<p style="font-size:12px;color:var(--ink-faint);margin:0">Lives in: '+
-                esc(b.where)+'</p>':'');
+                esc(b.where)+'</p>':'')+
+       // Shown for every kit rather than only the four that need it most: the
+       // date is a plain fact about any bag, and special-casing four ids would
+       // go stale the moment the kit list changes.
+       lastCheckedLine(b.id);
     if(b.photos&&b.photos.length){
       h+='<div class="photogrid">';
       b.photos.forEach(function(p){
@@ -5178,7 +5235,8 @@ function addPerson(){
     [{key:'email',label:'Email (their Google account)',type:'text',required:true},
      {key:'role',label:'Role',type:'select',required:true,value:'equipment',options:[
        {v:'equipment',t:'Equipment Manager'},
-       {v:'office',t:'Office Manager'}]}],{okText:'Add'})
+       {v:'office',t:'Office Manager'},
+       {v:'supervisor',t:'Supervisor'}]}],{okText:'Add'})
    .then(function(v){
      if(!v||!v.email) return;
      var e=normEmail(v.email);
@@ -5191,7 +5249,12 @@ function addPerson(){
        return;
      }
      DB.access.people=(DB.access.people||[]).filter(function(p){return normEmail(p.email)!==e;});
-     DB.access.people.push({email:e,role:(v.role==='office'?'office':'equipment')});
+     // Whitelisted, not a two-way guess. This read `v.role==='office'?'office':
+     // 'equipment'`, which silently filed anything else as an Equipment Manager
+     // — so adding the first Supervisor would have made them an equipment
+     // manager and nothing would have said so.
+     var role=['equipment','office','supervisor'].indexOf(v.role)>=0 ? v.role : 'equipment';
+     DB.access.people.push({email:e,role:role});
      saveDB(); renderPeople();
    });
 }
