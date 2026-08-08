@@ -660,6 +660,24 @@
      read as part of the page rather than as something that happened. */
   .formnote{font-size:13px;color:var(--ink-mute);margin:-4px 0 16px}
   .formnote b{color:var(--ink);font-weight:700}
+
+  /* ---------- duty periods ---------- */
+  .dpnew{font-size:12.5px;color:var(--ink-mute);margin:10px 0 0}
+  .dpopen{font-size:13px;color:var(--ink-soft);margin:10px 0 6px}
+  .dpdone{font-size:12.5px;color:var(--ok);font-weight:600;margin:8px 0 0}
+  .dplist{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
+  .dplist li{font-size:12px;background:var(--bg-2);border:1px solid var(--rule);
+    border-radius:999px;padding:3px 10px;color:var(--ink-soft)}
+  .dplist li span{font-family:var(--font-mono);font-size:11px;color:var(--ink-faint);margin-left:4px}
+  .dphead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .dphead h3{margin:0}
+  .dpcount{margin-left:auto;font-family:var(--font-mono);font-size:12.5px;color:var(--ink-faint)}
+  .dpcount.ok{color:var(--ok);font-weight:700}
+  .dpbar{height:5px;border-radius:999px;background:var(--bg-2);overflow:hidden;margin-top:10px}
+  .dpbar i{display:block;height:100%;background:var(--brand);border-radius:999px}
+  .dpwho{margin-top:12px;font-size:12px;color:var(--ink-faint)}
+  .dpwho summary{cursor:pointer}
+  .dpwho ul{margin:8px 0 0;padding-left:18px}
   @media(max-width:520px){
     /* On a phone the head is already tight; the chip drops under the name
        rather than squeezing it to two characters. */
@@ -1025,7 +1043,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260807211111';
+var BUILD='20260807213137';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -2105,7 +2123,27 @@ var DEFAULTS={
 
      In neither SEEDED nor NO_SYNC, like roomConfirmed: it records work that was
      done, so it must survive a content re-seed and it must reach everyone. */
-  lastChecked:{}
+  lastChecked:{},
+
+  /* DUTY PERIODS
+     ------------------------------------------------------------------------
+     Keyed `<academicYear>:<number>` — e.g. `2026:4` is the fourth duty period
+     of the 2026-27 year. The number is typed by whoever is on and runs
+     continuously through the year; the year is derived from the date, never
+     asked for, and rolls over in summer when the agency is not operational.
+
+     Each entry holds, per room, the call signs that have checked it:
+
+       {opened, openedBy, closed, rooms:{roomId:[{cs, at}]}}
+
+     A room needs `slots` checks per duty period, not one — the slot count on a
+     room IS how many times it gets done, and the call sign recorded in each
+     slot is whoever did that one. So "remaining" is a count, not a tick.
+
+     In neither SEEDED nor NO_SYNC: it is the record of a term's work, so it
+     must survive a content re-seed and it must reach everyone — the whole point
+     is that the next person on can see what is left. */
+  dutyPeriods:{}
 };
 
 
@@ -3266,6 +3304,8 @@ function go(v,fromHash){
   if(v==='toget'){ renderToGet(); fetchRestock().then(function(){ renderToGet(); }); }
   // Derived from DB.expiry, which any contents check can have just written.
   if(v==='expiring') renderExpiring();
+  // Derived from DB.dutyPeriods, which every room check writes to.
+  if(v==='tracker') renderTracker();
   // Arriving at a form is when to fill in who this is. The forms are rendered
   // once at startup and only shown by go(), so doing it at render time meant it
   // ran before anybody had filed anything and never again — the second check of
@@ -3284,7 +3324,12 @@ function go(v,fromHash){
 var FORMS={
   'room-check':{
     host:'roomCheckHost', tab:'Room Checks',
-    who:{callsign:true,name:true,andrew:true},
+    // No Andrew ID here. On a checkout it is the accountability record for who
+    // physically took a bag; on a room check the call sign is what the tracker
+    // has always recorded, and asking for both made the shortest form on the
+    // site the one with the most typing.
+    who:{callsign:true,name:true,andrew:false},
+    dp:true,
     pick:{key:'room', label:'Which room did you take?', from:'rooms'},
     extras:[
       {id:'restock', label:'Anything that needs restocking?'},
@@ -3430,6 +3475,20 @@ function renderCheck(fid){
        'oninput="onFormInput(\''+fid+'\')"></div>';
   }
   h+='</div>';
+
+  /* --- duty period ---
+     Its own card, above the room picker, because it is the context for the
+     whole check rather than another detail about the person filing it. The
+     number is typed: the scheduling manager decides when a duty period starts,
+     and this site is not told, so asking is the only honest way to know. */
+  if(c.dp){
+    h+='<div class="card mt"><h3>Which duty period?</h3>'+
+       '<div class="field"><label for="'+fid+'-dp">Duty period number</label>'+
+       '<input type="text" id="'+fid+'-dp" inputmode="numeric" autocomplete="off" '+
+       'placeholder="e.g. 4" oninput="onFormInput(\''+fid+'\')">'+
+       '<div id="'+fid+'-dpmsg" class="fieldmsg"></div></div>'+
+       '<div id="'+fid+'-dpstate"></div></div>';
+  }
 
   /* --- picker --- */
   if(c.pick){
@@ -3734,6 +3793,8 @@ function readCheck(fid){
   if(!host) return out;
   var g=function(s){var e=document.getElementById(fid+'-'+s);return e?e.value.trim():'';};
   out.callsign=g('cs'); out.first=g('fn'); out.last=g('ln'); out.andrew=g('aid');
+  out.dpRaw=g('dp'); out.dpN=dpNumber(out.dpRaw);
+  out.dp = out.dpN ? dpKey(out.dpN) : '';
   var rsel=document.getElementById(fid+'-radio');
   var roth=document.getElementById(fid+'-radioother');
   if(rsel){
@@ -3870,7 +3931,46 @@ function paintExpiry(fid){
   return out;
 }
 
-function onFormInput(fid){ renderAndrewMsg(fid); paintExpiry(fid); calcCheck(fid); saveDraft(fid); }
+function onFormInput(fid){ renderAndrewMsg(fid); renderDpState(fid); paintExpiry(fid); calcCheck(fid); saveDraft(fid); }
+
+/* What typing a duty period number tells you, before you commit to it.
+
+   Three answers, and they are genuinely different: a number nobody has used
+   opens a new duty period, an existing one shows what is left in it, and a
+   typo — 7 for 17 — is the case this panel exists to catch. Seeing "this will
+   start a new duty period" before pressing Submit is what stops a phantom DP
+   with fourteen empty rooms that somebody then has to find and delete. */
+function renderDpState(fid){
+  var box=document.getElementById(fid+'-dpstate'); if(!box) return;
+  var msg=document.getElementById(fid+'-dpmsg');
+  var el=document.getElementById(fid+'-dp'); if(!el) return;
+  var raw=el.value.trim(), n=dpNumber(raw);
+
+  if(msg){
+    msg.textContent = (raw && !n) ? 'A duty period is a number, like 4.' : '';
+    msg.className = 'fieldmsg'+((raw&&!n)?' bad':'');
+  }
+  if(!n){ box.innerHTML=''; return; }
+
+  var key=dpKey(n), d=dpGet(key);
+  if(!d){
+    box.innerHTML='<p class="dpnew">'+esc(dpLabel(key))+' has not been used yet. '+
+      'Filing this will start it.'+
+      (canOpenDP()?'':' Only somebody with site access can start one.')+'</p>';
+    return;
+  }
+  var rem=dpRemaining(key), t=dpTotals(key);
+  var h='<p class="dpopen"><b>'+esc(dpLabel(key))+'</b> · '+t.done+' of '+t.need+' checks done'+
+        (d.closed?' · closed':'')+'</p>';
+  if(!rem.length){
+    h+='<p class="dpdone">Every room is covered.</p>';
+  }else{
+    h+='<ul class="dplist">'+rem.map(function(r){
+      return '<li>'+esc(r.name)+' <span>'+r.done+'/'+r.need+'</span></li>';
+    }).join('')+'</ul>';
+  }
+  box.innerHTML=h;
+}
 
 /* ---- drafts ----
    Kept out of DB on purpose: a half-finished form is one person's device state,
@@ -3939,11 +4039,11 @@ function saveDraft(fid){
   var boxes=host.querySelectorAll('[data-item]');
   for(var i=0;i<boxes.length;i++) if(boxes[i].checked) ticked.push(boxes[i].getAttribute('data-item'));
   var rows=(c.usage?usageComplete(fid):[]);
-  var any = s.callsign||s.first||s.last||s.andrew||s.radio||ticked.length||s.pick||rows.length||
+  var any = s.callsign||s.first||s.last||s.andrew||s.radio||s.dpRaw||ticked.length||s.pick||rows.length||
             Object.keys(s.radios).length||Object.keys(s.extras).some(function(k){return s.extras[k];});
   if(!any){ delete d[fid]; writeDrafts(d); renderDraftNote(fid); return; }
   d[fid]={at:Date.now(),callsign:s.callsign,first:s.first,last:s.last,andrew:s.andrew,
-          radio:s.radio,
+          radio:s.radio, dpRaw:s.dpRaw,
           pick:s.pick,ticked:ticked,radios:s.radios,extras:s.extras,
           usage:rows.map(function(r){return {item:r.item,qty:r.qty,from:r.from,other:r.other||''};})};
   writeDrafts(d);
@@ -3955,6 +4055,7 @@ function restoreDraft(fid){
   var d=readDrafts()[fid]; if(!d) return;
   var set=function(s,v){var e=document.getElementById(fid+'-'+s); if(e&&v) e.value=v;};
   set('cs',d.callsign); set('fn',d.first); set('ln',d.last); set('aid',d.andrew);
+  set('dp',d.dpRaw);
   if(d.radio){
     var rs=document.getElementById(fid+'-radio');
     if(rs){
@@ -3991,6 +4092,9 @@ function restoreDraft(fid){
     if(kept.length){ usageRows[fid]=kept.map(function(r){
       return {item:r.item,qty:r.qty||1,from:r.from,other:r.other||''}; }); renderUsage(fid); }
   }
+  // The duty-period panel is derived from the field, so restoring the field
+  // without repainting it leaves a filled-in number with nothing under it.
+  renderDpState(fid);
   renderDraftNote(fid);
 }
 
@@ -4021,6 +4125,7 @@ function submitCheck(fid){
   var c=fcfg(fid), s=readCheck(fid), missing=[];
   if(c.who.callsign && !s.callsign) missing.push('your call sign');
   if(c.who.name && !(s.first&&s.last)) missing.push('your name');
+  if(c.dp && !s.dpN) missing.push('which duty period this is');
   if(c.who.radio && !s.radio) missing.push('which radio you have');
   if(c.pick && !s.pick) missing.push(
     c.pick.from==='rooms' ? 'which room you took'
@@ -4056,7 +4161,54 @@ function submitCheck(fid){
             'or the Equipment Manager has nothing to act on.','One more thing');
     return;
   }
+  if(c.dp){ submitWithDp(fid,s); return; }
   doSubmit(fid,s);
+}
+
+/* The two things that need saying BEFORE a room check is filed, both of which
+   are questions rather than refusals.
+
+   Starting a duty period is gated — a member cannot conjure one — but doing a
+   room in a period that already exists is not, because that is the job.
+
+   The repeat check is a warning with an override, never a block. A room that
+   got trashed after its check genuinely needs doing again, and refusing would
+   push somebody into filing it as a different room, which is worse than a
+   duplicate: it is a wrong room with a real call sign against it. */
+function submitWithDp(fid,s){
+  var key=s.dp, d=dpGet(key);
+
+  if(!d && !canOpenDP()){
+    uiAlert(dpLabel(key)+' has not been started yet, and starting one needs site '+
+            'access. Ask a manager or a supervisor to file the first check of '+
+            'the duty period, or check the number.','Not started yet');
+    return;
+  }
+
+  var go2=function(){
+    if(!dpGet(key)) dpOpen(key,s.callsign||'');
+    doSubmit(fid,s);
+  };
+
+  if(!d){
+    uiConfirm('Nothing has been filed against '+dpLabel(key)+' yet, so this will '+
+              'start it.\n\nIf that is not the duty period you are in, close this '+
+              'and correct the number.','Start '+dpLabel(key)+'?',
+              {okText:'Start it',cancelText:'Go back'})
+      .then(function(ok){ if(ok) go2(); });
+    return;
+  }
+
+  var done=dpRoomDone(key,s.pick), need=dpRoomNeeds(s.pick);
+  if(done>=need){
+    var nm=(DB.rooms||[]).filter(function(r){return r.id===s.pick;})[0];
+    uiConfirm((nm?nm.name:'That room')+' already has all '+need+' of its checks '+
+              'for '+dpLabel(key)+'.\n\nFile this one as well?',
+              'Already covered',{okText:'File it anyway',cancelText:'Go back'})
+      .then(function(ok){ if(ok) go2(); });
+    return;
+  }
+  go2();
 }
 
 /* One submission at a time, per form. The script drops a REPEAT of a submission
@@ -4081,6 +4233,9 @@ function doSubmit(fid,s){
     sid:uid('s')+'-'+Date.now(),
     callsign:s.callsign, name:(s.first+' '+s.last).trim(), andrew:s.andrew,
     radio:s.radio||'',
+    // Written as "DP 4 · 2026–27" rather than the internal key, because the
+    // person reading this column is reading a spreadsheet, not a data model.
+    dp:s.dp?dpLabel(s.dp):'', dpNum:s.dpN||'',
     subject:s.pickName, done:s.done.join(' | '), missing:s.missing.join(' | '),
     doneCount:s.done.length, missingCount:s.missing.length,
     expired:(s.expired||[]).join(' | '), expiringSoon:(s.soon||[]).join(' | ')
@@ -4169,6 +4324,14 @@ function doSubmit(fid,s){
       addIssue({area:'Equipment', urgency:'Soon', what:USED_ON_CALL+' '+s.date,
         where:unit.name, unit:r.from, by:openedBy});
     });
+  }
+  // Recorded against the duty period as well as sent to the sheet. The sheet is
+  // the permanent record — every room check row carries its duty period, so
+  // past years stay readable there — and this is the live one the next person
+  // on shift opens.
+  if(c.dp && s.dp && s.pick){
+    dpOpen(s.dp, s.callsign||'');
+    dpRecord(s.dp, s.pick, s.callsign||'');
   }
   // A contents check is the only thing that knows a whole kit was just gone
   // through. `s.pick` is the bag TYPE id, which is what this form picks.
@@ -4389,6 +4552,109 @@ function renderRooms(){
   });
   host.innerHTML=h;
   applyGates(host);
+}
+
+/* ============================================================================
+   DUTY PERIODS
+   ==========================================================================*/
+
+/* The academic year a date belongs to, as the year it STARTED in: August 2026
+   through July 2027 are all `2026`. August is the boundary because the agency
+   is not operational over the summer, so nothing is ever filed across it and
+   the numbers can restart at 1 without colliding with the year before.
+
+   Derived, never asked for. Making somebody type the year as well as the number
+   is two chances to mistype instead of one, and the date already knows. */
+var ACAD_START_MONTH=7;               // 0-based: 7 = August
+function acadYear(d){
+  d=d||new Date();
+  return d.getMonth()>=ACAD_START_MONTH ? d.getFullYear() : d.getFullYear()-1;
+}
+function acadLabel(y){ return y+'–'+String(y+1).slice(2); }
+function dpKey(n,y){ return (y==null?acadYear():y)+':'+n; }
+function dpParse(key){
+  var p=String(key).split(':');
+  return {year:parseInt(p[0],10), n:parseInt(p[1],10)};
+}
+function dpLabel(key){
+  var p=dpParse(key);
+  return 'DP '+p.n+' · '+acadLabel(p.year);
+}
+
+/* A duty period number is typed by hand, so it has to survive a stray space, a
+   leading zero and somebody writing "DP 4". Anything that is not a positive
+   whole number is not a duty period. */
+function dpNumber(raw){
+  var m=String(raw==null?'':raw).match(/\d+/);
+  if(!m) return 0;
+  var n=parseInt(m[0],10);
+  return (n>0 && n<1000) ? n : 0;
+}
+
+/* Who may open one. Michaela's call: anybody with access to the site, which
+   includes a Bike Manager — who is deliberately NOT a role here, so ROLE alone
+   would read them as a member and refuse. Checked against the bike list by
+   address, the same way the login dialog does it. */
+function canOpenDP(){
+  if(ROLE!=='member') return true;
+  var me=''; try{ me=localStorage.getItem(LS_EMAIL)||''; }catch(e){}
+  if(!me) return false;
+  return ((DB.access&&DB.access.bikeManagers)||[]).map(normEmail).indexOf(normEmail(me))>=0;
+}
+
+function dpGet(key){ return (DB.dutyPeriods||{})[key]||null; }
+function dpOpen(key,by){
+  DB.dutyPeriods=DB.dutyPeriods||{};
+  if(DB.dutyPeriods[key]) return DB.dutyPeriods[key];
+  DB.dutyPeriods[key]={opened:Date.now(), openedBy:by||'', closed:false, rooms:{}};
+  return DB.dutyPeriods[key];
+}
+
+/* How many checks a room still needs in this duty period. `slots` is the count
+   of checks it takes, so this is arithmetic rather than a boolean. */
+function dpRoomDone(key,roomId){
+  var d=dpGet(key); if(!d) return 0;
+  return ((d.rooms||{})[roomId]||[]).length;
+}
+function dpRoomNeeds(roomId){
+  var r=(DB.rooms||[]).filter(function(x){return x.id===roomId;})[0];
+  return r ? (r.slots||1) : 1;
+}
+function dpRemaining(key){
+  var out=[];
+  (DB.rooms||[]).forEach(function(r){
+    var done=dpRoomDone(key,r.id), need=r.slots||1;
+    if(done<need) out.push({id:r.id, name:r.name, done:done, need:need});
+  });
+  return out;
+}
+function dpTotals(key){
+  var done=0, need=0;
+  (DB.rooms||[]).forEach(function(r){
+    need+=(r.slots||1); done+=Math.min(dpRoomDone(key,r.id),(r.slots||1));
+  });
+  return {done:done, need:need};
+}
+
+/* Records one check. Returns false only when there is no duty period to record
+   it against — an over-filled room is still recorded, because the warning that
+   precedes this is an override, not a block, and a check somebody actually did
+   must not vanish because the site thought the room was finished. */
+function dpRecord(key,roomId,cs){
+  var d=dpGet(key); if(!d) return false;
+  d.rooms=d.rooms||{};
+  d.rooms[roomId]=(d.rooms[roomId]||[]).concat([{cs:cs||'', at:Date.now()}]);
+  return true;
+}
+
+/* Only this year's. Past years stay in the object and in the sheet — every room
+   check row carries its duty period — but the live view is what the next Office
+   Manager opens in September, and it starts empty. */
+function dpKeysThisYear(){
+  var y=acadYear();
+  return Object.keys(DB.dutyPeriods||{})
+    .filter(function(k){ return dpParse(k).year===y; })
+    .sort(function(a,b){ return dpParse(b).n-dpParse(a).n; });
 }
 
 /* A signature of the task list as it stands, so a confirmation stops vouching
@@ -5330,10 +5596,78 @@ function renderQR(){
    to know about every element on the page. */
 
 /* ---- duty-period tracker (printable) ---- */
+/* This year's duty periods, newest first. Only this year's: past ones stay in
+   the object and every room check row in the sheet carries its duty period, so
+   nothing is lost — but what the Office Manager opens in September should be
+   empty rather than three terms deep. */
+function dutyPeriodsHTML(){
+  var keys=dpKeysThisYear();
+  if(!keys.length){
+    return '<div class="card"><p class="hint" style="margin:0">No duty period has been '+
+      'started for '+esc(acadLabel(acadYear()))+' yet. One starts when somebody files '+
+      'the first room check against its number.</p></div>';
+  }
+  return keys.map(function(k){
+    var d=dpGet(k), t=dpTotals(k), rem=dpRemaining(k);
+    var pct=t.need?Math.round(t.done/t.need*100):0;
+    var h='<div class="card mt dpcard"><div class="dphead">'+
+      '<h3>'+esc(dpLabel(k))+'</h3>'+
+      '<span class="dpcount'+(rem.length?'':' ok')+'">'+t.done+' / '+t.need+'</span></div>'+
+      '<div class="dpbar"><i style="width:'+pct+'%"></i></div>';
+    if(!rem.length){
+      h+='<p class="dpdone">Every room is covered.</p>';
+    }else{
+      h+='<ul class="dplist">'+rem.map(function(r){
+        return '<li>'+esc(r.name)+' <span>'+r.done+'/'+r.need+'</span></li>';
+      }).join('')+'</ul>';
+    }
+    // Who did what, so a duty period is a record and not only a score.
+    var filled=[];
+    Object.keys(d.rooms||{}).forEach(function(rid){
+      var rm=(DB.rooms||[]).filter(function(x){return x.id===rid;})[0];
+      (d.rooms[rid]||[]).forEach(function(e){
+        filled.push((rm?rm.name:rid)+(e.cs?' · '+e.cs:''));
+      });
+    });
+    if(filled.length)
+      h+='<details class="dpwho"><summary>'+filled.length+' filed</summary><ul>'+
+         filled.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ul></details>';
+    h+='<div class="row mt" data-need="mgr">'+
+       '<button class="btn xs" onclick="dpDelete(\''+jsq(k)+'\')">Delete</button></div>';
+    h+='</div>';
+    return h;
+  }).join('');
+}
+
+/* Deleting is the fix for a typo — 7 for 17 — which otherwise leaves a duty
+   period with fourteen empty rooms that nothing else can clear. Says how much
+   real work is about to go with it, because by the time somebody notices the
+   typo there may be checks filed against it. */
+function dpDelete(key){
+  var d=dpGet(key); if(!d) return;
+  var t=dpTotals(key);
+  uiConfirm(t.done
+      ? dpLabel(key)+' has '+t.done+' check'+(t.done===1?'':'s')+' filed against it. '+
+        'Deleting it here removes that record from the site. The rows already in '+
+        'the spreadsheet are not touched.'
+      : 'Nothing has been filed against '+dpLabel(key)+'.',
+    'Delete '+dpLabel(key)+'?',{okText:'Delete',cancelText:'Keep it'})
+    .then(function(ok){
+      if(!ok) return;
+      delete DB.dutyPeriods[key];
+      saveDB(); renderTracker(); renderCheck('room-check');
+    });
+}
+
 function renderTracker(){
   var host=document.getElementById('trackerHost'); if(!host) return;
   var maxSlots=0; DB.rooms.forEach(function(r){ if(r.slots>maxSlots) maxSlots=r.slots; });
   var h='';
+
+  // The live duty periods come first; the printable grid below them is still
+  // worth having, because a board on a wall is what people actually look at
+  // mid-shift. The paper one is now a fallback rather than the only record.
+  h+='<div class="noprint">'+dutyPeriodsHTML()+'</div>';
 
   h+='<div class="row noprint"><button class="btn solid" onclick="window.print()">Print tracker</button>'+
      '<button class="btn ghost" onclick="go(\'qr\')">Get the QR code</button></div>';
