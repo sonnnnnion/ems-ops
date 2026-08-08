@@ -1061,7 +1061,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260807214017';
+var BUILD='20260808090729';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -5532,19 +5532,17 @@ function renderPeople(){
      '<div class="row mt"><button class="btn ghost sm" onclick="addOfficer()">Add an officer</button>'+
      '<span id="officerMsg" style="font-size:13px;color:var(--ink-faint)"></span></div></div>';
 
-  h+='<div class="card mt"><h3>Managers</h3>';
-  if(!(a.people||[]).length){
-    h+='<p class="hint" style="margin:0 0 10px">Nobody added yet.</p>';
-  }else{
-    h+='<div class="invwrap"><table class="invtable"><thead><tr>'+
-       '<th>Email</th><th>Role</th><th></th></tr></thead><tbody>';
-    a.people.forEach(function(p,i){
-      h+='<tr><td>'+esc(p.email)+'</td><td>'+esc(ROLE_LABEL[p.role]||p.role)+'</td>'+
-         '<td><button class="btn xs" onclick="delPerson('+i+')">Remove</button></td></tr>';
-    });
-    h+='</tbody></table></div>';
-  }
-  h+='<div class="row mt"><button class="btn ghost sm" onclick="addPerson()">Add someone</button></div></div>';
+  /* One card per group of people, because that is how the page is read. A
+     Supervisor was addable from the first day the role existed — the role
+     picker under "Add someone" has always offered it — but every OTHER group
+     here has its own heading, so a page with Officers, Managers and Bike
+     Managers on it reads as a complete list of what you can appoint. Michaela
+     went looking for supervisors, did not find a card, and correctly concluded
+     there was no way to add one. A control nobody can find is not a control. */
+  h+=peopleCard('Supervisors','supervisor',
+      'Everything an Operations Officer can do, including appointing people.',
+      'Add a supervisor');
+  h+=peopleCard('Managers',['equipment','office'],'','Add a manager');
 
   /* Bike Managers. A separate card, and separate wording, because these people
      get nothing at all on this site — the list is published for the Bike Ops
@@ -5660,15 +5658,51 @@ function delOfficer(i){
       if(msg) msg.textContent='Removed. Publish to share it.';
     });
 }
-function addPerson(){
-  uiForm('Add someone','',
-    [{key:'email',label:'Email (their Google account)',type:'text',required:true},
-     {key:'role',label:'Role',type:'select',required:true,value:'equipment',options:[
-       {v:'equipment',t:'Equipment Manager'},
-       {v:'office',t:'Office Manager'},
-       {v:'supervisor',t:'Supervisor'}]}],{okText:'Add'})
+/* One card for one group. `roles` is a single role id or a list of them, and
+   the rows are found by role rather than by position — `delPerson` takes an
+   index into DB.access.people, so the index has to come from that array and
+   never from the filtered view, or removing a manager would delete whoever
+   happened to sit at the same offset in a different card. */
+function peopleCard(title,roles,note,addLabel){
+  var want=[].concat(roles);
+  var all=(DB.access&&DB.access.people)||[];
+  var rows=[];
+  all.forEach(function(p,i){ if(want.indexOf(p.role)>=0) rows.push({p:p,i:i}); });
+
+  var h='<div class="card mt"><h3>'+esc(title)+'</h3>';
+  if(note) h+='<p class="hint" style="margin:0 0 10px">'+esc(note)+'</p>';
+  if(!rows.length){
+    h+='<p class="hint" style="margin:0 0 10px">Nobody added yet.</p>';
+  }else{
+    h+='<div class="invwrap"><table class="invtable"><thead><tr>'+
+       '<th>Email</th><th>Role</th><th></th></tr></thead><tbody>';
+    rows.forEach(function(r){
+      h+='<tr><td>'+esc(r.p.email)+'</td><td>'+esc(ROLE_LABEL[r.p.role]||r.p.role)+'</td>'+
+         '<td><button class="btn xs" onclick="delPerson('+r.i+')">Remove</button></td></tr>';
+    });
+    h+='</tbody></table></div>';
+  }
+  h+='<div class="row mt"><button class="btn ghost sm" onclick="addPerson('+
+     (want.length===1?'\''+jsq(want[0])+'\'':'')+')">'+esc(addLabel)+'</button></div></div>';
+  return h;
+}
+
+/* `preset` fixes the role, so the button on a card adds the kind of person that
+   card is about instead of reopening a menu the reader has already answered by
+   pressing it. Called with nothing from the Managers card, where the choice
+   between Equipment and Office is still a real question. */
+function addPerson(preset){
+  var ROLES=[{v:'equipment',t:'Equipment Manager'},
+             {v:'office',t:'Office Manager'},
+             {v:'supervisor',t:'Supervisor'}];
+  var fixed = preset && ROLES.some(function(r){return r.v===preset;}) ? preset : '';
+  var fields=[{key:'email',label:'Email (their Google account)',type:'text',required:true}];
+  if(!fixed) fields.push({key:'role',label:'Role',type:'select',required:true,
+                          value:'equipment',options:ROLES});
+  uiForm(fixed?('Add a '+ROLE_LABEL[fixed].toLowerCase()):'Add someone','',fields,{okText:'Add'})
    .then(function(v){
      if(!v||!v.email) return;
+     if(fixed) v.role=fixed;
      var e=normEmail(v.email);
      // roleForEmail checks officers first, so a manager row for someone who is
      // already an officer would never take effect — it would just read as a
