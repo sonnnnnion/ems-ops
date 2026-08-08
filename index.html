@@ -655,6 +655,11 @@
   .roomnote{font-size:12px;color:var(--ink-faint);margin:10px 0 0}
   .lastcheck{font-size:12px;color:var(--ink-faint);margin:2px 0 0}
   .lastcheck.none{font-style:italic}
+  /* A standing instruction above a form. Not a .notice and not a banner — it is
+     one line the person filling this in needs before they start, and it should
+     read as part of the page rather than as something that happened. */
+  .formnote{font-size:13px;color:var(--ink-mute);margin:-4px 0 16px}
+  .formnote b{color:var(--ink);font-weight:700}
   @media(max-width:520px){
     /* On a phone the head is already tight; the chip drops under the name
        rather than squeezing it to two characters. */
@@ -864,6 +869,12 @@
     <!-- ===== ROOM CHECK ====================================================== -->
     <section class="view" data-view="room-check">
       <h2 class="view-title">Room <em>check</em></h2>
+      <!-- A reminder, not a gate, and deliberately so. Room checks are filed by
+           ordinary members and the call sign is typed by hand, so anything
+           enforced here would only be enforceable against people who chose to
+           be honest about their own rank. Rank also changes mid-year, which a
+           prefix rule would get wrong in both directions. -->
+      <p class="formnote">Call sign still starts with <b>p</b>? Leave the tech room to a technician.</p>
       <div id="roomCheckHost"></div>
     </section>
 
@@ -880,6 +891,9 @@
     <!-- ===== FULL CONTENTS CHECK (Equipment Manager) ======================== -->
     <section class="view" data-view="bag-check">
       <h2 class="view-title">Full contents <em>check</em></h2>
+      <!-- The squad car is in the picker for the Equipment Manager because the
+           kit list is theirs to keep; going through it on duty is not. -->
+      <p class="formnote">The squad car is checked by a supervisor.</p>
       <div id="bagCheckHost"></div>
     </section>
 
@@ -1011,7 +1025,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260807210908';
+var BUILD='20260807211111';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
