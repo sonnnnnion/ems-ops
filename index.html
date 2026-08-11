@@ -117,10 +117,68 @@
   @keyframes viewIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
   .btn{transition:transform .14s var(--ease),box-shadow .14s var(--ease)}
   .sb-item{transition:background .18s var(--ease),border-color .18s var(--ease),color .18s var(--ease)}
+  /* ---------- polish ----------------------------------------------------
+     Motion here is feedback, never decoration: it tells you a tap registered,
+     or that a thing opened rather than replaced what was there. Everything is
+     under 200ms except the view fade, because this is used one-handed on a
+     phone mid-shift and anything slower is a delay rather than a cue.
+
+     Nothing in this block sets `display` on a [data-need] element. Gating is
+     `hidden` + `[hidden]{display:none !important}`, and !important on the child
+     beats any parent, so the accordion below cannot reveal a gated row. */
+
+  /* A press has to register on a touch screen, where there is no hover to
+     confirm the finger landed on the right thing. */
+  .btn:active{transform:translateY(1px) scale(.985)}
+  .sb-item:active{transform:translateY(1px)}
+  .btn,.sb-item,.lowbtn,.roompick,.photo{-webkit-tap-highlight-color:transparent}
+  .lowbtn{transition:border-color .16s var(--ease),color .16s var(--ease),
+                     background .16s var(--ease)}
+  .lowbtn:active{transform:scale(.94)}
+
+  /* Cards and rows lift a little under the pointer. Off on touch, where there
+     is no pointer and a stuck hover state just looks broken. */
+  @media(hover:hover){
+    .photo{transition:transform .2s var(--ease),box-shadow .2s var(--ease)}
+    .photo:hover{transform:translateY(-2px);box-shadow:var(--shadow-md)}
+    .invtable tbody tr:not(.grp){transition:background .14s var(--ease)}
+    .invtable tbody tr:not(.grp):hover{background:var(--card-2)}
+    .acchead{transition:background .16s var(--ease)}
+    .acchead:hover{background:var(--card-2)}
+  }
+
+  /* The accordion's own disclosure animation lives with its other rules further
+     down, not here — it has to be ONE definition or the later block silently
+     wins and the animation looks like it was never written. */
+
+  /* One visible focus ring for keyboard users, on everything focusable, rather
+     than the browser's default which the custom controls were overriding. */
+  .btn:focus-visible,.sb-item:focus-visible,.acchead:focus-visible,
+  .roompick:focus-visible,.lowbtn:focus-visible,.photo:focus-visible,
+  input:focus-visible,select:focus-visible,textarea:focus-visible{
+    outline:2px solid var(--brand);outline-offset:2px}
+
+  /* Status chips settle in when a render swaps them, so a badge changing from
+     Short to OK reads as that thing changing rather than as a repaint. */
+  .expbadge,.roomchip,.tag{transition:background .18s var(--ease),color .18s var(--ease),
+                                      border-color .18s var(--ease)}
+  .dpbar i{transition:width .3s var(--ease-out)}
+
+  /* Touch sizing. A checklist item is the single most-tapped thing on this site
+     — thirty-four of them in one jumpkit — and a 13px box is a miss waiting to
+     happen with one hand and a bag in the other. The label already extends the
+     hit area; this makes the box itself findable. */
+  /* Touch sizing lives at the very END of this stylesheet, not here. Equal
+     specificity means source order decides, and the component rules below would
+     win. (Written once with a literal closing style tag in this comment, which
+     the HTML parser honoured — it is not a CSS comment to the parser, it is the
+     end of the element — and silently dropped every rule after it.) */
+
   @media(prefers-reduced-motion:reduce){
     .view.active{animation:none}
-    .btn,.sb-item{transition:none}
-    .btn:hover{transform:none}
+    .btn,.sb-item,.lowbtn,.photo,.acchead,.expbadge,.roomchip,.tag,
+    .invtable tbody tr,.dpbar i,.acc .acchead .chev{transition:none}
+    .btn:hover,.btn:active,.sb-item:active,.lowbtn:active,.photo:hover{transform:none}
   }
   h2.view-title{font-family:var(--font-display);font-weight:var(--display-wt);font-size:34px;letter-spacing:-.025em;margin:0 0 6px;line-height:1.15}
   h2.view-title em{font-style:italic;color:var(--brand)}
@@ -305,6 +363,11 @@
     flex:0 0 auto;border-radius:var(--r-sm)}
   .acc .acchead .chev{margin-left:auto;font-family:var(--font-mono);color:var(--ink-faint);transition:transform .2s var(--ease)}
   .acc.open .acchead .chev{transform:rotate(90deg)}
+  /* Deliberately NOT animated open. The `grid-template-rows:0fr -> 1fr` trick
+     needs a single inner wrapper, and `.accbody` is built in six places with
+     different inner structure — six chances to strand a `</div>` and take out a
+     whole view, to soften one disclosure. The chevron already turns, which is
+     the part that says it opened. */
   .acc .accbody{display:none;padding:0 14px 14px 48px;font-size:13.5px;color:var(--ink-soft)}
   .acc.open .accbody{display:block}
   .acc .accbody ul{margin:0;padding-left:18px}
@@ -818,6 +881,20 @@
     .qrcard .qrsvg{width:4.5in;height:4.5in}
     .qrcard .qrlink{font-size:11px;padding-top:26px}
   }
+
+  /* ---------- touch sizing, last on purpose ----------------------------
+     A checklist item is the most-tapped thing on this site — thirty-four in one
+     jumpkit — and a 16px box is a miss waiting to happen one-handed with a bag
+     in the other. This has to come after the component rules: it is the same
+     specificity as `.checkline input[type=checkbox]`, so whichever is written
+     last wins, and written first it silently did nothing. */
+  @media(pointer:coarse){
+    .checkline input[type=checkbox],.countline input[type=checkbox],
+    input[type=checkbox],input[type=radio]{width:20px;height:20px;flex:0 0 auto}
+    .checkline input[type=checkbox]{margin-top:1px}
+    .linkline .linksel{min-height:30px;font-size:12px}
+    .stockin{min-height:34px}
+  }
 </style>
 
 <!-- GoatCounter. Counts are Michaela's own, at mbocksta.goatcounter.com.
@@ -1092,7 +1169,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260808094837';
+var BUILD='20260811154802';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
