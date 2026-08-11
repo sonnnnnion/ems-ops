@@ -113,8 +113,13 @@
      horizontal scrollbar at 375px instead of scrolling inside `.invwrap`. */
   main{padding:32px clamp(18px,4vw,44px);max-width:var(--maxw);min-width:0}
   .view{display:none}
-  .view.active{display:block;animation:viewIn .42s var(--ease-out)}
-  @keyframes viewIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  /* 200ms and 4px, down from 420ms and 8px. A view change on a phone happens
+     every few seconds during a shift, and at 420ms the page was still settling
+     when the thumb arrived at the next control — the animation had stopped
+     being a cue and started being a wait. Short enough to read as the page
+     responding, not as it moving. */
+  .view.active{display:block;animation:viewIn .2s var(--ease-out)}
+  @keyframes viewIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
   .btn{transition:transform .14s var(--ease),box-shadow .14s var(--ease)}
   .sb-item{transition:background .18s var(--ease),border-color .18s var(--ease),color .18s var(--ease)}
   /* ---------- polish ----------------------------------------------------
@@ -191,6 +196,26 @@
   .repgrid + .explegend{margin-top:14px}
   .explegend + .invwrap{margin-top:10px}
   .repgrid + .invwrap{margin-top:16px}
+
+  /* ---------- medications given ---------- */
+  .medcard h3 .opt{font-family:var(--font-body);font-size:11px;font-weight:600;
+    text-transform:uppercase;letter-spacing:.08em;color:var(--ink-faint);
+    margin-left:8px;vertical-align:middle}
+  .medrow{display:flex;align-items:center;gap:12px;padding:9px 0;
+    border-bottom:1px solid var(--rule-soft)}
+  .medrow:last-child{border-bottom:0}
+  .medrow .mname{flex:1;min-width:0;font-size:14px;color:var(--ink-soft);line-height:1.35}
+  .medrow.on .mname{color:var(--ink);font-weight:600}
+  .mstep{display:flex;align-items:center;gap:4px;flex:0 0 auto}
+  .mstep .btn{min-width:32px;justify-content:center;font-size:15px;line-height:1}
+  .mstep .mn{font-family:var(--font-mono);font-size:14px;min-width:22px;text-align:center;
+    color:var(--ink-faint)}
+  .medrow.on .mstep .mn{color:var(--brand);font-weight:700}
+  .mstep .btn[disabled]{opacity:.35;pointer-events:none}
+  @media(max-width:420px){
+    .medrow .mname{font-size:13.5px}
+    .mstep .btn{min-width:38px;min-height:38px}
+  }
 
   h2.view-title{font-family:var(--font-display);font-weight:var(--display-wt);font-size:34px;letter-spacing:-.025em;margin:0 0 6px;line-height:1.15}
   h2.view-title em{font-style:italic;color:var(--brand)}
@@ -906,6 +931,14 @@
     .checkline input[type=checkbox]{margin-top:1px}
     .linkline .linksel{min-height:30px;font-size:12px}
     .stockin{min-height:34px}
+
+    /* No scrollbar track drawn over the page on a phone. iOS overlays a
+       transient indicator anyway; what shows up here is the desktop-style
+       gutter, which on a narrow screen is a grey stripe down the content. The
+       tables that scroll sideways keep theirs — there, the bar is the only
+       thing saying there is more to the right. */
+    html,body{scrollbar-width:none}
+    html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none}
   }
 </style>
 
@@ -1181,7 +1214,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260811180005';
+var BUILD='20260811181611';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -2304,7 +2337,15 @@ var DEFAULTS={
      screen, and the shelf count starts moving by itself the moment they do.
      An unmapped row simply does not auto-decrement; nothing breaks. */
   stock:{},
-  stockLink:{}
+  /* The four Michaela confirmed. Everything else stays unset: those rows are
+     medications, and the post-call form asks about those in its own section
+     without naming a shelf, so there is nothing to link them to. */
+  stockLink:{
+    'iv-strips-cc':'c-glucstrip',   'iv-lancets-cc':'c-lancet',
+    'iv-strips-bb':'c-glucstrip',   'iv-lancets-bb':'c-lancet'
+  },
+  // Which batch of the above a device has already been given. See loadDB.
+  stockLinkSeed:0
 };
 
 
@@ -2413,6 +2454,18 @@ function loadDB(){
       stale=true;
     }
   });
+  /* The four confirmed shelf links, applied ONCE to devices that already stored
+     an empty stockLink. Version-flagged rather than "fill any gap", so that
+     unlinking one deliberately makes it stay unlinked — a migration that keeps
+     restoring a link the Equipment Manager just removed is a bug that reads as
+     the site arguing back. Raise the number to ship another batch. */
+  if((Number(DB.stockLinkSeed)||0) < 1){
+    DB.stockLink=DB.stockLink||{};
+    Object.keys(DEFAULTS.stockLink||{}).forEach(function(k){
+      if(!DB.stockLink[k]) DB.stockLink[k]=DEFAULTS.stockLink[k];
+    });
+    DB.stockLinkSeed=1; stale=true;
+  }
   if(stale) saveDB();
 }
 function saveDB(){
@@ -2968,7 +3021,11 @@ function googleSignIn(wantRole){
    deliberately NOT synced: publishing replaces, and two managers would clobber
    each other. The spreadsheet is the record for those.
    ========================================================================== */
-var NO_SYNC={api:1, issues:1, usage:1, toGet:1, expiry:1, version:1, seed:1};
+// `stockLinkSeed` is a per-device migration marker, not content. Synced, a
+// device could receive the flag while applyContent held `stockLink` back as a
+// local edit — flagged as done, with nothing to show for it, forever.
+var NO_SYNC={api:1, issues:1, usage:1, toGet:1, expiry:1, version:1, seed:1,
+             stockLinkSeed:1};
 // `error` carries WHY the last content read failed, so the login dialog can say
 // it instead of presenting a failed request as an empty People list.
 var contentState={loaded:false, dirty:false, at:0, error:''};
@@ -3524,6 +3581,13 @@ var FORMS={
     // The structured bit. Item, how many, which unit it came out of — all
     // picked, none typed, so the buy-list can actually be summed.
     usage:{label:'What did you use, and from where?'},
+    // Medications are their own section and entirely optional. Most members
+    // cannot give them at all — it is a higher-rank thing — so putting them in
+    // the same list as gauze would ask everybody about something almost nobody
+    // does. It asks WHAT and HOW MANY and deliberately not WHERE FROM: the same
+    // drug sits on more than one shelf, this form cannot know which one it came
+    // off, and a guess would be a wrong location attached to a real drug.
+    meds:{label:'Medications given'},
     // No free-text "did you replace anything?" here. It began as "anything you
     // could not replace", which assumed the member restocks the bag — they do
     // not — and asking it the other way round still could not say WHICH of four
@@ -3697,6 +3761,13 @@ function renderCheck(fid){
        'onclick="addUsageRow(\''+fid+'\')">+ Add an item</button></div></div>';
   }
 
+  /* --- medications, optional --- */
+  if(c.meds){
+    h+='<div class="card mt medcard"><h3>'+esc(c.meds.label)+
+       ' <span class="opt">optional</span></h3>'+
+       '<div id="'+fid+'-meds"></div></div>';
+  }
+
   /* --- extras --- */
   (c.extras||[]).forEach(function(x){
     h+='<div class="card mt"><h3>'+esc(x.label)+'</h3>'+
@@ -3717,6 +3788,7 @@ function renderCheck(fid){
   host.innerHTML=h;
   applyGates(host);
   if(c.usage) renderUsage(fid);
+  if(c.meds) renderMeds(fid);
   restoreDraft(fid);
   // After the draft, never over it: a half-finished form is what this person
   // was actually doing, and the remembered name is only a starting point.
@@ -3736,6 +3808,57 @@ var usageRows={};      // fid -> [{item, qty, from}]
 function usageState(fid){
   if(!usageRows[fid] || !usageRows[fid].length) usageRows[fid]=[{item:'',qty:1,from:''}];
   return usageRows[fid];
+}
+
+/* ---------- medications given ----------
+   Derived from the inventory rather than written out again here, so there is
+   one list of what the agency stocks and it cannot drift from itself. Deduped
+   by NAME, because the same drug sits on three shelves and a member giving one
+   is giving the drug, not the shelf. */
+function medList(){
+  var seen={}, out=[];
+  (DB.inventory||[]).forEach(function(r){
+    if(r.cat!=='Medication') return;
+    var k=r.item.toLowerCase();
+    if(seen[k]) return;
+    seen[k]=1; out.push({key:k, name:r.item});
+  });
+  return out;
+}
+
+var medsGiven={};                 // fid -> {medKey: count}
+function medState(fid){ return medsGiven[fid]=medsGiven[fid]||{}; }
+function setMed(fid,key,n){
+  var s=medState(fid);
+  n=Math.max(0,Math.min(99,parseInt(n,10)||0));
+  if(n) s[key]=n; else delete s[key];
+  renderMeds(fid); onFormInput(fid);
+}
+function bumpMed(fid,key,d){ setMed(fid,key,(medState(fid)[key]||0)+d); }
+function medsComplete(fid){
+  var s=medState(fid), list=medList(), out=[];
+  list.forEach(function(m){ if(s[m.key]) out.push({key:m.key,name:m.name,qty:s[m.key]}); });
+  return out;
+}
+
+function renderMeds(fid){
+  var host=document.getElementById(fid+'-meds'); if(!host) return;
+  var s=medState(fid), list=medList();
+  if(!list.length){ host.innerHTML='<p class="hint" style="margin:0">No medications are listed in the inventory yet.</p>'; return; }
+  // A stepper, not a text field: this is one hand on a phone after a call, and
+  // the answer is almost always 1.
+  host.innerHTML=list.map(function(m){
+    var n=s[m.key]||0;
+    return '<div class="medrow'+(n?' on':'')+'">'+
+      '<span class="mname">'+esc(m.name)+'</span>'+
+      '<span class="mstep">'+
+        '<button type="button" class="btn xs" aria-label="One fewer '+esc(m.name)+'"'+
+          (n?'':' disabled')+' onclick="bumpMed(\''+jsq(fid)+'\',\''+jsq(m.key)+'\',-1)">−</button>'+
+        '<b class="mn">'+n+'</b>'+
+        '<button type="button" class="btn xs" aria-label="One more '+esc(m.name)+'" '+
+          'onclick="bumpMed(\''+jsq(fid)+'\',\''+jsq(m.key)+'\',1)">+</button>'+
+      '</span></div>';
+  }).join('');
 }
 
 function renderUsage(fid){
@@ -3984,6 +4107,7 @@ function readCheck(fid){
   var picked=(c.pick?pickList(c.pick.from).filter(function(o){return o.id===out.pick;})[0]:null);
   out.pickName=picked?picked.name:'';
   var exs=paintExpiry(fid); out.expired=(exs&&exs.expired)||[]; out.soon=(exs&&exs.soon)||[];
+  if(c.meds) out.meds=medsComplete(fid);
   if(c.usage) out.usage=usageComplete(fid).map(function(r){
     var un=(DB.bagUnits||[]).filter(function(x){return x.id===r.from;})[0]||{};
     if(r.item==='__other'){
@@ -4285,6 +4409,7 @@ function discardCheck(fid){
       // usageRows is in-memory state, not part of the draft — clearing the draft
       // alone left the typed usage rows sitting on screen after "Clear".
       clearDraft(fid); formPick[fid]=null; formDone[fid]=false; usageRows[fid]=null;
+      medsGiven[fid]=null;
       renderCheck(fid);
     });
 }
@@ -4422,6 +4547,10 @@ function doSubmit(fid,s){
     payload.usageJson=JSON.stringify(s.usage.map(function(r){
       return {i:r.item,q:r.qty,f:r.from}; }));
     payload.usageCount=s.usage.reduce(function(a,r){return a+r.qty;},0);
+    // Named and counted, never located. The same drug is on three shelves and
+    // this form cannot know which one it came off.
+    payload.meds=(s.meds||[]).map(function(m){
+      return m.name+(m.qty>1?' x'+m.qty:''); }).join(' | ');
     // The sheet's "Replaced By Member" column, built from the ticks rather than
     // from a free-text box, so it names actual items.
     payload.replaced=s.usage.filter(function(r){return r.refilled;})
@@ -4451,6 +4580,23 @@ function doSubmit(fid,s){
        sweep below then picks up. */
     s.usage.forEach(function(r){ if(r.refilled) stockUse(r.item, r.qty||1); });
     stockSweep((s.first+' '+s.last).trim()||s.callsign||'');
+  }
+
+  /* Medications given. On the buy list, because a drug that went out has to be
+     replaced, and logged so there is a record of it — but NOT decremented off a
+     shelf, because the form never asked which shelf and the same drug sits on
+     three. Naming one would be a wrong location attached to a real drug, which
+     is worse than no location at all. */
+  if((s.meds||[]).length){
+    var medBy=(s.first+' '+s.last).trim()||s.callsign||'';
+    s.meds.forEach(function(m){
+      wantItem({name:m.name, cat:'Medication', qty:m.qty, where:'', by:medBy});
+    });
+    addIssue({area:'Equipment', urgency:'Soon',
+      what:'Given on a call: '+s.meds.map(function(m){
+        return m.name+(m.qty>1?' x'+m.qty:''); }).join(', '),
+      where:'', by:medBy});
+    saveDB();
     saveDB();
   }
 
@@ -4590,6 +4736,7 @@ function doSubmit(fid,s){
   clearDraft(fid);
   formPick[fid]=null;
   usageRows[fid]=null;
+  medsGiven[fid]=null;
   renderCheck(fid);
 }
 

@@ -43,9 +43,13 @@ var SHEETS = {
     // restock, so the old column asked everybody to account for something that
     // was never their job and the honest answer was always "all of it". This
     // records the exception instead: what they put back themselves.
-    keys:    ['date','time','name','callnum','result','usageCount','usageText','replaced','usageJson','sid'],
-    headers: ['Date','Time','Name','Call Number','Result','Units Used','What Was Used','Replaced By Member','Used (data)','Submission ID'],
-    widths:  [95, 70, 150, 110, 150, 90, 380, 260, 200, 120]
+    // `meds` is what was GIVEN on the call, named and counted but with no
+    // location — the same drug sits on more than one shelf and the form does
+    // not ask which, because a guess would be a wrong location against a real
+    // drug. Optional: most members cannot give medications at all.
+    keys:    ['date','time','name','callnum','result','usageCount','usageText','meds','replaced','usageJson','sid'],
+    headers: ['Date','Time','Name','Call Number','Result','Units Used','What Was Used','Medications Given','Replaced By Member','Used (data)','Submission ID'],
+    widths:  [95, 70, 150, 110, 150, 90, 380, 260, 260, 200, 120]
   },
   'Reports': {
     name: 'Reports', freeze: 3,
