@@ -216,7 +216,11 @@
   .medacc .accbody{padding-left:14px}
 
   /* ---------- the picture guide ---------- */
+  /* The guide link is an <a> wearing .btn, so it inherits the browser's default
+     underline the way .sb-ext does. A button that is underlined reads as two
+     controls stacked on each other. */
   .guidebar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 18px}
+  .guidebar a.btn{text-decoration:none}
   .guidecredit{font-family:var(--font-display);font-style:italic;font-size:14px;
     color:var(--brand);letter-spacing:.01em}
   .medrow{display:flex;align-items:center;gap:12px;padding:9px 0;
@@ -1257,7 +1261,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260811204758';
+var BUILD='20260811210724';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
