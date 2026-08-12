@@ -42,6 +42,16 @@
     --maxw:1120px;
   }
   *{box-sizing:border-box}
+  /* `overscroll-behavior-y:none` stops the rubber-band bounce at the top of the
+     page. Dragging down past the top otherwise pulls the whole document with it
+     and opens a gap above the sticky topbar — the header appears to leave, when
+     really the page has been dragged off it. Also stops a scroll that runs off
+     the end of the page from chaining to the browser's own pull-to-refresh.
+
+     `background-color` on html as well as body: the bounce area is painted from
+     the ROOT element, so without it that gap flashes white on a warm-paper
+     page even when the bounce is only a few pixels. */
+  html{overscroll-behavior-y:none;background-color:var(--bg)}
   html,body{margin:0}
   body{color:var(--ink);font-family:var(--font-body);line-height:1.55;-webkit-font-smoothing:antialiased;
     text-rendering:optimizeLegibility;
@@ -198,9 +208,17 @@
   .repgrid + .invwrap{margin-top:16px}
 
   /* ---------- medications given ---------- */
-  .medcard h3 .opt{font-family:var(--font-body);font-size:11px;font-weight:600;
-    text-transform:uppercase;letter-spacing:.08em;color:var(--ink-faint);
-    margin-left:8px;vertical-align:middle}
+  .medacc .acchead .opt{font-family:var(--font-body);font-size:10.5px;font-weight:600;
+    text-transform:uppercase;letter-spacing:.08em;color:var(--ink-faint);margin-left:auto}
+  .medacc .acchead .num{background:var(--bg-2);color:var(--ink-faint)}
+  .medacc .acchead .num.on{background:var(--brand);color:#fff}
+  .medacc.has .acchead{border-left:3px solid var(--brand)}
+  .medacc .accbody{padding-left:14px}
+
+  /* ---------- the picture guide ---------- */
+  .guidebar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 18px}
+  .guidecredit{font-family:var(--font-display);font-style:italic;font-size:14px;
+    color:var(--brand);letter-spacing:.01em}
   .medrow{display:flex;align-items:center;gap:12px;padding:9px 0;
     border-bottom:1px solid var(--rule-soft)}
   .medrow:last-child{border-bottom:0}
@@ -237,7 +255,10 @@
      above the topbar, and swallowed every tap including the one on the hamburger
      meant to open it. Opacity alone is invisible, not intangible. */
   .navscrim{display:none;position:fixed;inset:0;z-index:29;background:rgba(36,26,29,.42);
-    opacity:0;pointer-events:none;transition:opacity .22s var(--ease)}
+    /* Matched to the drawer's .26s so the dimming and the slide finish
+       together; at .22s the scrim cleared first and the last of the slide
+       happened against an already-bright page. */
+    opacity:0;pointer-events:none;transition:opacity .26s var(--ease)}
   body.nav-open .navscrim{opacity:1;pointer-events:auto}
 
   /* Narrow screens: the sidebar becomes a slide-in drawer rather than a horizontal
@@ -254,12 +275,20 @@
       flex-direction:column;gap:2px;padding:16px 12px calc(16px + env(safe-area-inset-bottom));
       background:var(--bg);border-right:1px solid var(--rule);border-bottom:0;
       box-shadow:var(--shadow-lg);overflow-y:auto;-webkit-overflow-scrolling:touch;
-      transform:translateX(-102%);transition:transform .26s var(--ease-out);
+      transform:translateX(-102%);
+      /* `visibility` is not interpolatable, so it flips the instant the class
+         goes — which meant the drawer DISAPPEARED at the start of its own
+         slide-out instead of travelling. Delaying it by exactly the slide
+         duration keeps it on screen for the whole animation and still makes it
+         untabbable once shut. Opening carries no delay, so it appears at once
+         and slides in. */
+      transition:transform .26s var(--ease-out), visibility 0s linear .26s;
       visibility:hidden}
     /* translateX(0), not `none`. Transitioning between `none` and a transform
        function is unreliable — the browser has no matching start value to
        interpolate from and can leave the element parked at its start offset. */
-    body.nav-open .sidebar{transform:translateX(0);visibility:visible}
+    body.nav-open .sidebar{transform:translateX(0);visibility:visible;
+      transition:transform .26s var(--ease-out), visibility 0s linear 0s}
     .sb-item{padding:11px 13px;font-size:15px;border-radius:var(--radius);white-space:normal}
     .sb-item .ic{display:inline-block}
     .sb-label{display:block}
@@ -690,7 +719,21 @@
     cursor:pointer;font:inherit;font-size:14px;font-weight:600;text-align:left;color:var(--ink-soft);
     transition:border-color .16s var(--ease),background .16s var(--ease),color .16s var(--ease)}
   .roompick:hover{border-color:var(--brand);color:var(--ink)}
-  .roompick.on{background:var(--brand);border-color:var(--brand);color:#fff;box-shadow:var(--shadow-sm)}
+  .roompick:active{transform:scale(.975)}
+  /* An ANIMATION, not a transition. setPick() re-renders the pick buttons, so
+     the selected one is a brand-new element and there is no previous state to
+     transition from — a transition here simply never plays. A keyframe runs on
+     creation, which is exactly the moment worth marking. */
+  .roompick.on{background:var(--brand);border-color:var(--brand);color:#fff;
+    box-shadow:var(--shadow-sm);animation:pickOn .22s var(--ease-out)}
+  @keyframes pickOn{
+    from{transform:scale(.96);box-shadow:none}
+    60%{transform:scale(1.015)}
+    to{transform:none}}
+  @media(prefers-reduced-motion:reduce){
+    .roompick.on{animation:none}
+    .roompick:active{transform:none}
+  }
   .roompick .rp-sub{display:block;font-size:11px;font-weight:500;letter-spacing:.04em;text-transform:uppercase;
     opacity:.7;margin-top:2px}/* ---------- counted items (stock entry) ---------- */
   .countline .cl-lbl small{display:block;color:var(--ink-faint);font-size:11.5px}
@@ -1214,7 +1257,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260811181611';
+var BUILD='20260811204758';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -2294,6 +2337,15 @@ var DEFAULTS={
 
      In neither SEEDED nor NO_SYNC, like roomConfirmed: it records work that was
      done, so it must survive a content re-seed and it must reach everyone. */
+  /* The Equipment Manager's visual guide to the bags — a link, its button text,
+     and a credit. Content, so it syncs and she can change it herself; not
+     SEEDED, so a release cannot overwrite her address with the placeholder. */
+  bagGuide:{
+    url:'https://www.figma.com/proto/Dc8siKEbekgyhu2OkfSjjM/EMS-Bag-PDF-s?node-id=3-6&scaling=min-zoom&content-scaling=fixed&page-id=0%3A1&starting-point-node-id=3%3A6',
+    label:'See the bags in pictures',
+    credit:'Thanks P3!'
+  },
+
   lastChecked:{},
 
   /* DUTY PERIODS
@@ -3761,11 +3813,19 @@ function renderCheck(fid){
        'onclick="addUsageRow(\''+fid+'\')">+ Add an item</button></div></div>';
   }
 
-  /* --- medications, optional --- */
+  /* --- medications, optional and shut ---
+     Eight rows of drugs almost nobody can give, sitting open between the usage
+     rows and the Submit button, made the form look longer and more medical than
+     it is for the member filling it in. Shut by default; one tap opens it, and
+     the count on the head says whether anything is in there so a closed section
+     can never hide an answer. */
   if(c.meds){
-    h+='<div class="card mt medcard"><h3>'+esc(c.meds.label)+
-       ' <span class="opt">optional</span></h3>'+
-       '<div id="'+fid+'-meds"></div></div>';
+    h+='<div class="acc mt medacc" id="'+fid+'-medacc">'+
+       '<button type="button" class="acchead" onclick="toggleAcc(this)">'+
+       '<span class="num" id="'+fid+'-medcount">0</span>'+
+       '<span>'+esc(c.meds.label)+'</span>'+
+       '<span class="opt">optional</span><span class="chev">▾</span></button>'+
+       '<div class="accbody"><div id="'+fid+'-meds"></div></div></div>';
   }
 
   /* --- extras --- */
@@ -3844,6 +3904,14 @@ function medsComplete(fid){
 function renderMeds(fid){
   var host=document.getElementById(fid+'-meds'); if(!host) return;
   var s=medState(fid), list=medList();
+  /* The head carries the total while the section is shut. A collapsed section
+     that can hold an answer has to say when it does, or somebody scrolls past
+     a closed row and files a call without the drug they gave. */
+  var given=medsComplete(fid).reduce(function(a,m){ return a+m.qty; },0);
+  var badge=document.getElementById(fid+'-medcount');
+  if(badge){ badge.textContent=given; badge.classList.toggle('on',given>0); }
+  var acc=document.getElementById(fid+'-medacc');
+  if(acc) acc.classList.toggle('has', given>0);
   if(!list.length){ host.innerHTML='<p class="hint" style="margin:0">No medications are listed in the inventory yet.</p>'; return; }
   // A stepper, not a text field: this is one hand on a phone after a call, and
   // the answer is almost always 1.
@@ -5085,6 +5153,21 @@ function editRoomTasks(id){
 }
 
 /* ---- bag contents ---- */
+function editBagGuide(){
+  if(!can('equipment')) return;
+  var g=DB.bagGuide||{};
+  uiForm('Picture guide','',
+    [{key:'url',label:'Link',type:'text',value:g.url||''},
+     {key:'label',label:'Button text',type:'text',value:g.label||'See the bags in pictures'},
+     {key:'credit',label:'Credit',type:'text',value:g.credit||''}],{okText:'Save'})
+   .then(function(v){
+     if(!v) return;
+     DB.bagGuide={url:(v.url||'').trim(), label:(v.label||'').trim()||'See the bags in pictures',
+                  credit:(v.credit||'').trim()};
+     saveDB(); renderBags();
+   });
+}
+
 /* "Last checked" for one kit type, or nothing at all if it never has been.
    Never invents a date: a kit nobody has opened says so, because "no date" and
    "checked a long time ago" need different reactions. */
@@ -5121,6 +5204,24 @@ function lastCheckedLine(bagId){
 function renderBags(){
   var host=document.getElementById('bagsHost'); if(!host) return;
   var h='';
+
+  /* The Equipment Manager's visual bag guide. Editable rather than hard-coded
+     because it is hers: the address will change when she moves it off a Figma
+     prototype, and the credit is a name that should be changeable by whoever
+     holds the role next. Hidden entirely when no link is set, so this never
+     shows an empty row waiting for content. */
+  if(DB.bagGuide && DB.bagGuide.url){
+    h+='<div class="guidebar">'+
+       '<a class="btn solid" href="'+esc(DB.bagGuide.url)+'" target="_blank" rel="noopener">'+
+       esc(DB.bagGuide.label||'See the bags in pictures')+
+       '<span class="ext-mark">↗</span></a>'+
+       (DB.bagGuide.credit?'<span class="guidecredit">'+esc(DB.bagGuide.credit)+'</span>':'')+
+       '<button class="btn ghost xs" data-need="equipment" onclick="editBagGuide()">Edit</button>'+
+       '</div>';
+  }else{
+    h+='<div class="row" data-need="equipment" style="margin-bottom:14px">'+
+       '<button class="btn ghost sm" onclick="editBagGuide()">Add a picture guide</button></div>';
+  }
 
   DB.bags.forEach(function(b){
     h+='<div class="card mt"><h3>'+esc(b.name)+
