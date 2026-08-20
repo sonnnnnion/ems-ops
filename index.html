@@ -215,6 +215,12 @@
   .medacc.has .acchead{border-left:3px solid var(--brand)}
   .medacc .accbody{padding-left:14px}
 
+  /* ---------- To Get sections ---------- */
+  .tgsec{font-family:var(--font-display);font-size:17px;margin:24px 0 2px;color:var(--ink)}
+  .tgsec:first-of-type{margin-top:18px}
+  .tgempty{margin:6px 0 0}
+  .dim{color:var(--ink-faint)}
+
   /* ---------- the picture guide ---------- */
   /* The guide link is an <a> wearing .btn, so it inherits the browser's default
      underline the way .sb-ext does. A button that is underlined reads as two
@@ -375,6 +381,12 @@
   th{font-family:var(--font-mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-faint);border-bottom:1.5px solid var(--rule)}
 
   .checkline{display:flex;align-items:flex-start;gap:12px;padding:11px 2px;border-bottom:1px dashed var(--rule-soft)}
+  /* An item that owns an expiry field hands its rule to that field, so the line
+     closes the PAIR. Otherwise the separator sits between the item and its own
+     date and the date reads as the next item's — which is how a pair of safety
+     glasses appeared to expire. */
+  .checkline.hasexp{border-bottom:0;padding-bottom:2px}
+  .exprow{border-bottom:1px dashed var(--rule-soft)}
   .checkline input[type=checkbox]{margin-top:3px;width:16px;height:16px;accent-color:var(--brand);flex:0 0 auto}
   .checkline .lbl{flex:1;font-size:14px}
   .checkline .lbl small{display:block;color:var(--ink-faint);font-size:12px}
@@ -1261,7 +1273,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260811210724';
+var BUILD='20260820001238';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -2510,6 +2522,14 @@ function loadDB(){
       stale=true;
     }
   });
+  /* `where` became `wheres` when one report could name more than one bag, and
+     `kind` split purchases from reports. Old rows carry neither. */
+  (DB.toGet||[]).forEach(function(t){
+    if(!t.wheres) t.wheres = t.where ? [t.where] : [];
+    if(!t.kind)   t.kind   = 'buy';
+    delete t.where;
+  });
+
   /* The four confirmed shelf links, applied ONCE to devices that already stored
      an empty stockLink. Version-flagged rather than "fill any gap", so that
      unlinking one deliberately makes it stay unlinked — a migration that keeps
@@ -3178,12 +3198,106 @@ function accessIsEmpty(a){
   return !((a.people||[]).length || (a.officers||[]).length || (a.bikeManagers||[]).length);
 }
 
+/* ============================================================================
+   MERGING COLLECTIONS, NOT REPLACING THEM
+   ============================================================================
+   Most synced keys are ONE DOCUMENT that one person edits — the room list, the
+   bag contents, the People list. For those, "keep mine if I edited it, else take
+   the server's" is right.
+
+   These are not that. They are COLLECTIONS that many people add to from many
+   devices, and treating them as one blob is wrong in both directions:
+
+     - a device holding any unpublished entry refuses the server's whole copy
+       forever, so somebody else's checks never arrive; and
+     - whichever device publishes last overwrites the array, destroying every
+       entry the others added.
+
+   That is the reported bug: a bike checked on a phone showed in service there
+   and "never checked" on a computer. The duty-period tracker has exactly the
+   same shape — two office managers filing room checks in the same period would
+   each hold the other's back and the last publish would erase slots.
+
+   So these merge per ENTRY. Union by id, newest wins per stamp, and the
+   baseline stays the SERVER's copy so this device still knows it owes the
+   server whatever it merged in and publishes it. Both sides converge. */
+
+/* Union of two arrays of {id,...}, newest first, capped. */
+function mergeById(mineArr, theirsArr, cap){
+  var out=[], seen={};
+  (mineArr||[]).concat(theirsArr||[]).forEach(function(e){
+    if(!e || typeof e!=='object') return;
+    var id=e.id||JSON.stringify(e);
+    if(seen[id]) return;
+    seen[id]=1; out.push(e);
+  });
+  out.sort(function(a,b){ return (b.at||0)-(a.at||0); });
+  if(cap && out.length>cap) out.length=cap;
+  return out;
+}
+
+/* id -> {at,...}. The later stamp wins; a key only one side has is kept. */
+function mergeStamps(mineObj, theirsObj){
+  var out={};
+  [mineObj||{}, theirsObj||{}].forEach(function(src){
+    Object.keys(src).forEach(function(k){
+      var a=out[k], b=src[k];
+      if(!b || typeof b!=='object') return;
+      if(!a || (b.at||0) > (a.at||0)) out[k]=b;
+    });
+  });
+  return out;
+}
+
+/* Duty periods: a map of DP -> {opened, openedBy, closed, rooms:{roomId:[...]}}.
+   The room arrays are what people append to, so those union by entry id. The
+   EARLIER `opened` wins, because whoever started it started it. */
+function mergeDutyPeriods(mineObj, theirsObj){
+  var out={}, keys={};
+  Object.keys(mineObj||{}).forEach(function(k){ keys[k]=1; });
+  Object.keys(theirsObj||{}).forEach(function(k){ keys[k]=1; });
+  Object.keys(keys).forEach(function(k){
+    var a=(mineObj||{})[k], b=(theirsObj||{})[k];
+    if(!a){ out[k]=b; return; }
+    if(!b){ out[k]=a; return; }
+    var rooms={}, rk={};
+    Object.keys(a.rooms||{}).forEach(function(r){ rk[r]=1; });
+    Object.keys(b.rooms||{}).forEach(function(r){ rk[r]=1; });
+    Object.keys(rk).forEach(function(r){
+      rooms[r]=mergeById((a.rooms||{})[r], (b.rooms||{})[r], 200);
+      // Oldest first inside a room: slot 1 is whoever did it first.
+      rooms[r].sort(function(x,y){ return (x.at||0)-(y.at||0); });
+    });
+    out[k]={opened:Math.min(a.opened||Infinity,b.opened||Infinity)||a.opened||b.opened,
+            openedBy:a.openedBy||b.openedBy,
+            closed:!!(a.closed&&b.closed),
+            rooms:rooms};
+  });
+  return out;
+}
+
+/* Which keys merge, and how. Anything not named here replaces as before. */
+var MERGE_KEYS={
+  dutyPeriods:  mergeDutyPeriods,
+  roomConfirmed:mergeStamps,
+  lastChecked:  mergeStamps
+};
+
 function applyContentInner(obj){
   var n=0, mine=unpublishedKeys();
   Object.keys(DEFAULTS).forEach(function(k){
     if(NO_SYNC[k] || !Object.prototype.hasOwnProperty.call(obj,k)) return;
     // Edited here since the last sync: keep it. Overwriting would discard work
     // with no way to get it back.
+    /* A collection is merged whether or not this device has edits pending —
+       that is the whole point. Done before the unpublished check, because
+       "I have entries the server lacks" must not mean "I refuse yours". */
+    if(MERGE_KEYS[k] &&
+       Object.prototype.toString.call(obj[k])===Object.prototype.toString.call(DEFAULTS[k])){
+      var merged=MERGE_KEYS[k](DB[k], obj[k]);
+      if(JSON.stringify(merged)!==JSON.stringify(DB[k])){ DB[k]=merged; n++; }
+      return;
+    }
     if(mine.indexOf(k)>=0){
       if(!(k==='access' && accessIsEmpty(DB.access) && !accessIsEmpty(obj.access))) return;
       // Fall through: take the server's list, and stop calling it a local edit.
@@ -4106,7 +4220,11 @@ function checkBody(fid){
   secs.forEach(function(sec){
     h+='<div class="card mt"><h3>'+esc(sec.name)+'</h3>';
     (sec.items||[]).forEach(function(it){
-      h+='<label class="checkline"><input type="checkbox" data-item="'+esc(it.id)+'" '+
+      // `hasexp` so the dashed rule can move to the bottom of the expiry row.
+      // Without it the rule falls BETWEEN an item and its own date field, which
+      // reads as the date belonging to the item below — and the item below was
+      // a pair of safety glasses.
+      h+='<label class="checkline'+(it.exp?' hasexp':'')+'"><input type="checkbox" data-item="'+esc(it.id)+'" '+
          'data-label="'+esc(it.label)+'" onchange="onFormInput(\''+fid+'\')">'+
          '<span class="lbl">'+esc(it.label)+'</span>'+
          (it.qty?'<span class="qty">'+esc(it.qty)+'</span>':'')+'</label>';
@@ -4775,7 +4893,9 @@ function doSubmit(fid,s){
         // Something missing from a bag is something to buy, so it joins the list
         // rather than only sitting in the problem log.
         if(c.tab==='Bag Checks'||c.tab==='Checkouts')
-          wantItem({name:m, cat:'Equipment', where:s.pickName, by:openedBy});
+          // A missing tick is a report, not a purchase: it may be short, or it may
+      // be on the wrong shelf, and the wording cannot tell you which.
+      wantItem({kind:'report', name:m, cat:'Equipment', where:s.pickName, by:openedBy});
       });
     }
     // Free text is always a real report, on every form — somebody chose to type it.
@@ -4785,7 +4905,11 @@ function doSubmit(fid,s){
       var ar=(c.tab==='Room Checks')?pair[1]:area;
       addIssue({area:ar, urgency:'Soon', what:v, where:s.pickName, unit:unitId, by:openedBy});
       // A restock request is a request to buy something. Maintenance is not.
-      if(pair[0]!=='maint') wantItem({name:v, cat:ar, where:s.pickName, by:openedBy});
+      // Somebody typed a sentence. It is worth reading, and it is not a line
+      // on a shopping list — "I was not able to find more medical tape." was
+      // appearing as an item to buy, named exactly that.
+      if(pair[0]!=='maint')
+        wantItem({kind:'report', name:v, cat:ar, where:s.pickName, by:openedBy});
     });
     /* What the member put back themselves, named per item rather than as free
        text. Logged and never bought: ordering another of the one thing that is
@@ -4855,13 +4979,39 @@ function resolveConcern(what,where){
   var k=concernKey(what,where);
   if(DB.resolvedKeys.indexOf(k)<0) DB.resolvedKeys.push(k);
   (DB.issues||[]).forEach(function(i){ if(concernKey(i.what,i.where)===k) i.open=false; });
+  /* A concern and the To Get line it produced are the same fact written twice.
+     Resolving one and leaving the other is how the buy list filled up with
+     things that had already been dealt with — somebody ticks "missing eyewash"
+     off the problem log and it is still sitting on the shopping list a week
+     later, so nobody trusts the list. Ticked, not deleted: it moves to Handled
+     where it can still be undone. */
+  toGetMarkHandled(what, where);
   if(DB.resolvedKeys.length>800) DB.resolvedKeys.splice(0,DB.resolvedKeys.length-800);
   saveDB();
+}
+
+/* Marks the report row matching a concern as handled. Matched on the same
+   what|where signature the concern uses, so a rename of neither breaks it. */
+function toGetMarkHandled(what, where, undo){
+  var w=String(where||'').trim().toLowerCase();
+  var name=String(what||'').trim().toLowerCase();
+  (DB.toGet||[]).forEach(function(t){
+    if((t.kind||'buy')!=='report') return;
+    var tn=String(toGetName(t)||'').trim().toLowerCase();
+    if(tn!==name) return;
+    var places=(t.wheres||[]).map(function(x){return String(x).trim().toLowerCase();});
+    // No place on either side still counts as a match: a note typed with no bag
+    // picked is about the check it came from, not about nowhere in particular.
+    if(w && places.length && places.indexOf(w)<0) return;
+    t.done = !undo;
+    t.last = Date.now();
+  });
 }
 function unresolveConcern(what,where){
   var k=concernKey(what,where);
   DB.resolvedKeys=(DB.resolvedKeys||[]).filter(function(x){return x!==k;});
   (DB.issues||[]).forEach(function(i){ if(concernKey(i.what,i.where)===k) i.open=true; });
+  toGetMarkHandled(what, where, true);
   saveDB();
 }
 
@@ -4875,10 +5025,10 @@ function addIssue(o){
   saveDB();
 }
 function resolveConcernUI(what,where){
-  resolveConcern(what,where); renderLog(); renderReports(); renderReadiness();
+  resolveConcern(what,where); renderLog(); renderReports(); renderReadiness(); renderToGet();
 }
 function reopenConcernUI(what,where){
-  unresolveConcern(what,where); renderLog(); renderReports(); renderReadiness();
+  unresolveConcern(what,where); renderLog(); renderReports(); renderReadiness(); renderToGet();
 }
 
 
@@ -5091,7 +5241,11 @@ function dpTotals(key){
 function dpRecord(key,roomId,cs){
   var d=dpGet(key); if(!d) return false;
   d.rooms=d.rooms||{};
-  d.rooms[roomId]=(d.rooms[roomId]||[]).concat([{cs:cs||'', at:Date.now()}]);
+  /* `id` so two devices filing into the same duty period can be merged rather
+     than one overwriting the other. Without it there is nothing to union on and
+     an identical-looking slot from another phone is indistinguishable from a
+     duplicate of this one. */
+  d.rooms[roomId]=(d.rooms[roomId]||[]).concat([{id:uid('dpe'), cs:cs||'', at:Date.now()}]);
   return true;
 }
 
@@ -5189,7 +5343,7 @@ function flagLow(bagId,itemId){
   var by=(me.first?(me.first+' '+(me.last||'')).trim():'')||me.callsign||'Anonymous';
   addIssue({area:'Equipment', urgency:'Soon', what:'Running low: '+label,
             where:b?b.name:'', by:by});
-  wantItem({name:label, cat:'Equipment', where:b?b.name:'', by:by});
+  wantItem({kind:'report', name:label, cat:'Equipment', where:b?b.name:'', by:by});
   saveDB(); renderToGet();
   uiAlert(label+' is flagged as low and on the To Get list.','Thanks');
 }
@@ -5502,24 +5656,64 @@ function clearUnit(id){
    item done greys it; if it is reported again afterwards the row reopens,
    because a ticked row that is no longer true is worse than no row.
    Mirrors the Restock tab the Apps Script maintains in the spreadsheet. */
+/* Two different things used to share one list, and reading it was guesswork.
+
+   A USAGE row or a below-par shelf count is a purchase: a known item, a known
+   quantity, buy it. A missing checklist tick or a typed note is a REPORT: "the
+   eyewash was not in Jumpkit A". Some of those become purchases and some turn
+   out to be "it was there, on the wrong shelf" — and the difference is not
+   something this site can work out from the wording. Trying to guess produced
+   rows called "Glucometer tested — strip inserted, blood droplet shows on
+   screen" sitting in a shopping list.
+
+   So `kind` splits them, and the view shows them as two sections with two
+   different questions: what to buy, and what somebody reported. Neither is
+   guessed at; each call site says which it is.
+
+   `wheres` is a LIST, not a string. It used to be overwritten by whichever
+   report landed last, so eyewash reported missing from Jumpkit A and Jumpkit D
+   showed as one row against Jumpkit A — which reads as the same kit asking
+   twice. Every place that asked is kept, and the row says all of them. */
 function wantItem(o){
   DB.toGet=DB.toGet||[];
-  var key=o.item||('free:'+(o.name||'').toLowerCase());
+  var kind=o.kind==='report'?'report':'buy';
+  // Reports key per PLACE as well as per item: the same thing missing from two
+  // bags is two things to go and look at, not one line with a bigger number.
+  var base=o.item||('free:'+(o.name||'').toLowerCase());
+  var key=kind==='report' ? 'rep:'+base+'@'+((o.where||'').toLowerCase()) : base;
   var hit=DB.toGet.filter(function(t){return t.key===key;})[0];
   var now=Date.now();
   if(hit){
     if(hit.done){ hit.done=false; hit.times=1; hit.qty=o.qty||1; hit.first=now; }
     else { hit.times=(hit.times||1)+1; hit.qty=(hit.qty||0)+(o.qty||1); }
     hit.last=now;
-    if(o.where) hit.where=o.where;
+    if(o.where && (hit.wheres||[]).indexOf(o.where)<0)
+      hit.wheres=(hit.wheres||[]).concat([o.where]);
     if(o.by) hit.by=o.by;
   }else{
-    DB.toGet.unshift({key:key, item:o.item||'', name:o.name||'', cat:o.cat||'Equipment',
-      qty:o.qty||1, unit:o.unit||'', times:1, first:now, last:now,
-      where:o.where||'', by:o.by||'', done:false});
+    DB.toGet.unshift({key:key, kind:kind, item:o.item||'', name:o.name||'',
+      cat:o.cat||'Equipment', qty:o.qty||1, unit:o.unit||'', times:1,
+      first:now, last:now, wheres:o.where?[o.where]:[], by:o.by||'', done:false});
   }
   if(DB.toGet.length>400) DB.toGet.length=400;
 }
+
+/* Every place that asked for this, as one readable string. */
+function toGetWhere(t){
+  var w=t.wheres || (t.where?[t.where]:[]);
+  return w.length ? w.join(', ') : '';
+}
+
+/* Rows older than this that are already ticked stop cluttering the list. Kept
+   rather than deleted while open, because an unhandled report is the whole
+   point of the list. */
+function pruneToGet(){
+  var cut=Date.now()-1000*60*60*24*45;
+  var before=(DB.toGet||[]).length;
+  DB.toGet=(DB.toGet||[]).filter(function(t){ return !t.done || (t.last||0)>cut; });
+  return before-(DB.toGet||[]).length;
+}
+
 
 function toGetName(t){
   if(t.item && t.item.indexOf('free:')===0) return t.name||t.item.slice(5);
@@ -5703,7 +5897,8 @@ function wantExpiring(key){
   if(r.onList){
     DB.toGet=(DB.toGet||[]).filter(function(t){ return t.key!==k; });
   }else{
-    wantItem({name:r.item, cat:'Equipment', where:r.place, by:(readMe()||{}).andrew||''});
+    wantItem({kind:'report', name:r.item, cat:'Equipment', where:r.place,
+            by:(readMe()||{}).andrew||''});
   }
   saveDB();
   renderExpiring();
@@ -5736,35 +5931,55 @@ function renderToGet(){
     h+='<div class="row mt"><button class="btn ghost sm" onclick="addToGet()">Add an item</button></div>';
     host.innerHTML=h; return;
   }
-  h+='<div class="repgrid"><div class="repstat"><div class="rs-n">'+open.length+
-     '</div><div class="rs-l">to get</div></div>'+
-     '<div class="repstat"><div class="rs-n">'+
-     open.filter(function(t){return (t.times||1)>1;}).length+
-     '</div><div class="rs-l">asked more than once</div></div></div>';
+  /* Two lists, two questions. "Buy these" is a shopping list: known item, known
+     quantity. "Reported on a check" is a to-look-at list: somebody could not
+     find something, or typed a note, and whether that becomes a purchase is a
+     judgment nobody can make from the wording. Mixing them is what put
+     "I was not able to find more medical tape." in a shopping list. */
+  var buys=open.filter(function(t){ return (t.kind||'buy')!=='report'; });
+  var reps=open.filter(function(t){ return (t.kind||'buy')==='report'; });
 
-  h+='<div class="invwrap"><table class="invtable"><thead><tr>'+
-     '<th></th><th>Item</th><th>Qty</th><th>Asked</th><th>Last</th><th>Where</th><th></th>'+
-     '</tr></thead><tbody>';
-  open.forEach(function(t,i){
-    var idx=list.indexOf(t);
-    var tick=t.remote
-      ? 'toggleRestock(\''+jsq(t.item)+'\',true)'
-      : 'toggleToGet('+idx+')';
-    h+='<tr><td><input type="checkbox" onchange="'+tick+'" '+
-       'aria-label="Mark got"></td>'+
-       '<td>'+esc(toGetName(t))+'<br><span style="font-size:11px;color:var(--ink-faint)">'+
-       esc(t.cat)+'</span></td>'+
-       '<td class="num">'+esc(String(t.qty||1))+(t.unit&&t.unit!=='each'?' '+esc(t.unit):'')+'</td>'+
-       '<td class="num"'+((t.times||1)>1?' style="font-weight:700;color:var(--warn)"':'')+'>'+
-       (t.times||1)+'</td>'+
-       '<td style="font-size:12px">'+esc(toGetDate(t))+'</td>'+
-       '<td style="font-size:12px">'+esc(t.where||'—')+'</td>'+
-       // Removing a row from the sheet is the sheet's job — a delete here would
-       // have to be undone there, and the two would disagree in the meantime.
-       '<td>'+(t.remote?'':'<button class="btn xs" onclick="delToGet('+idx+')">✕</button>')+
-       '</td></tr>';
-  });
-  h+='</tbody></table></div>';
+  h+='<div class="repgrid">'+
+     '<div class="repstat"><div class="rs-n">'+buys.length+'</div>'+
+     '<div class="rs-l">to buy</div></div>'+
+     '<div class="repstat"><div class="rs-n">'+reps.length+'</div>'+
+     '<div class="rs-l">reported, not yet handled</div></div>'+
+     '<div class="repstat"><div class="rs-n">'+done.length+'</div>'+
+     '<div class="rs-l">handled</div></div></div>';
+
+  function rowsTable(rows, cols3){
+    var t2='<div class="invwrap"><table class="invtable"><thead><tr>'+
+       '<th></th><th>Item</th>'+(cols3?'<th>Qty</th>':'')+
+       '<th>Where</th><th>Asked</th><th>Last</th><th></th></tr></thead><tbody>';
+    rows.forEach(function(t){
+      var idx=list.indexOf(t);
+      var tick=t.remote ? 'toggleRestock(\''+jsq(t.item)+'\',true)' : 'toggleToGet('+idx+')';
+      var w=toGetWhere(t);
+      t2+='<tr><td><input type="checkbox" onchange="'+tick+'" aria-label="Mark handled"></td>'+
+         '<td>'+esc(toGetName(t))+'<br><span style="font-size:11px;color:var(--ink-faint)">'+
+         esc(t.cat)+'</span></td>'+
+         (cols3?'<td class="num">'+esc(String(t.qty||1))+
+           (t.unit&&t.unit!=='each'?' '+esc(t.unit):'')+'</td>':'')+
+         // Every place that asked, not just the last one to ask.
+         '<td style="font-size:12px">'+(w?esc(w):'<span class="dim">anywhere</span>')+'</td>'+
+         '<td class="num"'+((t.times||1)>1?' style="font-weight:700;color:var(--warn)"':'')+'>'+
+         (t.times||1)+'</td>'+
+         '<td style="font-size:12px">'+esc(toGetDate(t))+'</td>'+
+         '<td>'+(t.remote?'':'<button class="btn xs" onclick="delToGet('+idx+')">✕</button>')+
+         '</td></tr>';
+    });
+    return t2+'</tbody></table></div>';
+  }
+
+  h+='<h3 class="tgsec">Buy these</h3>';
+  h+= buys.length ? rowsTable(buys,true)
+     : '<p class="hint tgempty">Nothing to buy. Items land here when a post-call '+
+       'logs what was used, or a shelf count drops below its par.</p>';
+
+  h+='<h3 class="tgsec">Reported on a check</h3>';
+  h+= reps.length ? rowsTable(reps,false)
+     : '<p class="hint tgempty">Nothing outstanding. Anything a member could not '+
+       'find, or typed into a check, appears here until somebody ticks it off.</p>';
 
   h+='<div class="row mt"><button class="btn ghost sm" onclick="addToGet()">Add an item</button>'+
      '<button class="btn ghost sm" onclick="copyToGet()">Copy list</button>'+
@@ -5773,7 +5988,7 @@ function renderToGet(){
 
   if(done.length){
     h+='<div class="acc mt"><button type="button" class="acchead" onclick="toggleAcc(this)">'+
-       '<span class="num">'+done.length+'</span><span>Got</span><span class="chev">▾</span></button>'+
+       '<span class="num">'+done.length+'</span><span>Handled</span><span class="chev">▾</span></button>'+
        '<div class="accbody"><ul class="isslist">'+done.slice(0,60).map(function(t){
          var idx=list.indexOf(t);
          var undo=t.remote
