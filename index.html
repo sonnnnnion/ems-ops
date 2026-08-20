@@ -821,6 +821,9 @@
   .formnote b{color:var(--ink);font-weight:700}
 
   /* ---------- duty periods ---------- */
+  .dpsrc{font-size:12px;color:var(--ink-faint);margin:0 0 12px}
+  .dpsrc.bad{color:var(--oos)}
+  .dpsrc .btn{margin-left:6px}
   .dpnew{font-size:12.5px;color:var(--ink-mute);margin:10px 0 0}
   .dpopen{font-size:13px;color:var(--ink-soft);margin:10px 0 6px}
   .dpdone{font-size:12.5px;color:var(--ok);font-weight:600;margin:8px 0 0}
@@ -1273,7 +1276,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260820003718';
+var BUILD='20260820011155';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -3742,8 +3745,11 @@ function go(v,fromHash){
   if(v==='toget'){ renderToGet(); fetchRestock().then(function(){ renderToGet(); }); }
   // Derived from DB.expiry, which any contents check can have just written.
   if(v==='expiring') renderExpiring();
-  // Derived from DB.dutyPeriods, which every room check writes to.
-  if(v==='tracker') renderTracker();
+  /* Read from the SHEET, then repainted — the same shape either way, so nothing
+     jumps. Without this the tracker shows only what this device filed, which is
+     the whole bug: publishing needs a manager token and filing does not. */
+  if(v==='tracker'){ renderTracker(); fetchDutyPeriods().then(function(){ renderTracker(); }); }
+  if(v==='room-check'){ fetchDutyPeriods().then(function(){ renderDpState('room-check'); }); }
   countView(v);
   // Arriving at a form is when to fill in who this is. The forms are rendered
   // once at startup and only shown by go(), so doing it at render time meant it
@@ -4490,7 +4496,7 @@ function renderDpState(fid){
   }
   if(!n){ box.innerHTML=''; return; }
 
-  var key=dpKey(n), d=dpGet(key);
+  var key=dpKey(n), d=dpExists(key);
   if(!d){
     box.innerHTML='<p class="dpnew">'+esc(dpLabel(key))+' has not been used yet. '+
       'Filing this will start it.'+
@@ -4498,8 +4504,9 @@ function renderDpState(fid){
     return;
   }
   var rem=dpRemaining(key), t=dpTotals(key);
+  var closed=!!((dpGet(key)||{}).closed);
   var h='<p class="dpopen"><b>'+esc(dpLabel(key))+'</b> · '+t.done+' of '+t.need+' checks done'+
-        (d.closed?' · closed':'')+'</p>';
+        (closed?' · closed':'')+'</p>';
   if(!rem.length){
     h+='<p class="dpdone">Every room is covered.</p>';
   }else{
@@ -4715,7 +4722,7 @@ function submitCheck(fid){
    push somebody into filing it as a different room, which is worse than a
    duplicate: it is a wrong room with a real call sign against it. */
 function submitWithDp(fid,s){
-  var key=s.dp, d=dpGet(key);
+  var key=s.dp, d=dpExists(key);
 
   if(!d && !canOpenDP()){
     uiAlert(dpLabel(key)+' has not been started yet, and starting one needs site '+
@@ -4728,6 +4735,7 @@ function submitWithDp(fid,s){
     if(!dpGet(key)) dpOpen(key,s.callsign||'');
     doSubmit(fid,s);
   };
+
 
   if(!d){
     uiConfirm('Nothing has been filed against '+dpLabel(key)+' yet, so this will '+
@@ -4774,7 +4782,10 @@ function doSubmit(fid,s){
     radio:s.radio||'',
     // Written as "DP 4 · 2026–27" rather than the internal key, because the
     // person reading this column is reading a spreadsheet, not a data model.
-    dp:s.dp?dpLabel(s.dp):'',
+    // `dpKey` and `roomId` ride alongside for the tracker to read back: matching
+    // on the readable ones would detach every check the moment a room is renamed.
+    dp:s.dp?dpLabel(s.dp):'', dpKey:s.dp||'',
+    roomId:(c.pick&&c.pick.from==='rooms')?(s.pick||''):'',
     subject:s.pickName, done:s.done.join(' | '), missing:s.missing.join(' | '),
     doneCount:s.done.length, missingCount:s.missing.length,
     expired:(s.expired||[]).join(' | '), expiringSoon:(s.soon||[]).join(' | ')
@@ -4907,7 +4918,9 @@ function doSubmit(fid,s){
   // on shift opens.
   if(c.dp && s.dp && s.pick){
     dpOpen(s.dp, s.callsign||'');
-    dpRecord(s.dp, s.pick, s.callsign||'');
+    // The sid goes in so this device can recognise its own row when it comes
+    // back from the sheet, instead of showing the same filing twice.
+    dpRecord(s.dp, s.pick, s.callsign||'', payload.sid);
   }
   // A contents check is the only thing that knows a whole kit was just gone
   // through. `s.pick` is the bag TYPE id, which is what this form picks.
@@ -5255,7 +5268,86 @@ function canOpenDP(){
   return ((DB.access&&DB.access.bikeManagers)||[]).map(normEmail).indexOf(normEmail(me))>=0;
 }
 
+/* ---- the duty period, as the SHEET has it -----------------------------------
+   The tracker cannot be built from synced content. Filing a form needs no
+   sign-in, which is why members can file at all — but PUBLISHING shared content
+   needs a manager token, so a member's room check reached the spreadsheet and
+   never reached anybody else's tracker. The Office Manager would open it, see
+   only what she had filed herself, and rooms already done would read as
+   outstanding. People would redo them.
+
+   So the sheet is the source, because it is the one place every filing lands no
+   matter who filed it. `DB.dutyPeriods` stays as an OPTIMISTIC overlay: the
+   device that just filed shows its own check immediately rather than waiting on
+   a round trip, and drops the overlay once the same sid comes back. */
+var remoteDP=null;                 // {dpKey:{roomId:[{cs,sid,date}]}}
+var dpState={loading:false, error:'', at:0};
+
+function fetchDutyPeriods(){
+  var url=(DB.api&&DB.api.url)||'';
+  if(!url) return Promise.resolve(false);
+  dpState.loading=true;
+  return fetchJSONTries(url+(url.indexOf('?')<0?'?':'&')+'dp=1&site=ops', 3, 12000)
+    .then(function(j){
+      dpState.loading=false;
+      if(!j||!j.ok||!j.dp||typeof j.dp!=='object'){ dpState.error='the sheet did not answer with duty periods'; return false; }
+      remoteDP=j.dp; dpState.error=''; dpState.at=Date.now();
+      return true;
+    })
+    .catch(function(e){
+      dpState.loading=false;
+      dpState.error='could not reach the spreadsheet ('+
+        (e&&e.message==='timeout'?'timed out':'connection failed')+')';
+      return false;
+    });
+}
+
+/* Filings for one room in one duty period: everything the sheet has, plus
+   anything this device filed that the sheet has not echoed back yet. Deduped on
+   `sid`, which is the id the row was written under — the only value both sides
+   agree on. */
+function dpEntries(key,roomId){
+  var out=[], seen={};
+  /* Array-guarded, not just null-guarded. A sheet that answers with the right
+     shape at the top level and the wrong one inside it — a room whose value is
+     a string — would otherwise throw here and take the whole tracker render
+     down with it, which is a worse failure than showing nothing. */
+  var remRaw=((remoteDP||{})[key]||{})[roomId];
+  var rem=Array.isArray(remRaw)?remRaw:[];
+  rem.forEach(function(e){
+    if(!e||typeof e!=='object') return;
+    var sid=e.sid?String(e.sid):('r'+out.length);
+    if(seen[sid]) return;
+    seen[sid]=1; out.push({cs:e.cs||'', sid:sid, at:0, remote:true});
+  });
+  var locRaw=((dpGet(key)||{}).rooms||{})[roomId];
+  var loc=Array.isArray(locRaw)?locRaw:[];
+  loc.forEach(function(e){
+    if(!e||typeof e!=='object') return;
+    // No sid means it predates this, or the submission never reached the sheet.
+    // Shown either way: a check somebody really did must not vanish because the
+    // network dropped on the way out.
+    if(e.sid && seen[e.sid]) return;
+    if(e.sid) seen[e.sid]=1;
+    out.push({cs:e.cs||'', sid:e.sid||'', at:e.at||0, remote:false});
+  });
+  return out;
+}
+
 function dpGet(key){ return (DB.dutyPeriods||{})[key]||null; }
+/* Known to anybody, not just to this device. Without this, the first member to
+   file into a duty period somebody else started would be told they were about
+   to start it — and would be asked to confirm creating one that already exists. */
+function dpExists(key){
+  if(dpGet(key)) return true;
+  return !!(remoteDP && remoteDP[key]);
+}
+function dpKeysKnown(){
+  var m={};
+  Object.keys(DB.dutyPeriods||{}).forEach(function(k){ m[k]=1; });
+  Object.keys(remoteDP||{}).forEach(function(k){ m[k]=1; });
+  return Object.keys(m);
+}
 function dpOpen(key,by){
   DB.dutyPeriods=DB.dutyPeriods||{};
   if(DB.dutyPeriods[key]) return DB.dutyPeriods[key];
@@ -5266,8 +5358,7 @@ function dpOpen(key,by){
 /* How many checks a room still needs in this duty period. `slots` is the count
    of checks it takes, so this is arithmetic rather than a boolean. */
 function dpRoomDone(key,roomId){
-  var d=dpGet(key); if(!d) return 0;
-  return ((d.rooms||{})[roomId]||[]).length;
+  return dpEntries(key,roomId).length;
 }
 function dpRoomNeeds(roomId){
   var r=(DB.rooms||[]).filter(function(x){return x.id===roomId;})[0];
@@ -5293,14 +5384,14 @@ function dpTotals(key){
    it against — an over-filled room is still recorded, because the warning that
    precedes this is an override, not a block, and a check somebody actually did
    must not vanish because the site thought the room was finished. */
-function dpRecord(key,roomId,cs){
+function dpRecord(key,roomId,cs,sid){
   var d=dpGet(key); if(!d) return false;
   d.rooms=d.rooms||{};
   /* `id` so two devices filing into the same duty period can be merged rather
      than one overwriting the other. Without it there is nothing to union on and
      an identical-looking slot from another phone is indistinguishable from a
      duplicate of this one. */
-  d.rooms[roomId]=(d.rooms[roomId]||[]).concat([{id:uid('dpe'), cs:cs||'', at:Date.now()}]);
+  d.rooms[roomId]=(d.rooms[roomId]||[]).concat([{id:uid('dpe'), cs:cs||'', at:Date.now(), sid:sid||''}]);
   return true;
 }
 
@@ -5309,7 +5400,7 @@ function dpRecord(key,roomId,cs){
    Manager opens in September, and it starts empty. */
 function dpKeysThisYear(){
   var y=acadYear();
-  return Object.keys(DB.dutyPeriods||{})
+  return dpKeysKnown()
     .filter(function(k){ return dpParse(k).year===y; })
     .sort(function(a,b){ return dpParse(b).n-dpParse(a).n; });
 }
@@ -6506,13 +6597,31 @@ function renderQR(){
    empty rather than three terms deep. */
 function dutyPeriodsHTML(){
   var keys=dpKeysThisYear();
+  /* Where these numbers came from. Without this the tracker silently falls back
+     to what this device filed, which under-reports without saying so — exactly
+     the failure the sheet-backed read exists to end. A view that cannot answer
+     the question must say it cannot, not answer it wrongly. */
+  var note='';
+  if(dpState.error){
+    note='<p class="dpsrc bad">Showing only what this device filed — '+
+         esc(dpState.error)+'. <button type="button" class="btn xs" '+
+         'onclick="fetchDutyPeriods().then(renderTracker)">Try again</button></p>';
+  }else if(remoteDP){
+    note='<p class="dpsrc">From the spreadsheet — everyone\u2019s checks, not just this device.</p>';
+  }else{
+    note='<p class="dpsrc">Reading the spreadsheet\u2026</p>';
+  }
   if(!keys.length){
-    return '<div class="card"><p class="hint" style="margin:0">No duty period has been '+
+    return note+'<div class="card"><p class="hint" style="margin:0">No duty period has been '+
       'started for '+esc(acadLabel(acadYear()))+' yet. One starts when somebody files '+
       'the first room check against its number.</p></div>';
   }
-  return keys.map(function(k){
-    var d=dpGet(k), t=dpTotals(k), rem=dpRemaining(k);
+  return note+keys.map(function(k){
+    // A duty period somebody else started exists only in the sheet on this
+    // device, so there is no local record to read — the counts come from the
+    // merged view either way.
+    var d=dpGet(k)||{opened:0,openedBy:'',closed:false,rooms:{}};
+    var t=dpTotals(k), rem=dpRemaining(k);
     var pct=t.need?Math.round(t.done/t.need*100):0;
     var h='<div class="card mt dpcard"><div class="dphead">'+
       '<h3>'+esc(dpLabel(k))+'</h3>'+
@@ -6527,10 +6636,9 @@ function dutyPeriodsHTML(){
     }
     // Who did what, so a duty period is a record and not only a score.
     var filled=[];
-    Object.keys(d.rooms||{}).forEach(function(rid){
-      var rm=(DB.rooms||[]).filter(function(x){return x.id===rid;})[0];
-      (d.rooms[rid]||[]).forEach(function(e){
-        filled.push((rm?rm.name:rid)+(e.cs?' · '+e.cs:''));
+    (DB.rooms||[]).forEach(function(rm){
+      dpEntries(k,rm.id).forEach(function(e){
+        filled.push(rm.name+(e.cs?' · '+e.cs:'')+(e.remote?'':' (not sent yet)'));
       });
     });
     if(filled.length)

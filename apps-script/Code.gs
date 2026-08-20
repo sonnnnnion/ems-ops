@@ -21,10 +21,16 @@ var SHEETS = {
        So `Duty Period` and `Call Sign` are appended, and `Andrew ID` stays in
        its original position holding the room checks already filed under it. The
        room-check form no longer asks for one, so that column simply stops
-       filling; the history under it stays readable. */
-    keys:    ['date','time','name','andrew','subject','result','missingCount','missing','restock','maint','sid','dp','callsign'],
-    headers: ['Date','Time','Name','Andrew ID','Room','Result','Missing','What Was Missing','Restock Needed','Maintenance','Submission ID','Duty Period','Call Sign'],
-    widths:  [95, 70, 150, 100, 150, 150, 80, 320, 260, 260, 120, 120, 90]
+       filling; the history under it stays readable.
+
+       `Room ID` and `DP Key` are the machine-readable pair the duty-period
+       tracker reads back. `Room` and `Duty Period` stay human-readable for
+       whoever is looking at the sheet; matching on those would break the moment
+       a room is renamed, which is the failure this file has hit more than once.
+    */
+    keys:    ['date','time','name','andrew','subject','result','missingCount','missing','restock','maint','sid','dp','callsign','roomId','dpKey'],
+    headers: ['Date','Time','Name','Andrew ID','Room','Result','Missing','What Was Missing','Restock Needed','Maintenance','Submission ID','Duty Period','Call Sign','Room ID','DP Key'],
+    widths:  [95, 70, 150, 100, 150, 150, 80, 320, 260, 260, 120, 120, 90, 110, 90]
   },
   'Checkouts': {
     name: 'Checkouts', freeze: 3,
@@ -810,6 +816,49 @@ function saveContent(p) {
 // it, where the site's own To Get only ever saw what that one browser filed.
 // These two let the site show the real list and tick it off from a phone.
 
+/* Every room check filed, grouped by duty period and room.
+
+   This exists because the tracker cannot be built from synced content. Filing a
+   form needs no sign-in — that is why members can file at all — but PUBLISHING
+   shared content needs a manager token, so a member's room check reached the
+   spreadsheet and never reached anybody else's tracker. The Office Manager would
+   open it and see only what she had filed herself, and rooms already done would
+   read as outstanding.
+
+   The sheet is the one place every filing lands regardless of who filed it, so
+   the sheet is what the tracker reads.
+
+   Keyed on `Room ID` and `DP Key`, never on the display columns beside them: a
+   renamed room would otherwise detach every check filed under its old name.
+   Rows written before those columns existed are skipped rather than guessed at.
+
+   `sid` rides along so the site can tell its own just-filed check apart from the
+   copy that has come back, instead of counting one filing twice. */
+function dutyPeriodRows() {
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS['Room Checks'].name);
+  if (!sh || sh.getLastRow() < 2) return {};
+  var head = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  var cDp = head.indexOf('DP Key'), cRoom = head.indexOf('Room ID');
+  var cCs = head.indexOf('Call Sign'), cSid = head.indexOf('Submission ID');
+  var cDate = head.indexOf('Date');
+  if (cDp < 0 || cRoom < 0) return {};          // sheet predates these columns
+  var rows = sh.getRange(2, 1, sh.getLastRow() - 1, sh.getLastColumn()).getValues();
+  var out = {};
+  rows.forEach(function (r) {
+    var dp = String(r[cDp] || '').trim();
+    var room = String(r[cRoom] || '').trim();
+    if (!dp || !room) return;
+    if (!out[dp]) out[dp] = {};
+    if (!out[dp][room]) out[dp][room] = [];
+    out[dp][room].push({
+      cs:   cCs  >= 0 ? String(r[cCs]  || '').trim() : '',
+      sid:  cSid >= 0 ? String(r[cSid] || '').trim() : '',
+      date: cDate >= 0 ? String(r[cDate] || '').trim() : ''
+    });
+  });
+  return out;
+}
+
 function restockRows() {
   var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(RESTOCK.name);
   if (!sh) return [];
@@ -951,6 +1000,9 @@ function doGet(e) {
   }
   if (p.restock) {
     return json({ ok: true, restock: restockRows() });
+  }
+  if (p.dp) {
+    return json({ ok: true, dp: dutyPeriodRows() });
   }
   if (p.names) {
     PropertiesService.getScriptProperties().setProperty('NAMES', p.names);
