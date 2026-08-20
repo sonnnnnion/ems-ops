@@ -1273,7 +1273,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260820001238';
+var BUILD='20260820002118';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -1732,7 +1732,7 @@ var DEFAULTS={
      older seed, so a corrected bag list actually reaches people instead of
      sitting behind whatever they cached weeks ago. Their own data — submissions,
      the To Get list, the spreadsheet link, who has access — is never touched. */
-  seed:9,
+  seed:10,
 
   // ONE Apps Script Web App in front of ONE spreadsheet. Every form writes to
   // its own tab in that file, so Equipment and Office data sit side by side and
@@ -1855,7 +1855,12 @@ var DEFAULTS={
          {id:'jk-bvm', label:'(1) adult BVM'},
          {id:'jk-bluepouch', label:'(1) blue pouch with (6) 1x3 bandaids, (6) VioNex wipes (for equipment), and (6) BZK wipes (for people)'},
          {id:'jk-blackpouch', label:'(1) black pouch with (3) 2" rolled gauze and (2) 4" rolled gauze'},
-         {id:'jk-redpouch', label:'(1) red pouch with (10) 2x2 gauze, (4) 4x4 gauze, (2) 5x9 combine pads, and (2) petroleum gauze pads', exp:true},
+         {id:'jk-redpouch', label:'(1) red pouch with (10) 2x2 gauze, (4) 4x4 gauze, (2) 5x9 combine pads, and (2) petroleum gauze pads',
+          // Only the petroleum gauze in this pouch carries a date. Asking for
+          // "expires" against the whole pouch invites whoever is holding it to
+          // date the gauze, the combine pads or nothing at all, and the answer
+          // then means three different things depending on who filed it.
+          exp:true, expOf:'petroleum gauze pads'},
          {id:'jk-glasses', label:'(1) pair of safety glasses'},
          {id:'jk-cat', label:'(1) combat application tourniquet'},
          {id:'jk-hot', label:'(1) hot pack'},
@@ -4241,7 +4246,12 @@ function checkBody(fid){
         // date fields still worked (paintExpiry queries inside the form host),
         // but the <label for> in the second form pointed at the FIRST form's
         // input, so tapping "Expires" focused a field in a different check.
-        h+='<div class="exprow"><label for="x-'+esc(fid)+'-'+esc(it.id)+'">Expires</label>'+
+        // Names the component when only one thing in a compound item expires.
+        // Leads with the same word as every other row so the column still scans,
+        // then names the part. "petroleum gauze pads expires" also read as bad
+        // grammar, which a plural/singular guess would only half fix.
+        var expLbl = it.expOf ? 'Expires — '+esc(it.expOf) : 'Expires';
+        h+='<div class="exprow"><label for="x-'+esc(fid)+'-'+esc(it.id)+'">'+expLbl+'</label>'+
            '<input type="date" id="x-'+esc(fid)+'-'+esc(it.id)+'" data-exp="'+esc(it.id)+'" value="'+esc(known)+'" '+
            'onchange="setExpiry(\''+jsq(fid)+'\',\''+jsq(it.id)+'\',this.value);onFormInput(\''+fid+'\')">'+
            '<span class="expbadge" data-expbadge="'+esc(it.id)+'"></span></div>';
@@ -5441,11 +5451,32 @@ function renderBags(){
 function bagToText(b){
   return (b.sections||[]).map(function(sec){
     return '== '+sec.name+'\n'+(sec.items||[]).map(function(it){
-      return it.label+(it.qty&&it.qty!=='—'?' x '+it.qty:'')+(it.exp?' *':'');
+      return it.label+(it.qty&&it.qty!=='—'?' x '+it.qty:'')+
+             (it.exp?(it.expOf?' * '+it.expOf:' *'):'');
     }).join('\n');
   }).join('\n\n');
 }
-function textToBag(txt,bagId){
+/* Item ids survive an edit wherever the label is unchanged.
+
+   This used to mint `bagId-0, bagId-1, ...` positionally on every save, so
+   editing a bag's contents silently re-keyed every item in it. Expiry dates are
+   stored against `pick|itemId`, so inserting one line at the top moved every
+   date in that bag down onto the wrong item — a jumpkit could come out of an
+   edit claiming its tourniquet expired in March because that was the pouch's
+   date. Nothing announced it.
+
+   Matching by label is the right key here precisely BECAUSE the editor edits
+   labels: a line whose text is unchanged is the same item, and a line whose
+   text changed is a decision somebody just made. `prev` is the bag's current
+   items, passed in by the caller. */
+function textToBag(txt,bagId,prev){
+  var byLabel={};
+  (prev||[]).forEach(function(sec){
+    (sec.items||[]).forEach(function(it){
+      if(it && it.label && !byLabel[it.label]) byLabel[it.label]=it.id;
+    });
+  });
+  var used={};
   var secs=[], cur=null, n=0;
   String(txt).split('\n').forEach(function(line){
     line=line.trim();
@@ -5454,13 +5485,22 @@ function textToBag(txt,bagId){
       cur={name:line.replace(/^==\s*/,'')||'Items', items:[]}; secs.push(cur); return;
     }
     if(!cur){ cur={name:'Items', items:[]}; secs.push(cur); }
-    var exp=/\*\s*$/.test(line);
-    line=line.replace(/\*\s*$/,'').trim();
+    // "* something" names WHAT expires, for an item that is really several
+    // things in one bag. A bare "*" still means the item itself.
+    var expOf='', exp=false, em=line.match(/\*\s*([^*]*)$/);
+    if(em){ exp=true; expOf=em[1].trim(); line=line.slice(0,em.index).trim(); }
     var qty='', m=line.match(/^(.*?)\s+x\s+(.+)$/i);
     if(m){ line=m[1].trim(); qty=m[2].trim(); }
-    var it={id:bagId+'-'+(n++), label:line};
+    var keep=byLabel[line];
+    if(keep && !used[keep]){ used[keep]=1; }
+    else { keep=null; }
+    // A brand-new label gets a fresh id that cannot collide with a kept one.
+    while(!keep && used[bagId+'-'+n]) n++;
+    var id=keep || (bagId+'-'+(n++));
+    used[id]=1;
+    var it={id:id, label:line};
     if(qty) it.qty=qty;
-    if(exp) it.exp=true;
+    if(exp){ it.exp=true; if(expOf) it.expOf=expOf; }
     cur.items.push(it);
   });
   return secs;
@@ -5472,7 +5512,7 @@ function editBagContents(id){
            bagToText(b), 'Contents — '+b.name, {rows:16, okText:'Save'})
     .then(function(v){
       if(v==null) return;
-      b.sections=textToBag(v,b.id);
+      b.sections=textToBag(v,b.id,b.sections);
       saveDB(); renderBags(); Object.keys(FORMS).forEach(renderCheck);
     });
 }
