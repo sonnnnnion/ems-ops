@@ -554,6 +554,14 @@
   .doneverdict{font-size:16px;font-weight:600;color:var(--ink-soft);margin:0 0 8px}
   .donetail{font-size:14px;color:var(--ink-mute);margin:0 0 8px}
   .donewhere{font-size:13px;color:var(--ink-faint);margin:0}
+  /* The answer to "did that actually go through" — the question that otherwise
+     sends somebody to the spreadsheet, or to a manager to ask on their behalf. */
+  .donefiled{font-size:13px;color:var(--ink-faint);margin:0;padding:9px 12px;
+             border-radius:var(--r-sm);background:var(--bg-2);line-height:1.45}
+  .donefiled.good{background:rgba(30,110,60,.10);color:var(--ok);font-weight:600}
+  .donefiled.warn{background:rgba(150,90,10,.10);color:var(--warn)}
+  .donefiled.bad{background:rgba(150,30,40,.08);color:var(--oos)}
+  .donefiled .btn{margin-left:4px}
   .donemissing{text-align:left;margin:16px auto;max-width:400px;padding:13px 16px;
     border:1px solid var(--rule-strong);border-radius:var(--radius);background:var(--bg-2)}
   .donemissing b{font-size:13px;color:var(--warn);display:block;margin-bottom:6px}
@@ -984,6 +992,33 @@
     .qrcard .qrlink{font-size:11px;padding-top:26px}
   }
 
+  /* ---------- the worklists, on a phone --------------------------------
+     Every one of these tables carried `min-width:600px`, so on a 375px screen
+     the Equipment Manager ticking off a restock had to scroll sideways to see
+     what she was ticking, and the People list — three columns — did the same
+     for no reason at all. This site is used on an iPhone more than anywhere
+     else, and a shopping list you have to drag around is a shopping list that
+     gets done from the spreadsheet instead.
+
+     So: no forced width, tighter cells, and the two columns that are context
+     rather than work (how many times it has been asked, and when) drop out.
+     They are still on the row in the spreadsheet and still there on a laptop. */
+  @media(max-width:560px){
+    /* Three counts across, not two-and-an-orphan. `minmax(150px,1fr)` wrapped
+       the third onto a row of its own and pushed the actual worklist most of a
+       screen down — on the view whose whole job is the worklist. */
+    .repgrid{grid-template-columns:repeat(3,1fr);gap:8px}
+    .repstat{padding:11px 9px}
+    .repstat .rs-n{font-size:21px}
+    .repstat .rs-l{font-size:9.5px;letter-spacing:.05em;margin-top:4px}
+    .invtable{min-width:0}
+    .invtable th,.invtable td{padding:9px 8px;font-size:12.9px}
+    .invtable th{font-size:10px;letter-spacing:.05em}
+    .mob-hide{display:none}
+    /* The item is the thing being read; let it have the room. */
+    .invtable td:nth-child(2){word-break:break-word}
+  }
+
   /* ---------- touch sizing, last on purpose ----------------------------
      A checklist item is the most-tapped thing on this site — thirty-four in one
      jumpkit — and a 16px box is a miss waiting to happen one-handed with a bag
@@ -994,6 +1029,10 @@
     .checkline input[type=checkbox],.countline input[type=checkbox],
     input[type=checkbox],input[type=radio]{width:20px;height:20px;flex:0 0 auto}
     .checkline input[type=checkbox]{margin-top:1px}
+    /* A worklist tick is pressed with a thumb, standing at a cupboard, and the
+       cell around it is the target as much as the box is. */
+    .invtable input[type=checkbox]{width:24px;height:24px}
+    .invtable td:first-child{padding-left:12px;padding-right:6px}
     .linkline .linksel{min-height:30px;font-size:12px}
     .stockin{min-height:34px}
 
@@ -1084,14 +1123,24 @@
     <button type="button" class="sb-item" data-need="equipment" data-view="toget"><span class="ic">▤</span>To Get</button>
 
     <div class="sb-label" data-need="office">Office Manager</div>
-    <button type="button" class="sb-item" data-need="office" data-view="room-check"><span class="ic">✔</span>Room Check</button>
+    <!-- No data-need. Room checks are MEMBER work — the call sign recorded
+         against a room is whoever checked it, and the whole duty-period tracker
+         is built out of member filings. `MANAGER_VIEWS` has never gated this
+         view, so go() has always allowed it; the nav gate meant the only way in
+         was to scan a QR sticker. Somebody opening the site to do their rooms
+         could not find the form. -->
+    <button type="button" class="sb-item" data-view="room-check"><span class="ic">✔</span>Room Check</button>
     <button type="button" class="sb-item" data-need="office" data-view="rooms"><span class="ic">▦</span>Rooms &amp; Standards</button>
     <button type="button" class="sb-item" data-need="office" data-view="tracker"><span class="ic">▤</span>Duty-Period Tracker</button>
     <button type="button" class="sb-item" data-need="office" data-view="restock"><span class="ic">▤</span>Office Restock List</button>
 
     <div class="sb-label" data-need="mgr">Oversight</div>
     <button type="button" class="sb-item" data-need="mgr" data-view="reports"><span class="ic">▤</span>Reports</button>
-    <button type="button" class="sb-item" data-need="mgr" data-view="log"><span class="ic">⚑</span>Reported Problems</button>
+    <!-- No data-need: see MANAGER_VIEWS. A member who reports something can
+         now see whether it was dealt with, which is the question they were
+         opening the spreadsheet to answer. The Mark resolved / Reopen buttons
+         are gated inside renderLog. -->
+    <button type="button" class="sb-item" data-view="log"><span class="ic">⚑</span>Reported Problems</button>
     <button type="button" class="sb-item" data-need="mgr" data-view="roles"><span class="ic">§</span>Role Checklists</button>
     <button type="button" class="sb-item" data-need="mgr" data-view="qr"><span class="ic">▤</span>QR Codes</button>
     <button type="button" class="sb-item" data-need="mgr" data-view="settings"><span class="ic">⚙</span>Site Settings</button>
@@ -1279,7 +1328,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260820101052';
+var BUILD='20260820141622';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -2677,11 +2726,17 @@ function applyGates(root){
 }
 function canSeeLearn(){ return !!DB.learnPublic || can('ops'); }
 
+/* `log` is deliberately NOT here. Reporting a problem is the one thing every
+   member does and never hears about again — they type "the cot strap is torn",
+   it goes to a screen only managers can open, and the only way to find out
+   whether anybody dealt with it was to ask somebody or open the spreadsheet.
+   Now they can read the list. Ticking something off is still a manager's call,
+   and the buttons that do it are gated inside renderLog. */
 var MANAGER_VIEWS={
   tracker:'office', restock:'office', rooms:'office',
   inventory:'equipment', 'bag-check':'equipment', toget:'equipment',
   expiring:'equipment',
-  reports:'mgr', log:'mgr', roles:'mgr', qr:'mgr', settings:'mgr',
+  reports:'mgr', roles:'mgr', qr:'mgr', settings:'mgr',
   people:'ops'
 };
 
@@ -4469,8 +4524,8 @@ function calcCheck(fid){
 
 /* An Andrew ID is UP TO 8 characters, not exactly 8 — they are built from the
    name and truncated, so most are shorter. This used to demand exactly 8 and
-   refuse anything else, which blocked real people: rithik is 6, leyuanc and
-   cebruno are 7. Every one of them is on the People list, and not one of them
+   refuse anything else, which blocked real people: plenty of real IDs are 6 or
+   7 characters. Every one of them is on the People list, and not one of them
    could have filed a single check.
 
    A typo here is still worse than a blank, because it lands in the sheet looking
@@ -4618,7 +4673,7 @@ function renderWhoNote(fid){
   var el=document.getElementById(fid+'-whonote'); if(!el) return;
   var me=readMe();
   el.innerHTML = me
-    // The Andrew ID, not the name. A name is whatever somebody typed — "Rithik S"
+    // The Andrew ID, not the name. A name is whatever somebody typed — a first
     // is not what she is called — and it is the ID that lands in the sheet and
     // has to be right. Showing the thing that matters also lets somebody catch a
     // typo in it before it is filed again.
@@ -4749,7 +4804,7 @@ function submitCheck(fid){
     if(!a.ok){
       renderAndrewMsg(fid);
       // Was "8 characters", left over from when this demanded exactly 8 and
-      // refused rithik, leyuanc and cebruno. The rule is at most 8; saying a
+      // refused every ID shorter than that. The rule is at most 8; saying a
       // number here would send somebody padding a correct ID to reach it.
       uiAlert(a.empty ? 'Your Andrew ID is needed.' : a.msg,'Check your Andrew ID');
       var el=document.getElementById(fid+'-aid'); if(el) el.focus();
@@ -4879,6 +4934,9 @@ function doSubmit(fid,s){
     s.usage.forEach(function(r){
       DB.usage.unshift({id:uid('use'), at:stamp, date:s.date, item:r.item, itemName:r.itemName,
         qty:r.qty, unit:r.unit, from:r.from, fromName:r.fromName,
+        // Whether the member put it back. Kept on the row it belongs to, so the
+        // fact survives without inventing a concern to carry it.
+        refilled:!!r.refilled,
         call:s.extras.callnum||'', by:(s.first+' '+s.last).trim()||s.callsign||''});
     });
     if(DB.usage.length>2000) DB.usage.length=2000;
@@ -4908,14 +4966,14 @@ function doSubmit(fid,s){
      is worse than no location at all. */
   if((s.meds||[]).length){
     var medBy=(s.first+' '+s.last).trim()||s.callsign||'';
+    /* On the buy list, because a drug that went out has to be replaced. NOT in
+       the problem log: a drug given on a call is the job being done, not a
+       fault, and filing it as an open concern meant every call left a line
+       nobody could act on or tick off. The spreadsheet's "Medications Given"
+       column is the record. */
     s.meds.forEach(function(m){
       wantItem({name:m.name, cat:'Medication', qty:m.qty, where:'', by:medBy});
     });
-    addIssue({area:'Equipment', urgency:'Soon',
-      what:'Given on a call: '+s.meds.map(function(m){
-        return m.name+(m.qty>1?' x'+m.qty:''); }).join(', '),
-      where:'', by:medBy});
-    saveDB();
     saveDB();
   }
 
@@ -5048,32 +5106,44 @@ function doSubmit(fid,s){
       wantItem({kind:'report', name:m, cat:'Equipment', where:s.pickName, by:openedBy});
       });
     }
-    // Free text is always a real report, on every form — somebody chose to type it.
-    [['restock','Office'],['maint','Office']].forEach(function(pair){
-      var v=s.extras[pair[0]];
+    /* Free text is always a real report, on every form — somebody chose to type
+       it. All three boxes, and `detail` was missing from this list: a member
+       typing "Couldn't find eyewash anywhere" into a checkout's "Anything
+       damaged or not working?" had it recorded NOWHERE on their own device. It
+       reached the spreadsheet, which turns it into a concern, so the two halves
+       of the same system disagreed about what that box meant — and on a phone
+       that could not reach the sheet, the sentence was simply gone.
+
+       `buys` says whether the sentence is also a thing to order. A restock
+       request is. Maintenance is not, and neither is damage: somebody typed a
+       sentence worth reading, not a line on a shopping list — "I was not able
+       to find more medical tape." was appearing as an item to buy, named
+       exactly that. */
+    [{k:'restock', buys:true},
+     {k:'maint',   buys:false},
+     {k:'detail',  buys:false}].forEach(function(f){
+      var v=s.extras[f.k];
       if(!v) return;
-      var ar=(c.tab==='Room Checks')?pair[1]:area;
-      addIssue({area:ar, urgency:'Soon', what:v, where:s.pickName, unit:unitId, by:openedBy});
-      // A restock request is a request to buy something. Maintenance is not.
-      // Somebody typed a sentence. It is worth reading, and it is not a line
-      // on a shopping list — "I was not able to find more medical tape." was
-      // appearing as an item to buy, named exactly that.
-      if(pair[0]!=='maint')
-        wantItem({kind:'report', name:v, cat:ar, where:s.pickName, by:openedBy});
+      // One rule, stated once, and the same one the Apps Script applies: a
+      // room's faults are the office's, everything else is equipment's.
+      addIssue({area:area, urgency:'Soon', what:v, where:s.pickName, unit:unitId, by:openedBy});
+      if(f.buys) wantItem({kind:'report', name:v, cat:area, where:s.pickName, by:openedBy});
     });
-    /* What the member put back themselves, named per item rather than as free
-       text. Logged and never bought: ordering another of the one thing that is
-       not missing is the mistake this whole flag exists to prevent. */
-    var putBack=(s.usage||[]).filter(function(r){return r.refilled;});
-    if(putBack.length){
-      addIssue({area:'Equipment', urgency:'Whenever',
-                what:'Replaced after a call: '+putBack.map(function(r){
-                  return r.itemName+(r.qty>1?' x'+r.qty:''); }).join(', '),
-                where:s.pickName, unit:unitId, by:openedBy});
-    }
+    /* What the member put back themselves is recorded on the usage rows
+       themselves (see `refilled` above), NOT as a concern.
+
+       It used to be filed as one, and that is a category error with real cost:
+       the problem log is a list of things somebody has to go and fix, and
+       "Replaced after a call: gauze" is a record of somebody having already
+       done the right thing. It could never be actioned and could never be
+       honestly ticked off, it arrived with no bag attached because a post-call
+       has no subject, and on an agency running calls every week it buried the
+       real faults underneath it — which is exactly what the unticked-box rule
+       above exists to prevent. The spreadsheet keeps the readable version in
+       its "Replaced By Member" column. */
   }
 
-  lastResult[fid]={sent:sent, url:!!url, s:s, tab:c.tab};
+  lastResult[fid]={sent:sent, url:!!url, s:s, tab:c.tab, sid:payload.sid, filed:null};
   formDone[fid]=true;
   // Remember who filed it. Here, and not on every keystroke, because by this
   // point the name and Andrew ID have passed validation — storing a half-typed
@@ -5084,6 +5154,51 @@ function doSubmit(fid,s){
   usageRows[fid]=null;
   medsGiven[fid]=null;
   renderCheck(fid);
+  // The submission is in the air by now and the panel is on screen. Go and ask
+  // the spreadsheet whether it arrived.
+  if(sent) checkFiled(fid);
+}
+
+/* Did it actually land?
+
+   A submission is posted no-cors, which means the browser is forbidden from
+   reading the reply — so "sent" has never been the same claim as "saved", and
+   the completion panel used to say so by telling the member to ask a manager to
+   go and look in the spreadsheet. That is the single commonest reason anybody
+   opens that file, and it asks the person with the least access to do the
+   checking.
+
+   A plain GET is readable, so the site can just ask. Three tries, backing off:
+   the row is written before the script answers, but a cold container can take a
+   few seconds to get there and a phone on campus wifi can drop the first one. */
+function checkFiled(fid){
+  var r=lastResult[fid]; if(!r||!r.sid) return;
+  var url=(DB.api&&DB.api.url)||''; if(!url) return;
+  var paint=function(state){
+    if(!lastResult[fid]||lastResult[fid].sid!==r.sid) return;   // a newer filing owns the panel
+    lastResult[fid].filed=state;
+    var el=document.getElementById(fid+'-filed');
+    if(el) el.outerHTML=filedLine(fid);
+  };
+  paint('checking');
+  fetchJSONTries(url+(url.indexOf('?')<0?'?':'&')+'filed='+encodeURIComponent(r.sid), 3, 9000)
+    .then(function(j){ paint(j&&j.ok&&j.found ? 'yes' : 'no'); })
+    .catch(function(){ paint('unreachable'); });
+}
+
+function filedLine(fid){
+  var r=lastResult[fid]||{};
+  var st=r.filed, cls='donefiled', txt;
+  if(!r.url) return '<div id="'+fid+'-filed" class="donefiled bad"><b>Not sent anywhere yet.</b> '+
+    'No spreadsheet is connected, so this was recorded on this device only. '+
+    'A manager needs to finish the setup in Site Settings.</div>';
+  if(st==='yes'){ cls+=' good'; txt='\u2713 On the spreadsheet. Nothing else to do.'; }
+  else if(st==='no'){ cls+=' bad'; txt='Not on the spreadsheet yet. It may still be arriving \u2014 '+
+    '<button type="button" class="btn xs" onclick="checkFiled(\''+fid+'\')">check again</button>'; }
+  else if(st==='unreachable'){ cls+=' warn'; txt='Sent, but the spreadsheet could not be reached to '+
+    'confirm it. <button type="button" class="btn xs" onclick="checkFiled(\''+fid+'\')">check again</button>'; }
+  else txt='Checking the spreadsheet\u2026';
+  return '<div id="'+fid+'-filed" class="'+cls+'">'+txt+'</div>';
 }
 
 function donePanel(fid){
@@ -5100,11 +5215,7 @@ function donePanel(fid){
     if(s.missing.length>12) h+='<li>and '+(s.missing.length-12)+' more</li>';
     h+='</ul></div>';
   }
-  h+='<div class="donewhere">'+(r.url
-      ? 'Sent to the Operations spreadsheet. The browser cannot read the reply, so if this '+
-        'is the first submission of the term ask a manager to confirm the row landed.'
-      : '<b>Not sent anywhere yet.</b> No spreadsheet is connected, so this was recorded on '+
-        'this device only. A manager needs to finish the setup in Site Settings.')+'</div>';
+  h+=filedLine(fid);
   h+='<div class="donetail"><button class="btn solid" onclick="startAgain(\''+fid+'\')">File another</button>'+
      '<button class="btn ghost" onclick="go(\'home\')">Done for now</button></div></div>';
   return h;
@@ -6452,10 +6563,10 @@ function wantExpiring(key){
 
 function renderToGet(){
   var host=document.getElementById('togetHost'); if(!host) return;
-  var remote=!!remoteRestock;
+  var remote=Array.isArray(remoteRestock);
   // One shape either way, so the table below does not care which list it got.
   var list=remote
-    ? remoteRestock.map(function(r){
+    ? remoteRestock.filter(function(r){ return r && typeof r==='object'; }).map(function(r){
         // `kind` carried through from the sheet. Without it every shared row
         // read as a purchase and the "Reported on a check" section was empty
         // whenever the sheet answered — which is the normal case for a manager,
@@ -6500,10 +6611,12 @@ function renderToGet(){
   function rowsTable(rows, cols3){
     var t2='<div class="invwrap"><table class="invtable"><thead><tr>'+
        '<th></th><th>Item</th>'+(cols3?'<th>Qty</th>':'')+
-       '<th>Where</th><th>Asked</th><th>Last</th><th></th></tr></thead><tbody>';
+       '<th>Where</th><th class="mob-hide">Asked</th>'+
+       '<th class="mob-hide">Last</th><th></th></tr></thead><tbody>';
     rows.forEach(function(t){
-      var idx=list.indexOf(t);
-      var tick=t.remote ? 'toggleRestock(\''+jsq(t.item)+'\',true)' : 'toggleToGet('+idx+')';
+      var tick=t.remote
+        ? 'toggleRestock(\''+jsq(t.item)+'\',true,\''+jsq(t.where||'')+'\')'
+        : 'toggleToGet(\''+jsq(t.key)+'\')';
       var w=toGetWhere(t);
       t2+='<tr><td><input type="checkbox" onchange="'+tick+'" aria-label="Mark handled"></td>'+
          '<td>'+esc(toGetName(t))+'<br><span style="font-size:11px;color:var(--ink-faint)">'+
@@ -6512,10 +6625,10 @@ function renderToGet(){
            (t.unit&&t.unit!=='each'?' '+esc(t.unit):'')+'</td>':'')+
          // Every place that asked, not just the last one to ask.
          '<td style="font-size:12px">'+(w?esc(w):'<span class="dim">anywhere</span>')+'</td>'+
-         '<td class="num"'+((t.times||1)>1?' style="font-weight:700;color:var(--warn)"':'')+'>'+
+         '<td class="num mob-hide"'+((t.times||1)>1?' style="font-weight:700;color:var(--warn)"':'')+'>'+
          (t.times||1)+'</td>'+
-         '<td style="font-size:12px">'+esc(toGetDate(t))+'</td>'+
-         '<td>'+(t.remote?'':'<button class="btn xs" onclick="delToGet('+idx+')">✕</button>')+
+         '<td class="mob-hide" style="font-size:12px">'+esc(toGetDate(t))+'</td>'+
+         '<td>'+(t.remote?'':'<button class="btn xs" onclick="delToGet(\''+jsq(t.key)+'\')">✕</button>')+
          '</td></tr>';
     });
     return t2+'</tbody></table></div>';
@@ -6540,10 +6653,9 @@ function renderToGet(){
     h+='<div class="acc mt"><button type="button" class="acchead" onclick="toggleAcc(this)">'+
        '<span class="num">'+done.length+'</span><span>Handled</span><span class="chev">▾</span></button>'+
        '<div class="accbody"><ul class="isslist">'+done.slice(0,60).map(function(t){
-         var idx=list.indexOf(t);
          var undo=t.remote
-           ? 'toggleRestock(\''+jsq(t.item)+'\',false)'
-           : 'toggleToGet('+idx+')';
+           ? 'toggleRestock(\''+jsq(t.item)+'\',false,\''+jsq(t.where||'')+'\')'
+           : 'toggleToGet(\''+jsq(t.key)+'\')';
          return '<li><b style="text-decoration:line-through;color:var(--ink-faint)">'+
            esc(toGetName(t))+'</b>'+
            '<button class="issx" onclick="'+undo+'">Undo</button></li>';
@@ -6573,7 +6685,12 @@ function fetchRestock(){
     .then(function(r){ return r.json(); })
     .then(function(j){
       restockState.loading=false;
-      if(!j||!j.ok||!j.restock) throw 0;
+      /* The SHAPE, not just the presence. A deployment that predates this
+         endpoint answers the fallback reply, and anything that is not a list
+         used to be adopted as one — then `.map` threw and took the whole
+         worklist down with it, which on the view a manager opens to do the
+         restocking is a blank screen rather than a message. */
+      if(!j||!j.ok||!Array.isArray(j.restock)) throw 0;
       remoteRestock=j.restock;
       restockState.at=Date.now();
       restockState.sig=JSON.stringify(remoteRestock);
@@ -6588,22 +6705,39 @@ function fetchRestock(){
     });
 }
 
-function toggleToGet(i){
-  var t=(DB.toGet||[])[i]; if(!t) return;
+/* By key, never by row number. `wantItem` unshifts new entries at the FRONT of
+   the list, so anything arriving between the moment a row is drawn and the
+   moment a thumb lands on it shifts every index by one — and the visible form
+   of that is the ✕ deleting a different line from the one that was pressed.
+   These entries have carried a stable `key` from the start; the buttons just
+   were not using it. */
+function toGetBy(key){
+  var l=DB.toGet||[];
+  for(var i=0;i<l.length;i++) if(l[i].key===key) return l[i];
+  return null;
+}
+function toggleToGet(key){
+  var t=toGetBy(key); if(!t) return;
   t.done=!t.done; t.last=Date.now();
   saveDB(); renderToGet();
 }
 
-function toggleRestock(item,got){
+/* `where` as well as `item`. The shared list keeps one line PER PLACE for
+   anything reported on a check — eyewash missing from Jumpkit A and from
+   Jumpkit D are two cupboards to open — so an item name on its own no longer
+   names a row, and ticking by name alone would close whichever one came first. */
+function toggleRestock(item,got,where){
   var url=(DB.api&&DB.api.url)||''; if(!url) return;
-  var row=(remoteRestock||[]).filter(function(r){return r.item===item;})[0];
+  where=where||'';
+  var row=(remoteRestock||[]).filter(function(r){
+    return r.item===item && String(r.where||'')===where; })[0];
   if(row) row.got=got;                       // optimistic, so the tick feels instant
   renderToGet();
   var msg=document.getElementById('togetMsg');
   if(msg) msg.textContent='Saving…';
   fetch(url,{method:'POST', mode:'no-cors',
     headers:{'Content-Type':'text/plain;charset=utf-8'},
-    body:JSON.stringify({form:'__restock', item:item, got:got,
+    body:JSON.stringify({form:'__restock', item:item, where:where, got:got,
                          idToken:googleIdToken, key:(DB.api&&DB.api.key)||''})});
   // no-cors means the reply is unreadable, so the only honest confirmation is
   // to read the sheet back and re-render from what it actually says.
@@ -6615,7 +6749,10 @@ function toggleRestock(item,got){
     });
   },1200);
 }
-function delToGet(i){ (DB.toGet||[]).splice(i,1); saveDB(); renderToGet(); }
+function delToGet(key){
+  DB.toGet=(DB.toGet||[]).filter(function(t){ return t.key!==key; });
+  saveDB(); renderToGet();
+}
 function addToGet(){
   uiForm('Add an item','',
     [{key:'name',label:'Item',type:'text',required:true},
@@ -6631,8 +6768,8 @@ function addToGet(){
 }
 function copyToGet(){
   // Copy what is on screen, which is the sheet's list whenever it loaded.
-  var src=remoteRestock
-    ? remoteRestock.filter(function(r){return !r.got;})
+  var src=Array.isArray(remoteRestock)
+    ? remoteRestock.filter(function(r){return r && typeof r==='object' && !r.got;})
         .map(function(r){return {name:r.item, qty:r.qty, times:r.times};})
     : (DB.toGet||[]).filter(function(t){return !t.done;});
   var txt='CMU EMS — to get\n\n'+src.map(function(t){
@@ -7618,6 +7755,9 @@ function renderLog(){
     host.innerHTML=h; return;
   }
   var badge={Blocking:'crit',Soon:'warn',Whenever:'brand'};
+  // Deciding something is dealt with is a manager's call. A member reads the
+  // same list and sees the same answer; they just have no button.
+  var canTick=can('mgr');
   var row=function(i,isOpen){
     return '<li><span class="tag '+(badge[i.urgency]||'brand')+'">'+esc(i.urgency)+'</span> '+
       '<b>'+esc(i.what)+'</b>'+
@@ -7626,9 +7766,11 @@ function renderLog(){
       // Remote rows carry a yyyy-MM-dd string, local ones a timestamp. Neither
       // must render as "Invalid Date".
       esc(i.area)+' · '+esc(i.by||'anonymous')+' · '+esc(concernWhen(i.at))+'</div>'+
-      '<button class="issx" onclick="'+(isOpen?'resolveConcernUI':'reopenConcernUI')+
-      '(\''+jsq(i.what)+'\',\''+jsq(i.where||'')+'\')">'+
-      (isOpen?'Mark resolved':'Reopen')+'</button></li>';
+      (canTick
+        ? '<button class="issx" onclick="'+(isOpen?'resolveConcernUI':'reopenConcernUI')+
+          '(\''+jsq(i.what)+'\',\''+jsq(i.where||'')+'\')">'+
+          (isOpen?'Mark resolved':'Reopen')+'</button>'
+        : '')+'</li>';
   };
   h+='<div class="card"><h3>Open — '+open.length+'</h3>';
   h+= open.length ? '<ul class="isslist">'+open.map(function(i){return row(i,true);}).join('')+'</ul>'

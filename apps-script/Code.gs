@@ -36,9 +36,17 @@ var SHEETS = {
     name: 'Checkouts', freeze: 3,
     // `Bag ID` appended so a flag raised here keys on the unit, not on the name
     // beside it — a rename would otherwise detach every flag against that bag.
-    keys:    ['date','time','name','andrew','radio','subject','result','missingCount','expired','expiringSoon','detail','sid','unitId'],
-    headers: ['Date','Time','Name','Andrew ID','Radio','Bag','Result','Missing','Expired','Expiring Soon','Damaged','Submission ID','Bag ID'],
-    widths:  [95, 70, 150, 100, 90, 160, 150, 80, 220, 220, 260, 120, 110]
+    /* `What Was Missing` is appended LAST, so no existing row shifts. It should
+       have been here from the beginning: this tab recorded the missing COUNT and
+       nothing else, so a checkout reading "2 missing" was the only record that
+       anything was wrong and the NAMES of the two things existed nowhere in the
+       file. The restock list was the single copy, and anything that went wrong
+       between here and there — an older deployment, a wording change — lost a
+       report a member had filed correctly. Room Checks has always had this
+       column; the two forms members use most did not. */
+    keys:    ['date','time','name','andrew','radio','subject','result','missingCount','expired','expiringSoon','detail','sid','unitId','missing'],
+    headers: ['Date','Time','Name','Andrew ID','Radio','Bag','Result','Missing','Expired','Expiring Soon','Damaged','Submission ID','Bag ID','What Was Missing'],
+    widths:  [95, 70, 150, 100, 90, 160, 150, 80, 220, 220, 260, 120, 110, 340]
   },
   'Bag Checks': {
     name: 'Bag Checks', freeze: 3,
@@ -46,9 +54,10 @@ var SHEETS = {
        kits. The COLUMN stays exactly where it was, because removing it would
        pull Submission ID one place left and every row already filed would show
        its seal value under that heading. It just stops filling. */
-    keys:    ['date','time','name','andrew','subject','result','missingCount','expired','expiringSoon','seal','sid','bagId'],
-    headers: ['Date','Time','Name','Andrew ID','Bag','Result','Missing','Expired','Expiring Soon','Seal (no longer used)','Submission ID','Bag ID'],
-    widths:  [95, 70, 150, 100, 150, 150, 80, 220, 220, 100, 120, 110]
+    // Same gap as Checkouts, same fix, appended in the same place.
+    keys:    ['date','time','name','andrew','subject','result','missingCount','expired','expiringSoon','seal','sid','bagId','missing'],
+    headers: ['Date','Time','Name','Andrew ID','Bag','Result','Missing','Expired','Expiring Soon','Seal (no longer used)','Submission ID','Bag ID','What Was Missing'],
+    widths:  [95, 70, 150, 100, 150, 150, 80, 220, 220, 100, 120, 110, 340]
   },
   'Post-Call': {
     name: 'Post-Call', freeze: 3,
@@ -271,17 +280,54 @@ function concernSig(what, where) {
          String(where || '').trim().toLowerCase();
 }
 
+/* Everything a submission says is wrong, in the same words and under the same
+   rules the site itself uses. The two have to agree: the site builds this list
+   for the device that filed, and this builds it for everybody else, so anything
+   only one of them files is a report that exists for exactly one person.
+
+   Two things were only ever on the site's side, and both mattered:
+
+   - AN UNTICKED BOX. A checkout saying the stethoscope is missing raised a flag
+     against that bag on the phone that filed it and nowhere else — so the
+     readiness board showed the bag as Ready to the next person to pick it up.
+     That is the whole reason the board exists.
+   - A RESTOCK REQUEST. It reached the shopping list but never the problem log,
+     so it could be bought and still read as outstanding, or read as handled
+     when nobody had touched it. */
 function noteConcerns(p) {
   var items = [];
   var subj = p.subject || '';
-  var unit = p.unitId || p.bagId || '';
+  // The bag UNIT, which is what the readiness board keys on. A bag-check picks a
+  // kit TYPE, and a type id matches no unit — the site leaves it blank there for
+  // exactly that reason, so this does too.
+  var unit = p.unitId || '';
+  // A room's faults are the office's; everything else is equipment's.
+  var area = (p.form === 'Room Checks') ? 'Office' : 'Equipment';
+
   if (p.form === 'Reports' && p.what)
     items.push({ what: p.what, where: p.where || '', area: p.area || 'Other',
                  urgency: p.urgency || 'Whenever', unit: '' });
-  if (p.maint)  items.push({ what: p.maint,  where: subj, area: 'Office',    urgency: 'Soon', unit: unit });
-  if (p.detail) items.push({ what: p.detail, where: subj, area: 'Equipment', urgency: 'Soon', unit: unit });
+
+  /* An unticked box only means a fault where the list describes the WORLD. On a
+     room or bag check, "sink empty" and "2 tourniquets present" are claims about
+     what is there. On a post-call the list is YOUR TASKS — "kit back where it
+     belongs" — and leaving one unticked says you did not do it, which is not an
+     equipment fault. Filing those buried the real concerns underneath them. */
+  if (p.form !== 'Post-Call' && p.missing)
+    String(p.missing).split(' | ').forEach(function (m) {
+      if (m) items.push({ what: m + ' missing', where: subj, area: area,
+                          urgency: 'Soon', unit: unit });
+    });
+
+  // Free text is always a real report — somebody chose to type it.
+  ['restock', 'maint', 'detail'].forEach(function (k) {
+    if (p[k]) items.push({ what: String(p[k]), where: subj, area: area,
+                           urgency: 'Soon', unit: unit });
+  });
+
   if (p.expired) String(p.expired).split(' | ').forEach(function (m) {
-    if (m) items.push({ what: m + ' (expired)', where: subj, area: 'Equipment', urgency: 'Soon', unit: unit });
+    if (m) items.push({ what: m + ' (expired)', where: subj, area: area,
+                        urgency: 'Soon', unit: unit });
   });
   if (!items.length) return;
   putConcerns(items.map(function (it) {
@@ -572,15 +618,47 @@ function styleRow(sh, rowIdx, conf, bad, soon) {
     .setVerticalAlignment('top');
 }
 
+/* Which column holds the submission id, BY NAME. This used to assume it was the
+   last one, which was true right up until a column was appended after it — and
+   then the duplicate guard was silently reading the wrong column, matching
+   nothing, and every retry on a patchy phone would have written a second row.
+   Nothing about that would have looked wrong until the counts were. */
+function sidCol(conf) {
+  var i = conf.headers.indexOf('Submission ID');
+  return i < 0 ? conf.headers.length : i + 1;
+}
+
 function alreadySeen(sh, conf, sid) {
   if (!sid) return false;
-  var col = conf.headers.length;
+  var col = sidCol(conf);
   var last = sh.getLastRow();
   if (last < 2) return false;
   var start = Math.max(2, last - 100);
   var ids = sh.getRange(start, col, last - start + 1, 1).getValues();
   for (var i = 0; i < ids.length; i++) if (String(ids[i][0]) === String(sid)) return true;
   return false;
+}
+
+/* Did this submission land? The site asks straight after filing, so the person
+   who filed it gets a plain yes instead of being told to ask a manager to go and
+   look in the spreadsheet — which is the single commonest reason anybody opens
+   that file at all. Searches the recent rows of every form tab, because the
+   answer must not depend on the asker knowing which tab their form writes to. */
+function findFiled(sid) {
+  if (!sid) return { ok: true, found: false };
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var groups = [SHEETS, BIKE_SHEETS];
+  for (var g = 0; g < groups.length; g++) {
+    var group = groups[g];
+    var names = Object.keys(group);
+    for (var n = 0; n < names.length; n++) {
+      var conf = group[names[n]];
+      var sh = ss.getSheetByName(conf.name);
+      if (!sh || sh.getLastRow() < 2) continue;
+      if (alreadySeen(sh, conf, sid)) return { ok: true, found: true, tab: conf.name };
+    }
+  }
+  return { ok: true, found: false };
 }
 
 function doPost(e) {
@@ -724,11 +802,17 @@ function wantsFrom(p) {
   if (p.usageJson) {
     var list;
     try { list = JSON.parse(p.usageJson); } catch (err) { list = []; }
-    var names = nameMap().items;
-    // Picked from a list, with a quantity. This is the only one that is a
-    // purchase; everything below is somebody reporting something.
+    var map = nameMap(), names = map.items || {}, units = map.units || {};
+    /* Picked from a list, with a quantity. This is the only one that is a
+       purchase; everything below is somebody reporting something.
+
+       `where` is the bag it came OUT of, not p.subject — a post-call has no
+       subject, so every purchase on the shared list said "anywhere" while the
+       device that filed it knew perfectly well which jumpkit was now short. The
+       shopping was right and the putting-away was guesswork. */
     list.forEach(function (u) {
-      out.push({ item: names[u.i] || u.i, qty: Number(u.q) || 1, cat: 'Equipment', kind: 'buy' });
+      out.push({ item: names[u.i] || u.i, qty: Number(u.q) || 1, cat: 'Equipment',
+                 kind: 'buy', where: units[u.f] || u.f || '' });
     });
   }
   if ((p.form === 'Bag Checks' || p.form === 'Checkouts') && p.missing) {
@@ -759,13 +843,35 @@ function addToRestock(p) {
   var n = RESTOCK.headers.length;
   var last = sh.getLastRow();
   var existing = last > 1 ? sh.getRange(2, 1, last - 1, n).getValues() : [];
+
+  /* A BUY is one line however many bags asked for it — six gauze is six gauze,
+     and the places are context. A REPORT is one line PER PLACE: "eyewash missing
+     from Jumpkit A" and "eyewash missing from Jumpkit D" are two cupboards to go
+     and open, and merging them is how three people reporting eyewash from three
+     different bags became a single row naming only the last one. Whoever
+     restocked that bag ticked it off and the other two stayed empty, with
+     nothing left in the file to say they had ever been reported.
+
+     This is the same rule the site itself uses when it builds its own copy of
+     this list, and the two have to match or one submission produces different
+     work depending on who is looking. */
+  var keyOf = function (kind, item, place) {
+    return (kind === 'report' ? 'report' : 'buy') + '\u0001' + String(item) +
+           (kind === 'report' ? '\u0001' + String(place || '') : '');
+  };
   var index = {};
-  for (var i = 0; i < existing.length; i++) index[String(existing[i][1])] = i + 2;
+  for (var i = 0; i < existing.length; i++)
+    index[keyOf(existing[i][9], existing[i][1], existing[i][7])] = i + 2;
 
   var fresh = [];
   wants.forEach(function (w) {
-    var atRow = index[String(w.item)];
-    if (atRow) {
+    var kind = w.kind || 'buy';
+    // A want can name its own place (a post-call names the bag the item came out
+    // of); everything else belongs to the subject of the check.
+    var place = (w.where === undefined || w.where === null) ? where : String(w.where);
+    var ix = keyOf(kind, w.item, place);
+    var atRow = index[ix];
+    if (atRow > 0) {
       var wasDone = sh.getRange(atRow, 1).getValue() === true;
       var qty = Number(sh.getRange(atRow, 4).getValue()) || 0;
       var times = Number(sh.getRange(atRow, 5).getValue()) || 0;
@@ -774,12 +880,16 @@ function addToRestock(p) {
       sh.getRange(atRow, 5).setValue(wasDone ? 1 : times + 1);
       if (wasDone) sh.getRange(atRow, 6).setValue(when);
       sh.getRange(atRow, 7).setValue(when);
-      sh.getRange(atRow, 8).setValue(where);
+      // Every place that has asked, not only the last one to ask. A buy row
+      // covering four bags has to say four bags, or the shopping is right and
+      // the putting-away is wrong.
+      sh.getRange(atRow, 8).setValue(
+        wasDone ? place : addPlace(sh.getRange(atRow, 8).getValue(), place));
       sh.getRange(atRow, 9).setValue(who);
-      sh.getRange(atRow, 10).setValue(w.kind || 'buy');
+      sh.getRange(atRow, 10).setValue(kind);
     } else {
-      fresh.push([false, w.item, w.cat, w.qty, 1, when, when, where, who, w.kind || 'buy']);
-      index[String(w.item)] = -1;      // do not add the same item twice in one payload
+      fresh.push([false, w.item, w.cat, w.qty, 1, when, when, place, who, kind]);
+      index[ix] = -1;      // do not add the same line twice in one payload
     }
   });
 
@@ -789,6 +899,19 @@ function addToRestock(p) {
     sh.getRange(start, 1, fresh.length, 1).insertCheckboxes();
   }
   paintRestock(sh);
+}
+
+/* Places are held in one cell as a comma-separated list, because this column is
+   read by a person deciding which cupboards to walk to. Capped so a line that
+   gets reported all term does not grow into an unreadable paragraph. */
+function addPlace(current, place) {
+  place = String(place || '').trim();
+  var have = String(current || '').split(',').map(function (x) { return x.trim(); })
+             .filter(function (x) { return x; });
+  if (!place || have.indexOf(place) >= 0) return have.join(', ');
+  have.push(place);
+  if (have.length > 6) have = have.slice(have.length - 6);
+  return have.join(', ');
 }
 
 function paintRestock(sh) {
@@ -1308,15 +1431,21 @@ function setRestockGot(p) {
   if (!sh) return json({ ok: false, error: 'no restock tab' });
   var last = sh.getLastRow();
   if (last < 2) return json({ ok: false, error: 'nothing to tick' });
-  // Matched on the item text, which is the same key addToRestock indexes on.
-  // Not the row number: a sort or an inserted row would tick the wrong thing.
-  var names = sh.getRange(2, 2, last - 1, 1).getValues();
-  for (var i = 0; i < names.length; i++) {
-    if (String(names[i][0]) === String(p.item)) {
-      sh.getRange(i + 2, 1).setValue(p.got === true);
-      paintRestock(sh);
-      return json({ ok: true, set: true });
-    }
+  /* Matched on item AND place, which together are what addToRestock indexes on
+     — anything reported on a check is one line per place, so several rows can
+     share an item name and ticking by name alone closed whichever came first.
+     Not the row number: a sort or an inserted row would tick the wrong thing.
+
+     `where` absent from the payload means an older page: fall back to the first
+     row with that item, which is the behaviour it expects. */
+  var rows = sh.getRange(2, 1, last - 1, RESTOCK.headers.length).getValues();
+  var want = (p.where === undefined || p.where === null) ? null : String(p.where);
+  for (var i = 0; i < rows.length; i++) {
+    if (String(rows[i][1]) !== String(p.item)) continue;
+    if (want !== null && String(rows[i][7] || '') !== want) continue;
+    sh.getRange(i + 2, 1).setValue(p.got === true);
+    paintRestock(sh);
+    return json({ ok: true, set: true });
   }
   return json({ ok: false, error: 'not found' });
 }
@@ -1428,6 +1557,9 @@ function doGet(e) {
   /* Everything a view needs that has to aggregate across people, in one call.
      Three round trips from a phone on campus wifi is three chances to time out
      on one screen. */
+  if (p.filed) {
+    return json(findFiled(String(p.filed)));
+  }
   if (p.state) {
     var st = siteOf(p);
     return json({ ok: true, site: st, concerns: concernRows(st), expiry: expiryRows(st) });
@@ -1473,6 +1605,31 @@ function doGet(e) {
   return json(out);
 }
 
+/* headers, keys and widths are three parallel lists, and adding a column to two
+   of them is silent: every value after the gap lands one place left, which reads
+   as somebody typing the sheet wrong rather than as a bug. Checked here, and
+   again at the top of tidyUp, so a mistake shows up the moment it is pasted
+   instead of the next time somebody files a check. */
+function checkTabShapes() {
+  var bad = [];
+  [SHEETS, BIKE_SHEETS].forEach(function (group) {
+    Object.keys(group).forEach(function (k) {
+      var c = group[k];
+      // The bike tabs build their row in writeBikeRow rather than from a key
+      // list, so `keys` is absent there and its absence is not a fault.
+      if (c.keys && c.headers.length !== c.keys.length)
+        bad.push(c.name + ': ' + c.headers.length + ' headers vs ' + c.keys.length + ' keys');
+      if (c.widths && c.headers.length !== c.widths.length)
+        bad.push(c.name + ': ' + c.headers.length + ' headers vs ' + c.widths.length + ' widths');
+    });
+  });
+  [RESTOCK, BIKE_RESTOCK, ITEMS, EXPIRY, CONCERNS].forEach(function (c) {
+    if (c.widths && c.headers.length !== c.widths.length)
+      bad.push(c.name + ': ' + c.headers.length + ' headers vs ' + c.widths.length + ' widths');
+  });
+  return bad;
+}
+
 // Run by hand (Run ▸ tidyUp) after pasting an updated script: reformats every
 // tab that already exists and repaints the restock list.
 /* The order the tabs sit in, left to right. Grouped by whose job it is rather
@@ -1497,6 +1654,10 @@ var TAB_ORDER = ['Checkouts', 'Restock', 'Room Checks', 'Bag Checks', 'Post-Call
    Safe to run as often as you like: every step below either finds the tab and
    reformats it, or creates it. Nothing is cleared. */
 function tidyUp() {
+  var shape = checkTabShapes();
+  if (shape.length)
+    throw new Error('This script has a tab defined wrongly and would misalign a ' +
+                    'column. Fix it before running: ' + shape.join('; '));
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 
   // The five operations forms. ensureSheet rewrites a header row that no longer
