@@ -1276,7 +1276,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260820011155';
+var BUILD='20260820012421';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -6087,8 +6087,13 @@ function renderToGet(){
   // One shape either way, so the table below does not care which list it got.
   var list=remote
     ? remoteRestock.map(function(r){
+        // `kind` carried through from the sheet. Without it every shared row
+        // read as a purchase and the "Reported on a check" section was empty
+        // whenever the sheet answered — which is the normal case for a manager,
+        // so the split existed only on a device that had never synced.
         return {name:r.item, cat:r.cat||'Equipment', qty:r.qty, times:r.times,
-                last:r.last, where:r.where, done:r.got, item:r.item, remote:true};
+                last:r.last, where:r.where, done:r.got, item:r.item,
+                kind:(r.kind==='report'?'report':'buy'), remote:true};
       })
     : (DB.toGet||[]);
   var open=list.filter(function(t){return !t.done;});

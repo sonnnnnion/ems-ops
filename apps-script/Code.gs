@@ -85,10 +85,19 @@ var ITEMS = {
   widths:  [95, 70, 110, 160, 320, 80, 150, 120]
 };
 
+/* `Kind` separates a PURCHASE from a REPORT, appended so no existing row moves.
+
+   A consumable logged on a post-call is a purchase: known item, known quantity,
+   buy it. A missing tick, an expired flag or a typed note is a report — the
+   eyewash was not in Jumpkit A, and whether that becomes a purchase or turns
+   out to be "it was on the wrong shelf" is a judgment nobody can make from the
+   wording. One list of both is a shopping list containing sentences, which is
+   what the site was showing. The site splits them; without this column the
+   split collapses the moment the sheet answers, which is the normal case. */
 var RESTOCK = {
   name: 'Restock',
-  headers: ['Got','Item','Category','Qty','Times Asked','First Reported','Last Reported','Where','Who'],
-  widths:  [55, 280, 110, 70, 100, 120, 120, 160, 150]
+  headers: ['Got','Item','Category','Qty','Times Asked','First Reported','Last Reported','Where','Who','Kind'],
+  widths:  [55, 280, 110, 70, 100, 120, 120, 160, 150, 90]
 };
 
 // ---- the bike site's tabs ---------------------------------------------------
@@ -343,20 +352,25 @@ function wantsFrom(p) {
     var list;
     try { list = JSON.parse(p.usageJson); } catch (err) { list = []; }
     var names = nameMap().items;
+    // Picked from a list, with a quantity. This is the only one that is a
+    // purchase; everything below is somebody reporting something.
     list.forEach(function (u) {
-      out.push({ item: names[u.i] || u.i, qty: Number(u.q) || 1, cat: 'Equipment' });
+      out.push({ item: names[u.i] || u.i, qty: Number(u.q) || 1, cat: 'Equipment', kind: 'buy' });
     });
   }
   if ((p.form === 'Bag Checks' || p.form === 'Checkouts') && p.missing) {
     String(p.missing).split(' | ').forEach(function (m) {
-      if (m) out.push({ item: m, qty: 1, cat: 'Equipment' });
+      if (m) out.push({ item: m, qty: 1, cat: 'Equipment', kind: 'report' });
     });
   }
   if (p.expired) String(p.expired).split(' | ').forEach(function (m) {
-    if (m) out.push({ item: m + ' (expired)', qty: 1, cat: 'Equipment' });
+    if (m) out.push({ item: m + ' (expired)', qty: 1, cat: 'Equipment', kind: 'report' });
   });
-  if (p.restock) out.push({ item: String(p.restock), qty: 1, cat: 'Office' });
-  if (p.short)   out.push({ item: String(p.short),   qty: 1, cat: 'Equipment' });
+  if (p.restock) out.push({ item: String(p.restock), qty: 1, cat: 'Office', kind: 'report' });
+  // Medications given on a call: replace what went out, so a purchase.
+  if (p.meds) String(p.meds).split(' | ').forEach(function (m) {
+    if (m) out.push({ item: m, qty: 1, cat: 'Medication', kind: 'buy' });
+  });
   return out;
 }
 
@@ -389,8 +403,9 @@ function addToRestock(p) {
       sh.getRange(atRow, 7).setValue(when);
       sh.getRange(atRow, 8).setValue(where);
       sh.getRange(atRow, 9).setValue(who);
+      sh.getRange(atRow, 10).setValue(w.kind || 'buy');
     } else {
-      fresh.push([false, w.item, w.cat, w.qty, 1, when, when, where, who]);
+      fresh.push([false, w.item, w.cat, w.qty, 1, when, when, where, who, w.kind || 'buy']);
       index[String(w.item)] = -1;      // do not add the same item twice in one payload
     }
   });
@@ -877,7 +892,10 @@ function restockRows() {
       return { got: r[0] === true, item: String(r[1]), cat: String(r[2] || ''),
                qty: Number(r[3]) || 0, times: Number(r[4]) || 0,
                first: asDate(r[5]), last: asDate(r[6]),
-               where: String(r[7] || ''), who: String(r[8] || '') };
+               where: String(r[7] || ''), who: String(r[8] || ''),
+               // Rows written before this column existed read as purchases,
+               // which is what the list meant when they were filed.
+               kind: String(r[9] || 'buy') };
     });
 }
 
