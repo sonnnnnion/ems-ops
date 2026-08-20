@@ -34,9 +34,11 @@ var SHEETS = {
   },
   'Checkouts': {
     name: 'Checkouts', freeze: 3,
-    keys:    ['date','time','name','andrew','radio','subject','result','missingCount','expired','expiringSoon','detail','sid'],
-    headers: ['Date','Time','Name','Andrew ID','Radio','Bag','Result','Missing','Expired','Expiring Soon','Damaged','Submission ID'],
-    widths:  [95, 70, 150, 100, 90, 160, 150, 80, 220, 220, 260, 120]
+    // `Bag ID` appended so a flag raised here keys on the unit, not on the name
+    // beside it — a rename would otherwise detach every flag against that bag.
+    keys:    ['date','time','name','andrew','radio','subject','result','missingCount','expired','expiringSoon','detail','sid','unitId'],
+    headers: ['Date','Time','Name','Andrew ID','Radio','Bag','Result','Missing','Expired','Expiring Soon','Damaged','Submission ID','Bag ID'],
+    widths:  [95, 70, 150, 100, 90, 160, 150, 80, 220, 220, 260, 120, 110]
   },
   'Bag Checks': {
     name: 'Bag Checks', freeze: 3,
@@ -44,9 +46,9 @@ var SHEETS = {
        kits. The COLUMN stays exactly where it was, because removing it would
        pull Submission ID one place left and every row already filed would show
        its seal value under that heading. It just stops filling. */
-    keys:    ['date','time','name','andrew','subject','result','missingCount','expired','expiringSoon','seal','sid'],
-    headers: ['Date','Time','Name','Andrew ID','Bag','Result','Missing','Expired','Expiring Soon','Seal (no longer used)','Submission ID'],
-    widths:  [95, 70, 150, 100, 150, 150, 80, 220, 220, 100, 120]
+    keys:    ['date','time','name','andrew','subject','result','missingCount','expired','expiringSoon','seal','sid','bagId'],
+    headers: ['Date','Time','Name','Andrew ID','Bag','Result','Missing','Expired','Expiring Soon','Seal (no longer used)','Submission ID','Bag ID'],
+    widths:  [95, 70, 150, 100, 150, 150, 80, 220, 220, 100, 120, 110]
   },
   'Post-Call': {
     name: 'Post-Call', freeze: 3,
@@ -141,6 +143,192 @@ var BIKE_RESTOCK = {
   widths:  [55, 320, 100, 120, 120, 120, 150]
 };
 
+/* ============================================================================
+   SHARED STATE THAT MEMBERS CAN WRITE
+   ============================================================================
+   Publishing site content needs a manager token. Submitting a form does not —
+   that is why members can file at all. Anything that has to aggregate across
+   everybody therefore cannot live in published content, or it only ever shows
+   what the person looking at it filed themselves.
+
+   That was the duty-period tracker, and it is also: which bag is flagged, what
+   has been reported, and when things expire. All three ride in on the ordinary
+   submission, which every member can make, and are read back from here.
+
+   `Expiry` is a date per bag-and-item. `Concerns` is every problem raised, with
+   a Resolved tick a manager can set. Both are upserted, so the same fact filed
+   twice is one row. */
+var EXPIRY = {
+  name: 'Expiry',
+  headers: ['Key','Bag','Item','Expires','Last Reported By','Updated'],
+  widths:  [220, 150, 320, 100, 150, 120]
+};
+
+var CONCERNS = {
+  name: 'Concerns',
+  headers: ['Resolved','Signature','What','Where','Bag ID','Area','Urgency',
+            'Times','First','Last','By','Resolved By'],
+  widths:  [80, 240, 340, 160, 120, 110, 100, 70, 110, 110, 140, 140]
+};
+
+function ensureExpiry() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(EXPIRY.name);
+  if (!sh) { sh = ss.insertSheet(EXPIRY.name); sh.appendRow(EXPIRY.headers); }
+  var have = sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), 1)).getValues()[0];
+  if (have.join('|') !== EXPIRY.headers.join('|'))
+    sh.getRange(1, 1, 1, EXPIRY.headers.length).setValues([EXPIRY.headers]);
+  return sh;
+}
+
+function ensureConcerns() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(CONCERNS.name);
+  if (!sh) { sh = ss.insertSheet(CONCERNS.name); sh.appendRow(CONCERNS.headers); }
+  var have = sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), 1)).getValues()[0];
+  if (have.join('|') !== CONCERNS.headers.join('|'))
+    sh.getRange(1, 1, 1, CONCERNS.headers.length).setValues([CONCERNS.headers]);
+  return sh;
+}
+
+/* Expiry dates carried in on a submission. Keyed exactly as the site keys them
+   — `<pick>|<itemId>` — because a date belongs to a physical kit, not to an
+   item name shared by six of them. */
+function saveExpiry(p) {
+  if (!p.expiryJson) return;
+  var list;
+  try { list = JSON.parse(p.expiryJson); } catch (err) { return; }
+  if (!list || !list.length) return;
+  var sh = ensureExpiry();
+  var last = sh.getLastRow();
+  var have = last > 1 ? sh.getRange(2, 1, last - 1, 1).getValues() : [];
+  var at = {};
+  for (var i = 0; i < have.length; i++) at[String(have[i][0])] = i + 2;
+  var when = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  var who = p.name || p.callsign || '';
+  var fresh = [];
+  list.forEach(function (e) {
+    if (!e || !e.k) return;
+    var row = [String(e.k), String(e.b || ''), String(e.i || ''),
+               String(e.d || ''), who, when];
+    var r = at[String(e.k)];
+    if (r) sh.getRange(r, 1, 1, EXPIRY.headers.length).setValues([row]);
+    else { fresh.push(row); at[String(e.k)] = -1; }
+  });
+  if (fresh.length)
+    sh.getRange(sh.getLastRow() + 1, 1, fresh.length, EXPIRY.headers.length).setValues(fresh);
+}
+
+function expiryRows() {
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(EXPIRY.name);
+  if (!sh || sh.getLastRow() < 2) return {};
+  var tz = Session.getScriptTimeZone();
+  var asDate = function (v) {
+    if (!v) return '';
+    return (v instanceof Date) ? Utilities.formatDate(v, tz, 'yyyy-MM-dd') : String(v);
+  };
+  var out = {};
+  sh.getRange(2, 1, sh.getLastRow() - 1, EXPIRY.headers.length).getValues()
+    .forEach(function (r) {
+      var k = String(r[0] || '').trim();
+      if (!k) return;
+      out[k] = { date: asDate(r[3]), by: String(r[4] || ''), at: asDate(r[5]) };
+    });
+  return out;
+}
+
+/* One row per distinct problem. `sig` is what|where lowercased, the same
+   signature the site has always used to decide whether two reports are the same
+   thing — so a tick on either side means the same tick. */
+function concernSig(what, where) {
+  return String(what || '').trim().toLowerCase() + '|' +
+         String(where || '').trim().toLowerCase();
+}
+
+function noteConcerns(p) {
+  var items = [];
+  var subj = p.subject || '';
+  var unit = p.unitId || p.bagId || '';
+  if (p.form === 'Reports' && p.what)
+    items.push({ what: p.what, where: p.where || '', area: p.area || 'Other',
+                 urgency: p.urgency || 'Whenever', unit: '' });
+  if (p.maint)  items.push({ what: p.maint,  where: subj, area: 'Office',    urgency: 'Soon', unit: unit });
+  if (p.detail) items.push({ what: p.detail, where: subj, area: 'Equipment', urgency: 'Soon', unit: unit });
+  if (p.expired) String(p.expired).split(' | ').forEach(function (m) {
+    if (m) items.push({ what: m + ' (expired)', where: subj, area: 'Equipment', urgency: 'Soon', unit: unit });
+  });
+  if (!items.length) return;
+
+  var sh = ensureConcerns();
+  var n = CONCERNS.headers.length;
+  var last = sh.getLastRow();
+  var have = last > 1 ? sh.getRange(2, 1, last - 1, n).getValues() : [];
+  var at = {};
+  for (var i = 0; i < have.length; i++) at[String(have[i][1])] = i + 2;
+  var when = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  var who = p.name || p.callsign || '';
+  var fresh = [];
+  items.forEach(function (it) {
+    var sig = concernSig(it.what, it.where);
+    var r = at[sig];
+    if (r) {
+      // Raised again after being ticked off means it is back. Reopen it: a
+      // ticked row that is no longer true is worse than no row.
+      var wasResolved = sh.getRange(r, 1).getValue() === true;
+      var times = Number(sh.getRange(r, 8).getValue()) || 0;
+      sh.getRange(r, 1).setValue(false);
+      sh.getRange(r, 8).setValue(wasResolved ? 1 : times + 1);
+      if (wasResolved) sh.getRange(r, 9).setValue(when);
+      sh.getRange(r, 10).setValue(when);
+      sh.getRange(r, 11).setValue(who);
+      if (wasResolved) sh.getRange(r, 12).setValue('');
+    } else {
+      fresh.push([false, sig, it.what, it.where, it.unit, it.area, it.urgency,
+                  1, when, when, who, '']);
+      at[sig] = -1;
+    }
+  });
+  if (fresh.length) sh.getRange(sh.getLastRow() + 1, 1, fresh.length, n).setValues(fresh);
+}
+
+function concernRows() {
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONCERNS.name);
+  if (!sh || sh.getLastRow() < 2) return [];
+  var tz = Session.getScriptTimeZone();
+  var asDate = function (v) {
+    if (!v) return '';
+    return (v instanceof Date) ? Utilities.formatDate(v, tz, 'yyyy-MM-dd') : String(v);
+  };
+  return sh.getRange(2, 1, sh.getLastRow() - 1, CONCERNS.headers.length).getValues()
+    .filter(function (r) { return String(r[1] || '').trim() !== ''; })
+    .map(function (r) {
+      return { resolved: r[0] === true, sig: String(r[1]), what: String(r[2] || ''),
+               where: String(r[3] || ''), unit: String(r[4] || ''),
+               area: String(r[5] || ''), urgency: String(r[6] || 'Whenever'),
+               times: Number(r[7]) || 1, first: asDate(r[8]), last: asDate(r[9]),
+               by: String(r[10] || ''), resolvedBy: String(r[11] || '') };
+    });
+}
+
+/* Ticking a concern IS a manager action, so unlike a submission this one is
+   checked. A member reporting a problem needs no permission; deciding it is
+   dealt with does. */
+function setConcernResolved(p) {
+  var c = writerCheck(p);
+  if (!c.name) return json({ ok: false, error: 'not allowed: ' + c.why });
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONCERNS.name);
+  if (!sh || sh.getLastRow() < 2) return json({ ok: false, error: 'nothing to tick' });
+  var sigs = sh.getRange(2, 2, sh.getLastRow() - 1, 1).getValues();
+  for (var i = 0; i < sigs.length; i++) {
+    if (String(sigs[i][0]) === String(p.sig)) {
+      sh.getRange(i + 2, 1).setValue(p.resolved === true);
+      sh.getRange(i + 2, 12).setValue(p.resolved === true ? c.name : '');
+      return json({ ok: true, set: true });
+    }
+  }
+  return json({ ok: false, error: 'not found' });
+}
+
 function json(o) {
   return ContentService.createTextOutput(JSON.stringify(o))
     .setMimeType(ContentService.MimeType.JSON);
@@ -223,6 +411,7 @@ function doPost(e) {
     // hardest to notice — it looks like the edit saved.
     if (p.form === '__content' || p.type === 'content') return saveContent(p);
     if (p.form === '__restock') return setRestockGot(p);
+    if (p.form === '__resolve') return setConcernResolved(p);
 
     // The bike site's forms, which post a different payload shape.
     if (BIKE_SHEETS[p.form]) return writeBikeRow(p);
@@ -269,6 +458,8 @@ function doPost(e) {
 
     writeItems(p);
     addToRestock(p);
+    noteConcerns(p);
+    saveExpiry(p);
     return json({ result: 'saved' });
   } catch (err) {
     // Never throw: the site cannot read the response anyway, and throwing just
@@ -816,9 +1007,31 @@ function saveContent(p) {
     logError('Publish REFUSED for the ' + site + ' site: ' + c.why, '');
     return json({ ok: false, error: 'not allowed: ' + c.why });
   }
-  PropertiesService.getScriptProperties()
-    .setProperty(contentKey(site),
-      JSON.stringify({ at: Date.now(), by: c.name, content: p.content }));
+  /* MERGED PER KEY, not replaced wholesale.
+
+     Publishing used to overwrite the stored copy entire, so two managers
+     working at once silently destroyed each other: the Office Manager edits
+     room checklists on her phone, the officer edits People on hers, and
+     whichever publishes second wipes the first person's work with nothing said.
+
+     A device now sends only the keys it actually changed (see contentPayload),
+     and those are laid over what is stored. Two people editing DIFFERENT things
+     no longer collide at all. Two editing the SAME key still resolve
+     last-writer-wins, which is unavoidable without a real merge — but that is
+     one key, not the whole document. */
+  var props = PropertiesService.getScriptProperties();
+  var prevRaw = props.getProperty(contentKey(site));
+  var merged = {};
+  if (prevRaw) {
+    try {
+      var prev = JSON.parse(prevRaw);
+      if (prev && prev.content && typeof prev.content === 'object') merged = prev.content;
+    } catch (err) { merged = {}; }
+  }
+  var incoming = p.content || {};
+  Object.keys(incoming).forEach(function (k) { merged[k] = incoming[k]; });
+  props.setProperty(contentKey(site),
+    JSON.stringify({ at: Date.now(), by: c.name, content: merged }));
   // Successes go to the execution log only. Auto-save publishes whenever an edit
   // settles, so putting those in the Errors tab would bury the refusals that
   // actually need reading.
@@ -1022,6 +1235,12 @@ function doGet(e) {
   if (p.dp) {
     return json({ ok: true, dp: dutyPeriodRows() });
   }
+  /* Everything a view needs that has to aggregate across people, in one call.
+     Three round trips from a phone on campus wifi is three chances to time out
+     on one screen. */
+  if (p.state) {
+    return json({ ok: true, concerns: concernRows(), expiry: expiryRows() });
+  }
   if (p.names) {
     PropertiesService.getScriptProperties().setProperty('NAMES', p.names);
     return json({ ok: true, stored: true });
@@ -1072,7 +1291,8 @@ function doGet(e) {
 /* Checkouts first and Restock second: the two anybody actually opens the file
    to read. Moved with moveActiveSheet, which reorders without touching a row. */
 var TAB_ORDER = ['Checkouts', 'Restock', 'Room Checks', 'Bag Checks', 'Post-Call',
-                 'Reports', 'Bike Jumpkit Checks', 'Bike Safety Checks',
+                 'Reports', 'Concerns', 'Expiry',
+                 'Bike Jumpkit Checks', 'Bike Safety Checks',
                  'Bike Restock', 'Items'];
 
 /* Run by hand (Run ▸ tidyUp) after pasting an updated script.
@@ -1112,6 +1332,13 @@ function tidyUp() {
   }
   paintRestock(ensureRestock());
   paintBikeRestock(ensureBikeRestock());
+  [ [ensureExpiry(), EXPIRY], [ensureConcerns(), CONCERNS] ].forEach(function (pair) {
+    var sh = pair[0], conf = pair[1];
+    sh.setFrozenRows(1);
+    sh.getRange(1, 1, 1, conf.headers.length)
+      .setFontWeight('bold').setBackground(BRAND).setFontColor('#ffffff');
+    conf.widths.forEach(function (w, i) { sh.setColumnWidth(i + 1, w); });
+  });
 
   orderTabs();
   return 'All tabs are present. Order: ' + TAB_ORDER.join(', ');

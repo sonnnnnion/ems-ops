@@ -1276,7 +1276,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260820012421';
+var BUILD='20260820091319';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -3154,10 +3154,41 @@ function trimOldDutyPeriods(dps){
   return out;
 }
 
+/* Only the keys this device actually changed.
+
+   Publishing used to send everything and the server replaced its copy entire,
+   so two managers working at once silently destroyed each other's work: the
+   Office Manager edits room checklists on her phone while the officer edits
+   People on hers, and whichever publishes second wipes the first. Nothing said
+   so; the loser simply found their edit gone later.
+
+   Sending only what changed, and merging per key server-side, means two people
+   editing DIFFERENT things never collide. Two editing the SAME key still
+   resolve last-writer-wins, which needs a real merge to fix — but that is one
+   key rather than the whole document.
+
+   With no baseline this device cannot tell changed from unchanged, so it sends
+   everything: that is a first publish, and there is nothing to overwrite. */
 function contentPayload(){
   var out={};
-  Object.keys(DEFAULTS).forEach(function(k){ if(!NO_SYNC[k]) out[k]=DB[k]; });
-  out.dutyPeriods=trimOldDutyPeriods(out.dutyPeriods);
+  var base=contentBase||{};
+  /* An EMPTY baseline is not the same as a matching one. `setContentBase(null)`
+     stores `{}`, and unpublishedKeys() only considers keys already PRESENT in
+     the baseline — so a device that had never synced reported nothing as
+     changed, and would have published an empty document. That did not matter
+     while the payload always sent everything; it matters now.
+
+     So: send a key when there is no baseline at all, when the baseline has
+     never held that key, or when it differs from what the baseline holds. */
+  var noBase=!Object.keys(base).length;
+  Object.keys(DEFAULTS).forEach(function(k){
+    if(NO_SYNC[k]) return;
+    if(!noBase && (k in base) &&
+       JSON.stringify(DB[k])===JSON.stringify(base[k])) return;
+    out[k]=DB[k];
+  });
+  if(Object.prototype.hasOwnProperty.call(out,'dutyPeriods'))
+    out.dutyPeriods=trimOldDutyPeriods(out.dutyPeriods);
   // Stamped so the bike site's copy can never be mistaken for this one. Not a
   // key in DEFAULTS, so nothing reads it into DB.
   out.__site='ops';
@@ -3670,7 +3701,14 @@ function publishContent(opts){
     fetch(url+(url.indexOf('?')<0?'?':'&')+'content=1&site=ops&t='+Date.now())
       .then(function(r){ return r.json(); })
       .then(function(j){
-        var same=j&&j.content&&JSON.stringify(j.content)===JSON.stringify(sent);
+        /* Compare only the keys that were SENT. The payload is now just what
+           this device changed, while the server returns the whole merged
+           document — so a whole-object comparison can never match and every
+           publish would report itself refused. */
+        var same=!!(j&&j.content);
+        if(same) Object.keys(sent).forEach(function(k){
+          if(JSON.stringify(j.content[k])!==JSON.stringify(sent[k])) same=false;
+        });
         if(same){
           // Only on a confirmed match. The baseline must never claim the server
           // holds something it does not, or the next pull discards the difference.
@@ -3738,13 +3776,13 @@ function go(v,fromHash){
   // the checkout form — nothing tells the readiness board its status changed, so
   // it kept showing every bag as ready until something else triggered a render.
   if(v==='reports'){ remoteReport[REPORT_PERIOD]=null; renderReports(); }
-  if(v==='log') renderLog();
-  if(v==='readiness') renderReadiness();
+  if(v==='log'){ renderLog(); fetchSharedState().then(function(){ renderLog(); }); }
+  if(v==='readiness'){ renderReadiness(); fetchSharedState().then(function(){ renderReadiness(); }); }
   // Paint what we have immediately, then replace it with the sheet's copy when
   // it lands — the list is the same shape either way, so nothing jumps about.
   if(v==='toget'){ renderToGet(); fetchRestock().then(function(){ renderToGet(); }); }
   // Derived from DB.expiry, which any contents check can have just written.
-  if(v==='expiring') renderExpiring();
+  if(v==='expiring'){ renderExpiring(); fetchSharedState().then(function(){ renderExpiring(); }); }
   /* Read from the SHEET, then repainted — the same shape either way, so nothing
      jumps. Without this the tracker shows only what this device filed, which is
      the whole bug: publishing needs a manager token and filing does not. */
@@ -4786,6 +4824,10 @@ function doSubmit(fid,s){
     // on the readable ones would detach every check the moment a room is renamed.
     dp:s.dp?dpLabel(s.dp):'', dpKey:s.dp||'',
     roomId:(c.pick&&c.pick.from==='rooms')?(s.pick||''):'',
+    // Which physical bag, and which kit type. Sent as ids so a flag raised on a
+    // check keys on the thing, not on the name printed beside it.
+    unitId:(c.pick&&c.pick.from==='units')?(s.pick||''):'',
+    bagId:(c.pick&&c.pick.from==='bags')?(s.pick||''):'',
     subject:s.pickName, done:s.done.join(' | '), missing:s.missing.join(' | '),
     doneCount:s.done.length, missingCount:s.missing.length,
     expired:(s.expired||[]).join(' | '), expiringSoon:(s.soon||[]).join(' | ')
@@ -4854,6 +4896,25 @@ function doSubmit(fid,s){
       where:'', by:medBy});
     saveDB();
     saveDB();
+  }
+
+  /* The dates typed on THIS check, sent with it.
+
+     `DB.expiry` is device-local, so the Expiring view only ever showed dates
+     typed on the device looking at it — the Equipment Manager types them on her
+     phone during a contents check, opens her laptop, and the view is empty.
+     Riding in on the submission puts them where everybody reads from, using the
+     one path a member is allowed to write on. */
+  if(c.pick && (s.pick||'')){
+    var exOut=[];
+    (pickSections(fid, s.pick)||[]).forEach(function(sec){
+      (sec.items||[]).forEach(function(it){
+        if(!it.exp) return;
+        var d=(DB.expiry||{})[expiryKey(fid,it.id)];
+        if(d) exOut.push({k:expiryKey(fid,it.id), b:s.pickName||'', i:it.label, d:d});
+      });
+    });
+    if(exOut.length) payload.expiryJson=JSON.stringify(exOut);
   }
 
   var url=(DB.api&&DB.api.url)||'';
@@ -5056,6 +5117,22 @@ function resolveConcern(what,where){
   toGetMarkHandled(what, where);
   if(DB.resolvedKeys.length>800) DB.resolvedKeys.splice(0,DB.resolvedKeys.length-800);
   saveDB();
+  pushConcernResolved(k, true);
+}
+
+/* Ticking a concern is a manager action, so unlike a submission this one is
+   checked server-side. Fire-and-forget: the local tick has already happened and
+   `resolvedKeys` still syncs between managers, so a failed post means the sheet
+   catches up on the next tick rather than the click doing nothing. */
+function pushConcernResolved(sig, resolved){
+  var url=(DB.api&&DB.api.url)||'';
+  if(!url || !googleIdToken) return;
+  try{
+    fetch(url,{method:'POST',mode:'no-cors',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({form:'__resolve', site:'ops', sig:sig,
+                           resolved:!!resolved, idToken:googleIdToken})});
+  }catch(e){}
 }
 
 /* Marks the report row matching a concern as handled. Matched on the same
@@ -5081,6 +5158,7 @@ function unresolveConcern(what,where){
   (DB.issues||[]).forEach(function(i){ if(concernKey(i.what,i.where)===k) i.open=true; });
   toGetMarkHandled(what, where, true);
   saveDB();
+  pushConcernResolved(k, false);
 }
 
 function addIssue(o){
@@ -5266,6 +5344,89 @@ function canOpenDP(){
   var me=''; try{ me=localStorage.getItem(LS_EMAIL)||''; }catch(e){}
   if(!me) return false;
   return ((DB.access&&DB.access.bikeManagers)||[]).map(normEmail).indexOf(normEmail(me))>=0;
+}
+
+/* ---- shared state: concerns and expiry, as the SHEET has them ---------------
+   Same reasoning as the duty-period tracker. Publishing needs a manager token
+   and filing does not, so anything that must aggregate across people cannot
+   live in published content — it would only ever show what the person looking
+   at it had filed themselves.
+
+   That was true of three things at once:
+     - What's Ready decided a bag was flagged from DB.issues, which is local, so
+       a jumpkit used on a call showed "Check first" on the phone that filed the
+       post-call and "Ready" to everybody else. That is the safety-relevant one.
+     - Reported Problems listed DB.issues, so the officer's problem list was
+       really "problems reported on this laptop".
+     - Expiring read DB.expiry, so dates typed on a phone were invisible on a
+       laptop and to everyone else.
+
+   All three now read from the sheet, with the local copy kept as an optimistic
+   overlay so the device that just filed sees its own entry at once. */
+var remoteConcerns=null;     // [{sig,what,where,unit,area,urgency,times,first,last,by,resolved}]
+var remoteExpiry=null;       // {"pick|item":{date,by,at}}
+var stateFetch={loading:false, error:'', at:0};
+
+function fetchSharedState(){
+  var url=(DB.api&&DB.api.url)||'';
+  if(!url) return Promise.resolve(false);
+  stateFetch.loading=true;
+  return fetchJSONTries(url+(url.indexOf('?')<0?'?':'&')+'state=1&site=ops', 3, 12000)
+    .then(function(j){
+      stateFetch.loading=false;
+      if(!j||!j.ok){ stateFetch.error='the sheet did not answer'; return false; }
+      remoteConcerns=Array.isArray(j.concerns)?j.concerns:[];
+      remoteExpiry=(j.expiry&&typeof j.expiry==='object')?j.expiry:{};
+      stateFetch.error=''; stateFetch.at=Date.now();
+      return true;
+    })
+    .catch(function(e){
+      stateFetch.loading=false;
+      stateFetch.error='could not reach the spreadsheet ('+
+        (e&&e.message==='timeout'?'timed out':'connection failed')+')';
+      return false;
+    });
+}
+
+/* Every open concern, from the sheet plus anything this device raised that has
+   not come back yet. Deduped on the what|where signature, which is what both
+   sides key on, so one problem is one row however many places reported it. */
+function allConcerns(){
+  var out=[], seen={};
+  (Array.isArray(remoteConcerns)?remoteConcerns:[]).forEach(function(c){
+    if(!c||typeof c!=='object') return;
+    var sig=String(c.sig||concernKey(c.what,c.where));
+    if(seen[sig]) return;
+    seen[sig]=1;
+    out.push({sig:sig, what:c.what||'', where:c.where||'', unit:c.unit||'',
+              area:c.area||'Other', urgency:c.urgency||'Whenever',
+              times:c.times||1, by:c.by||'', at:c.last||c.first||'',
+              open:!c.resolved && !isResolvedConcern(c.what,c.where),
+              remote:true});
+  });
+  (DB.issues||[]).forEach(function(i){
+    if(!i||typeof i!=='object') return;
+    var sig=concernKey(i.what,i.where);
+    if(seen[sig]) return;
+    seen[sig]=1;
+    out.push({sig:sig, what:i.what||'', where:i.where||'', unit:i.unit||'',
+              area:i.area||'Other', urgency:i.urgency||'Whenever',
+              times:1, by:i.by||'', at:i.at||0,
+              open:i.open!==false && !isResolvedConcern(i.what,i.where),
+              remote:false});
+  });
+  return out;
+}
+function openConcerns(){ return allConcerns().filter(function(c){ return c.open; }); }
+
+/* A date from either side. The sheet sends yyyy-MM-dd, a local issue holds a
+   millisecond timestamp, and an old row may hold neither. */
+function concernWhen(v){
+  if(!v) return '';
+  if(typeof v==='number'){ var d=new Date(v); return isNaN(d)?'':d.toLocaleDateString(); }
+  var p=String(v).split('-');
+  if(p.length===3){ var d2=new Date(+p[0],+p[1]-1,+p[2]); if(!isNaN(d2)) return d2.toLocaleDateString(); }
+  return String(v);
 }
 
 /* ---- the duty period, as the SHEET has it -----------------------------------
@@ -5713,8 +5874,10 @@ function renderRoles(){
    something is wrong with it at checkout or files a problem against it, and it
    clears when that problem is marked resolved. Nothing to keep up to date. */
 function unitStatus(id){
-  var open=(DB.issues||[]).filter(function(i){
-    return i.open && i.unit===id; });
+  /* From the shared view, not from this device's issues. A bag flagged by
+     somebody else's post-call has to show flagged here, or the next person
+     takes a kit the system knows was used and not re-checked. */
+  var open=openConcerns().filter(function(c){ return c.unit===id; });
   /* Taken out of service by hand, and that outranks everything derived. A bag
      goes down for reasons nobody files a checkout problem about — it is away
      being repaired, it is stripped for parts, the seal is gone and the
@@ -5995,10 +6158,18 @@ function expiryIndex(){
 
 function expiringRows(){
   var ix=expiryIndex(), rows=[];
-  Object.keys(DB.expiry||{}).forEach(function(k){
+  /* Shared dates first, then this device's on top. A date typed here that has
+     not reached the sheet yet still shows; one that has is not shown twice. */
+  var merged={};
+  Object.keys(remoteExpiry||{}).forEach(function(k){
+    var e=(remoteExpiry||{})[k];
+    if(e&&e.date) merged[k]=e.date;
+  });
+  Object.keys(DB.expiry||{}).forEach(function(k){ merged[k]=DB.expiry[k]; });
+  Object.keys(merged).forEach(function(k){
     var cut=k.indexOf('|'); if(cut<0) return;
     var place=k.slice(0,cut), item=k.slice(cut+1);
-    var iso=DB.expiry[k]; var n=daysUntil(iso);
+    var iso=merged[k]; var n=daysUntil(iso);
     if(n===null) return;
     var label=ix.items[item]||item;
     rows.push({key:k, iso:iso, days:n,
@@ -7240,11 +7411,25 @@ function fallbackCopy(t,done){
 /* ---- problem log ---- */
 function renderLog(){
   var host=document.getElementById('logHost'); if(!host) return;
-  var open=DB.issues.filter(function(i){return i.open;});
-  var closed=DB.issues.filter(function(i){return !i.open;});
+  /* Everybody's, not this laptop's. A member reporting a problem cannot publish
+     content, so their report reached the spreadsheet and never reached the
+     officer's problem list — which made that list "problems reported on this
+     device" while reading as the agency's. */
+  var all=allConcerns();
+  var open=all.filter(function(i){return i.open;});
+  var closed=all.filter(function(i){return !i.open;});
   var h='';
-  if(!DB.issues.length){
-    h='<div class="card"><p class="hint" style="margin:0">Nothing has been reported yet. '+
+  if(stateFetch.error){
+    h+='<p class="dpsrc bad">Showing only what this device reported — '+
+       esc(stateFetch.error)+'. <button type="button" class="btn xs" '+
+       'onclick="fetchSharedState().then(renderLog)">Try again</button></p>';
+  }else if(remoteConcerns){
+    h+='<p class="dpsrc">From the spreadsheet — everyone\u2019s reports, not just this device.</p>';
+  }else{
+    h+='<p class="dpsrc">Reading the spreadsheet\u2026</p>';
+  }
+  if(!all.length){
+    h+='<div class="card"><p class="hint" style="margin:0">Nothing has been reported yet. '+
       'Anything left unticked on a check, and anything filed through Report a Problem, lands here.</p></div>';
     host.innerHTML=h; return;
   }
@@ -7254,7 +7439,9 @@ function renderLog(){
       '<b>'+esc(i.what)+'</b>'+
       (i.where?' <span style="color:var(--ink-faint)">— '+esc(i.where)+'</span>':'')+
       '<div style="font-size:11.5px;color:var(--ink-faint);margin-top:2px">'+
-      esc(i.area)+' · '+esc(i.by||'anonymous')+' · '+new Date(i.at).toLocaleDateString()+'</div>'+
+      // Remote rows carry a yyyy-MM-dd string, local ones a timestamp. Neither
+      // must render as "Invalid Date".
+      esc(i.area)+' · '+esc(i.by||'anonymous')+' · '+esc(concernWhen(i.at))+'</div>'+
       '<button class="issx" onclick="'+(isOpen?'resolveConcernUI':'reopenConcernUI')+
       '(\''+jsq(i.what)+'\',\''+jsq(i.where||'')+'\')">'+
       (isOpen?'Mark resolved':'Reopen')+'</button></li>';
