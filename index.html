@@ -1273,7 +1273,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260820002118';
+var BUILD='20260820003718';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -2549,10 +2549,26 @@ function loadDB(){
   }
   if(stale) saveDB();
 }
+/* Said once, not swallowed. Private mode and a full device both land here, and
+   in both the site keeps working while nothing is written down — so a manager
+   can spend an evening editing and lose all of it with the page looking normal
+   the whole time. Once per session, because a failing save fails on every
+   keystroke and a dialog per keystroke is worse than the bug. */
+var storageWarned=false;
 function saveDB(){
   markContentDirty();
   try{ localStorage.setItem(LS_DB,JSON.stringify(DB)); }
-  catch(e){ /* private mode / quota — the site still works, edits just don't persist */ }
+  catch(e){
+    if(!storageWarned){
+      storageWarned=true;
+      try{
+        uiAlert('This device will not save changes — either it is in private '+
+                'browsing, or its storage is full. The site still works and '+
+                'anything you send still reaches the spreadsheet, but edits made '+
+                'here will be gone when the page reloads.','Not saving on this device');
+      }catch(_){}
+    }
+  }
   syncNames();
   scheduleAutoPublish();
 }
@@ -3111,9 +3127,34 @@ var NO_SYNC={api:1, issues:1, usage:1, toGet:1, expiry:1, version:1, seed:1,
 // it instead of presenting a failed request as an empty People list.
 var contentState={loaded:false, dirty:false, at:0, error:''};
 
+/* Duty periods from earlier academic years, dropped from the PAYLOAD only.
+
+   Every room check row in the spreadsheet carries its duty period, so the sheet
+   is the permanent record and nothing here is the only copy. What rides in the
+   sync blob is just what people still need to see, and the live view only ever
+   shows the current year anyway.
+
+   Measured: a full year of duty periods is ~52 KB on top of a ~26 KB baseline,
+   and nothing pruned them — four years reached 235 KB, of which 210 KB was duty
+   periods. Every auto-publish sends the whole blob, from a phone, on every edit,
+   so this degrades long before it hits any hard limit.
+
+   Dropped from the payload rather than DELETED from DB on purpose. A deletion
+   would sync: a device with a wrong clock, or one opened in the summer as the
+   academic year rolls over, would push a removal to everybody. Old periods stay
+   on whatever device already has them and simply stop travelling. */
+function trimOldDutyPeriods(dps){
+  var y=acadYear(), out={};
+  Object.keys(dps||{}).forEach(function(k){
+    if(dpParse(k).year>=y) out[k]=dps[k];
+  });
+  return out;
+}
+
 function contentPayload(){
   var out={};
   Object.keys(DEFAULTS).forEach(function(k){ if(!NO_SYNC[k]) out[k]=DB[k]; });
+  out.dutyPeriods=trimOldDutyPeriods(out.dutyPeriods);
   // Stamped so the bike site's copy can never be mistaken for this one. Not a
   // key in DEFAULTS, so nothing reads it into DB.
   out.__site='ops';
@@ -3258,9 +3299,13 @@ function mergeStamps(mineObj, theirsObj){
    The room arrays are what people append to, so those union by entry id. The
    EARLIER `opened` wins, because whoever started it started it. */
 function mergeDutyPeriods(mineObj, theirsObj){
-  var out={}, keys={};
+  var out={}, keys={}, y=acadYear();
+  // Mine are kept whatever their year — deleting somebody's local history is
+  // not this function's job. Theirs are only taken for the current year, so an
+  // old copy on one device cannot drag previous years back into everyone's
+  // payload and undo the trim.
   Object.keys(mineObj||{}).forEach(function(k){ keys[k]=1; });
-  Object.keys(theirsObj||{}).forEach(function(k){ keys[k]=1; });
+  Object.keys(theirsObj||{}).forEach(function(k){ if(dpParse(k).year>=y) keys[k]=1; });
   Object.keys(keys).forEach(function(k){
     var a=(mineObj||{})[k], b=(theirsObj||{})[k];
     if(!a){ out[k]=b; return; }
@@ -4729,7 +4774,7 @@ function doSubmit(fid,s){
     radio:s.radio||'',
     // Written as "DP 4 · 2026–27" rather than the internal key, because the
     // person reading this column is reading a spreadsheet, not a data model.
-    dp:s.dp?dpLabel(s.dp):'', dpNum:s.dpN||'',
+    dp:s.dp?dpLabel(s.dp):'',
     subject:s.pickName, done:s.done.join(' | '), missing:s.missing.join(' | '),
     doneCount:s.done.length, missingCount:s.missing.length,
     expired:(s.expired||[]).join(' | '), expiringSoon:(s.soon||[]).join(' | ')
