@@ -158,18 +158,28 @@ var BIKE_RESTOCK = {
    `Expiry` is a date per bag-and-item. `Concerns` is every problem raised, with
    a Resolved tick a manager can set. Both are upserted, so the same fact filed
    twice is one row. */
+/* `Site` is LAST on both, not beside the key it qualifies. Two sites write here
+   now, and a column added in the middle would shift every value in every row
+   that is already in the file one place left — which does not look like a bug,
+   it looks like somebody typed the sheet wrong. Appended, an older row simply
+   has the cell empty, and empty reads as 'ops' below, which is what those rows
+   are. */
 var EXPIRY = {
   name: 'Expiry',
-  headers: ['Key','Bag','Item','Expires','Last Reported By','Updated'],
-  widths:  [220, 150, 320, 100, 150, 120]
+  headers: ['Key','Bag','Item','Expires','Last Reported By','Updated','Site'],
+  widths:  [220, 150, 320, 100, 150, 120, 70]
 };
 
 var CONCERNS = {
   name: 'Concerns',
   headers: ['Resolved','Signature','What','Where','Bag ID','Area','Urgency',
-            'Times','First','Last','By','Resolved By'],
-  widths:  [80, 240, 340, 160, 120, 110, 100, 70, 110, 110, 140, 140]
+            'Times','First','Last','By','Resolved By','Site'],
+  widths:  [80, 240, 340, 160, 120, 110, 100, 70, 110, 110, 140, 140, 70]
 };
+
+// Which site a row belongs to. Blank is 'ops': every row written before this
+// column existed came from the operations site.
+function rowSite(v) { return String(v || '') === 'bike' ? 'bike' : 'ops'; }
 
 function ensureExpiry() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -199,27 +209,43 @@ function saveExpiry(p) {
   var list;
   try { list = JSON.parse(p.expiryJson); } catch (err) { return; }
   if (!list || !list.length) return;
-  var sh = ensureExpiry();
-  var last = sh.getLastRow();
-  var have = last > 1 ? sh.getRange(2, 1, last - 1, 1).getValues() : [];
-  var at = {};
-  for (var i = 0; i < have.length; i++) at[String(have[i][0])] = i + 2;
-  var when = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
-  var who = p.name || p.callsign || '';
-  var fresh = [];
-  list.forEach(function (e) {
-    if (!e || !e.k) return;
-    var row = [String(e.k), String(e.b || ''), String(e.i || ''),
-               String(e.d || ''), who, when];
-    var r = at[String(e.k)];
-    if (r) sh.getRange(r, 1, 1, EXPIRY.headers.length).setValues([row]);
-    else { fresh.push(row); at[String(e.k)] = -1; }
-  });
-  if (fresh.length)
-    sh.getRange(sh.getLastRow() + 1, 1, fresh.length, EXPIRY.headers.length).setValues(fresh);
+  putExpiry(list.map(function (e) {
+    return e && e.k ? { k: e.k, bag: e.b || '', item: e.i || '', date: e.d || '' } : null;
+  }), 'ops', p.name || p.callsign || '');
 }
 
-function expiryRows() {
+/* The upsert both sites share. Keyed on site AND key: the two sites number their
+   kit independently, so one of them happening to reuse an id must not overwrite
+   the other's date. A blank date is skipped rather than written — one person
+   leaving the field alone must not erase a date somebody else recorded. */
+function putExpiry(list, site, who) {
+  var rows = (list || []).filter(function (e) { return e && e.k && String(e.date || '').trim(); });
+  if (!rows.length) return;
+  var sh = ensureExpiry();
+  var n = EXPIRY.headers.length;
+  var last = sh.getLastRow();
+  var have = last > 1 ? sh.getRange(2, 1, last - 1, n).getValues() : [];
+  var at = {};
+  for (var i = 0; i < have.length; i++)
+    at[rowSite(have[i][6]) + '\u0001' + String(have[i][0])] = i + 2;
+  var when = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  var fresh = [];
+  // Same collapse as putConcerns, for the same reason: a repeated key in one
+  // payload would read the -1 sentinel back as a row number.
+  rows = dedupeBy(rows, function (e) { return String(e.k); });
+  rows.forEach(function (e) {
+    var row = [String(e.k), String(e.bag || ''), String(e.item || ''),
+               String(e.date), who || '', when, site];
+    var ix = site + '\u0001' + String(e.k);
+    var r = at[ix];
+    if (r > 0) sh.getRange(r, 1, 1, n).setValues([row]);
+    else { fresh.push(row); at[ix] = -1; }
+  });
+  if (fresh.length) sh.getRange(sh.getLastRow() + 1, 1, fresh.length, n).setValues(fresh);
+}
+
+function expiryRows(site) {
+  site = site === 'bike' ? 'bike' : 'ops';
   var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(EXPIRY.name);
   if (!sh || sh.getLastRow() < 2) return {};
   var tz = Session.getScriptTimeZone();
@@ -231,7 +257,7 @@ function expiryRows() {
   sh.getRange(2, 1, sh.getLastRow() - 1, EXPIRY.headers.length).getValues()
     .forEach(function (r) {
       var k = String(r[0] || '').trim();
-      if (!k) return;
+      if (!k || rowSite(r[6]) !== site) return;
       out[k] = { date: asDate(r[3]), by: String(r[4] || ''), at: asDate(r[5]) };
     });
   return out;
@@ -258,40 +284,191 @@ function noteConcerns(p) {
     if (m) items.push({ what: m + ' (expired)', where: subj, area: 'Equipment', urgency: 'Soon', unit: unit });
   });
   if (!items.length) return;
+  putConcerns(items.map(function (it) {
+    return { sig: concernSig(it.what, it.where), what: it.what, where: it.where,
+             unit: it.unit, area: it.area, urgency: it.urgency };
+  }), 'ops', p.name || p.callsign || '');
+}
 
+/* The upsert both sites share. Keyed on site AND signature, so the two sites
+   cannot land on each other's rows — "missing gauze" is a real thing to report
+   on both, and one tick must not silently close the other. */
+function putConcerns(items, site, who) {
+  if (!items || !items.length) return;
   var sh = ensureConcerns();
   var n = CONCERNS.headers.length;
   var last = sh.getLastRow();
   var have = last > 1 ? sh.getRange(2, 1, last - 1, n).getValues() : [];
   var at = {};
-  for (var i = 0; i < have.length; i++) at[String(have[i][1])] = i + 2;
+  for (var i = 0; i < have.length; i++)
+    at[rowSite(have[i][12]) + '\u0001' + String(have[i][1])] = i + 2;
   var when = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
-  var who = p.name || p.callsign || '';
   var fresh = [];
+  /* One submission can name the same thing twice — two checklist lines with the
+     same wording, or a note that repeats a fault. Collapsed here, because the
+     loop below marks a queued row with -1 and would otherwise read that back as
+     a row NUMBER on the second sighting. Sheets refuses row -1, so the whole
+     batch was lost, quietly, and only for the submissions that happened to
+     repeat themselves. */
+  items = dedupeBy(items, function (it) { return String(it.sig); });
   items.forEach(function (it) {
-    var sig = concernSig(it.what, it.where);
-    var r = at[sig];
-    if (r) {
+    var ix = site + '\u0001' + it.sig;
+    var r = at[ix];
+    if (r > 0) {
       // Raised again after being ticked off means it is back. Reopen it: a
       // ticked row that is no longer true is worse than no row.
       var wasResolved = sh.getRange(r, 1).getValue() === true;
       var times = Number(sh.getRange(r, 8).getValue()) || 0;
       sh.getRange(r, 1).setValue(false);
+      sh.getRange(r, 3).setValue(it.what);   // the wording can change; the fact does not
       sh.getRange(r, 8).setValue(wasResolved ? 1 : times + 1);
       if (wasResolved) sh.getRange(r, 9).setValue(when);
       sh.getRange(r, 10).setValue(when);
-      sh.getRange(r, 11).setValue(who);
+      sh.getRange(r, 11).setValue(who || '');
       if (wasResolved) sh.getRange(r, 12).setValue('');
+      // Rows written before this column existed have it blank. Blank already
+      // reads as 'ops', but filling it in as they are touched means the file
+      // itself says which site a row came from.
+      sh.getRange(r, 13).setValue(site);
     } else {
-      fresh.push([false, sig, it.what, it.where, it.unit, it.area, it.urgency,
-                  1, when, when, who, '']);
-      at[sig] = -1;
+      fresh.push([false, it.sig, it.what, it.where, it.unit || '', it.area || 'Other',
+                  it.urgency || 'Whenever', 1, when, when, who || '', '', site]);
+      at[ix] = -1;
     }
   });
   if (fresh.length) sh.getRange(sh.getLastRow() + 1, 1, fresh.length, n).setValues(fresh);
 }
 
-function concernRows() {
+/* ---- the bike site's half ---------------------------------------------------
+   The same three things a bike or jumpkit check can report as the site files
+   locally — what is missing, what has expired, and anything typed in the notes —
+   under the SAME signature the site uses, so one problem is one row whether the
+   site put it there or this did.
+
+   It has to happen here rather than being left to the site, for the reason the
+   duty-period tracker had to move: filing a check needs no sign-in, publishing
+   the site's shared copy needs a manager token, so a member's report reached the
+   spreadsheet and never reached the Bike Manager's screen. */
+var BIKE_URGENCY = { crit: 'Blocking', warn: 'Soon', minor: 'Whenever' };
+
+// Last mention of a key wins, order otherwise preserved.
+function dedupeBy(items, keyOf) {
+  var out = [], at = {};
+  (items || []).forEach(function (it) {
+    if (!it) return;
+    var k = keyOf(it);
+    if (at[k] === undefined) { at[k] = out.length; out.push(it); }
+    else out[at[k]] = it;
+  });
+  return out;
+}
+
+function bikeConcernSig(bike, bag, key) {
+  return String(bike || '') + '|' + String(bag || '') + '|' + String(key || '');
+}
+
+// Whole days from today, matching the site's daysUntil so both sides agree on
+// what "expiring soon" means. Anything that is not a yyyy-MM-dd date is null.
+function daysUntilISO(v) {
+  var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(v || '').trim());
+  if (!m) return null;
+  var t = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd').split('-');
+  return Math.round((Date.UTC(+m[1], +m[2] - 1, +m[3]) -
+                     Date.UTC(+t[0], +t[1] - 1, +t[2])) / 86400000);
+}
+
+function noteBikeConcerns(p) {
+  var isJk = p.form === 'jumpkit';
+  // The stable id, with the display name only as a fallback for a page cached
+  // from before this shipped. A signature built on a name would come apart the
+  // moment a bike is renamed, which is the one thing renaming is meant to be
+  // safe against.
+  var bike  = isJk ? '' : String(p.bikeId || p.bike || '');
+  var bag   = isJk ? String(p.bagId || p.bag || '') : '';
+  var where = isJk ? ('Jumpkit \u2014 ' + String(p.bag || bag)) : String(p.bike || bike);
+  var area  = isJk ? 'Jumpkit' : 'Bike';
+  var who   = ((p.firstName || '') + ' ' + (p.lastName || '')).trim();
+  var missing = p.missing || [];
+  var items = [];
+
+  // 1. one row per missing item, never a combined "2 missing" — restocking NPAs
+  //    and restocking gauze finish at different times.
+  missing.forEach(function (m) {
+    items.push({ key: 'missing:' + m, what: 'Missing: ' + m, sev: isJk ? 'warn' : 'crit' });
+  });
+
+  // 2. anything expired or close to it, named so it can be ordered.
+  var exp = [], soon = [], ex = p.expiries || {};
+  Object.keys(ex).forEach(function (k) {
+    var d = daysUntilISO(ex[k]);
+    if (d === null) return;
+    if (d < 0) exp.push(k); else if (d <= 30) soon.push(k + ' (' + d + 'd)');
+  });
+  var expiryBad = !!(exp.length || soon.length);
+  if (expiryBad) items.push({ key: 'expiry', sev: exp.length ? 'crit' : 'warn',
+    what: (exp.length ? 'EXPIRED: ' + exp.join(', ') : '') +
+          (exp.length && soon.length ? ' \u2014 ' : '') +
+          (soon.length ? 'expiring soon: ' + soon.join(', ') : '') });
+
+  // 3. free text, deduped on its own words.
+  var note = String(p.notes || '').trim();
+  if (note) items.push({ key: 'note:' + note.toLowerCase(), what: note, sev: 'minor' });
+
+  putConcerns(items.map(function (it) {
+    return { sig: bikeConcernSig(bike, bag, it.key), what: it.what, where: where,
+             unit: isJk ? bag : bike, area: area, urgency: BIKE_URGENCY[it.sev] || 'Whenever' };
+  }), 'bike', who);
+
+  retireBikeConcerns(bike, bag, missing, expiryBad);
+}
+
+/* A later check that finds the item back in the bag is the only evidence there
+   will ever be that somebody restocked it — nobody goes and ticks it off. So a
+   check clears what it no longer reports, item by item, for its own subject
+   only. Ticked, not deleted: the row stays as history.
+
+   Notes are deliberately NOT retired. A check that does not repeat "chain keeps
+   slipping" is a check where nobody typed it again, which is not the same as
+   the chain having been fixed. */
+function retireBikeConcerns(bike, bag, stillMissing, expiryBad) {
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONCERNS.name);
+  if (!sh || sh.getLastRow() < 2) return;
+  var n = CONCERNS.headers.length;
+  var rows = sh.getRange(2, 1, sh.getLastRow() - 1, n).getValues();
+  // The trailing separator is what makes this a safe prefix: "|bag2|" cannot
+  // match a row belonging to "bag20".
+  var pre = bikeConcernSig(bike, bag, '');
+  var keep = {};
+  (stillMissing || []).forEach(function (m) { keep['missing:' + m] = 1; });
+  for (var i = 0; i < rows.length; i++) {
+    if (rows[i][0] === true) continue;
+    if (rowSite(rows[i][12]) !== 'bike') continue;
+    var sig = String(rows[i][1] || '');
+    if (sig.indexOf(pre) !== 0) continue;
+    var key = sig.slice(pre.length);
+    var gone = (key.indexOf('missing:') === 0 && !keep[key]) ||
+               (key === 'expiry' && !expiryBad);
+    if (!gone) continue;
+    sh.getRange(i + 2, 1).setValue(true);
+    sh.getRange(i + 2, 12).setValue('a later check');
+  }
+}
+
+/* Expiration dates off a bike check. The bike site keys these by item id, one
+   date per item across the whole kit, which is how its own form reads them
+   back. */
+function saveBikeExpiry(p) {
+  var by = p.expiryById;
+  if (!by || typeof by !== 'object') return;
+  var who = ((p.firstName || '') + ' ' + (p.lastName || '')).trim();
+  putExpiry(Object.keys(by).map(function (k) {
+    var e = by[k] || {};
+    return { k: k, bag: String(p.bag || ''), item: String(e.l || k), date: String(e.d || '') };
+  }), 'bike', who);
+}
+
+function concernRows(site) {
+  site = site === 'bike' ? 'bike' : 'ops';
   var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONCERNS.name);
   if (!sh || sh.getLastRow() < 2) return [];
   var tz = Session.getScriptTimeZone();
@@ -300,7 +477,9 @@ function concernRows() {
     return (v instanceof Date) ? Utilities.formatDate(v, tz, 'yyyy-MM-dd') : String(v);
   };
   return sh.getRange(2, 1, sh.getLastRow() - 1, CONCERNS.headers.length).getValues()
-    .filter(function (r) { return String(r[1] || '').trim() !== ''; })
+    .filter(function (r) {
+      return String(r[1] || '').trim() !== '' && rowSite(r[12]) === site;
+    })
     .map(function (r) {
       return { resolved: r[0] === true, sig: String(r[1]), what: String(r[2] || ''),
                where: String(r[3] || ''), unit: String(r[4] || ''),
@@ -318,9 +497,12 @@ function setConcernResolved(p) {
   if (!c.name) return json({ ok: false, error: 'not allowed: ' + c.why });
   var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONCERNS.name);
   if (!sh || sh.getLastRow() < 2) return json({ ok: false, error: 'nothing to tick' });
-  var sigs = sh.getRange(2, 2, sh.getLastRow() - 1, 1).getValues();
-  for (var i = 0; i < sigs.length; i++) {
-    if (String(sigs[i][0]) === String(p.sig)) {
+  var site = siteOf(p);
+  var rows = sh.getRange(2, 1, sh.getLastRow() - 1, CONCERNS.headers.length).getValues();
+  for (var i = 0; i < rows.length; i++) {
+    // Site as well as signature: the same words reported on both sites are two
+    // different problems, and ticking one must not tick the other.
+    if (String(rows[i][1]) === String(p.sig) && rowSite(rows[i][12]) === site) {
       sh.getRange(i + 2, 1).setValue(p.resolved === true);
       sh.getRange(i + 2, 12).setValue(p.resolved === true ? c.name : '');
       return json({ ok: true, set: true });
@@ -660,8 +842,12 @@ function writeBikeRow(p) {
   // Same duplicate guard as the ops forms, reading the bike site's id field.
   if (alreadySeen(sh, conf, p.submissionId)) return json({ result: 'duplicate ignored' });
 
-  var missing = p.missing || [];
-  var conditions = p.conditions || [];
+  // Coerced, not just defaulted. A truncated or garbled body can carry a STRING
+  // here, and a string has a length but no join — which threw out of doPost and
+  // lost the whole submission. A check somebody really did must survive its own
+  // payload being malformed.
+  var missing = Array.isArray(p.missing) ? p.missing : [];
+  var conditions = Array.isArray(p.conditions) ? p.conditions : [];
   var now = new Date();
   var tz = Session.getScriptTimeZone();
   var isJk = p.form === 'jumpkit';
@@ -700,6 +886,10 @@ function writeBikeRow(p) {
   var bad = missing.length > 0 || /not|fail|ground|out of service/i.test(String(p.verdict || ''));
   styleRow(sh, sh.getLastRow(), conf, bad, !bad && conditions.length > 0);
   addToBikeRestock(p, missing);
+  // The row is written by this point, so a fault in either of these costs a
+  // derived view and never the submission itself.
+  try { noteBikeConcerns(p); } catch (err) { logError('bike concerns: ' + err, JSON.stringify(p)); }
+  try { saveBikeExpiry(p); }  catch (err) { logError('bike expiry: ' + err, JSON.stringify(p)); }
   return json({ result: 'saved' });
 }
 
@@ -1239,7 +1429,8 @@ function doGet(e) {
      Three round trips from a phone on campus wifi is three chances to time out
      on one screen. */
   if (p.state) {
-    return json({ ok: true, concerns: concernRows(), expiry: expiryRows() });
+    var st = siteOf(p);
+    return json({ ok: true, site: st, concerns: concernRows(st), expiry: expiryRows(st) });
   }
   if (p.names) {
     PropertiesService.getScriptProperties().setProperty('NAMES', p.names);

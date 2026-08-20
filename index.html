@@ -824,6 +824,9 @@
   .dpsrc{font-size:12px;color:var(--ink-faint);margin:0 0 12px}
   .dpsrc.bad{color:var(--oos)}
   .dpsrc .btn{margin-left:6px}
+  /* "10:07 AM" is one thing to read, and it was breaking across two lines with
+     the AM stranded beside the button. */
+  .dpsrc .when{white-space:nowrap}
   .dpnew{font-size:12.5px;color:var(--ink-mute);margin:10px 0 0}
   .dpopen{font-size:13px;color:var(--ink-soft);margin:10px 0 6px}
   .dpdone{font-size:12.5px;color:var(--ok);font-weight:600;margin:8px 0 0}
@@ -1276,7 +1279,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260820091319';
+var BUILD='20260820101052';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -3360,11 +3363,26 @@ function mergeDutyPeriods(mineObj, theirsObj){
   return out;
 }
 
+/* Union of two lists of plain strings, order preserved, first sighting wins.
+   `resolvedKeys` is a collection and not a document: the officer ticking off a
+   broken cot and the Equipment Manager ticking off a missing splint are two
+   people adding to one list, and replacing meant whichever published second
+   erased the other's tick and the concern came back open. */
+function mergeKeySet(mineArr, theirsArr){
+  var out=[], seen={};
+  (mineArr||[]).concat(theirsArr||[]).forEach(function(k){
+    if(typeof k!=='string' || !k || seen[k]) return;
+    seen[k]=1; out.push(k);
+  });
+  return out;
+}
+
 /* Which keys merge, and how. Anything not named here replaces as before. */
 var MERGE_KEYS={
   dutyPeriods:  mergeDutyPeriods,
   roomConfirmed:mergeStamps,
-  lastChecked:  mergeStamps
+  lastChecked:  mergeStamps,
+  resolvedKeys: mergeKeySet
 };
 
 function applyContentInner(obj){
@@ -3788,6 +3806,9 @@ function go(v,fromHash){
      the whole bug: publishing needs a manager token and filing does not. */
   if(v==='tracker'){ renderTracker(); fetchDutyPeriods().then(function(){ renderTracker(); }); }
   if(v==='room-check'){ fetchDutyPeriods().then(function(){ renderDpState('room-check'); }); }
+  /* Sheet-backed views keep asking while they are on screen; everything else
+     stops the timer, so a form is never repainted under somebody's hands. */
+  liveStart(v);
   countView(v);
   // Arriving at a form is when to fill in who this is. The forms are rendered
   // once at startup and only shown by go(), so doing it at render time meant it
@@ -5115,7 +5136,6 @@ function resolveConcern(what,where){
      later, so nobody trusts the list. Ticked, not deleted: it moves to Handled
      where it can still be undone. */
   toGetMarkHandled(what, where);
-  if(DB.resolvedKeys.length>800) DB.resolvedKeys.splice(0,DB.resolvedKeys.length-800);
   saveDB();
   pushConcernResolved(k, true);
 }
@@ -5159,6 +5179,57 @@ function unresolveConcern(what,where){
   toGetMarkHandled(what, where, true);
   saveDB();
   pushConcernResolved(k, false);
+}
+
+/* Ticked-off signatures are a permanent list, and the old one dropped the
+   OLDEST once it passed 800. That is the one trim that must never happen here:
+   a signature is the only thing suppressing its concern, so dropping it puts a
+   problem that was dealt with back on the readiness board as open — the list
+   would quietly start lying at exactly the point it had been used long enough
+   to be trusted.
+
+   Now the sheet carries a Resolved tick of its own, there is a safe rule: a key
+   is only holding something down if there is something to hold down. Drop it
+   when the server already records that concern as resolved (the sheet remembers
+   it, so the key is duplicate), and drop it when no concern with that signature
+   exists on either side (there is nothing left for it to suppress). Everything
+   else stays, however old.
+
+   Runs ONLY on a good read of the sheet. With `remoteConcerns` null — offline,
+   or the endpoint not redeployed yet — every key would look unreferenced and
+   the whole list would clear, which is the resurrection bug with extra steps. */
+function pruneResolvedKeys(){
+  if(!Array.isArray(remoteConcerns)) return false;
+  var keys=DB.resolvedKeys||[];
+  if(!keys.length) return false;
+  var srvOpen={}, srvDone={};
+  remoteConcerns.forEach(function(c){
+    if(!c||typeof c!=='object') return;
+    var sig=String(c.sig||concernKey(c.what,c.where));
+    if(c.resolved) srvDone[sig]=1; else srvOpen[sig]=1;
+  });
+  var local={};
+  (DB.issues||[]).forEach(function(i){
+    if(i&&typeof i==='object') local[concernKey(i.what,i.where)]=1;
+  });
+  var kept=keys.filter(function(k){
+    if(srvDone[k]) return false;        // the sheet remembers; the key is spare
+    return !!(srvOpen[k] || local[k]);  // still something to suppress
+  });
+  /* A ceiling far above anything this list can reach in practice, kept only so
+     a runaway cannot fill localStorage. It drops from the front, and only keys
+     the SHEET confirms resolved, so passing it still cannot reopen anything. */
+  if(kept.length>2000){
+    var over=kept.length-2000, out=[];
+    for(var i=0;i<kept.length;i++){
+      if(over>0 && srvDone[kept[i]]){ over--; continue; }
+      out.push(kept[i]);
+    }
+    kept=out;
+  }
+  if(kept.length===keys.length) return false;
+  DB.resolvedKeys=kept; saveDB();
+  return true;
 }
 
 function addIssue(o){
@@ -5365,7 +5436,7 @@ function canOpenDP(){
    overlay so the device that just filed sees its own entry at once. */
 var remoteConcerns=null;     // [{sig,what,where,unit,area,urgency,times,first,last,by,resolved}]
 var remoteExpiry=null;       // {"pick|item":{date,by,at}}
-var stateFetch={loading:false, error:'', at:0};
+var stateFetch={loading:false, error:'', at:0, sig:''};
 
 function fetchSharedState(){
   var url=(DB.api&&DB.api.url)||'';
@@ -5375,9 +5446,23 @@ function fetchSharedState(){
     .then(function(j){
       stateFetch.loading=false;
       if(!j||!j.ok){ stateFetch.error='the sheet did not answer'; return false; }
-      remoteConcerns=Array.isArray(j.concerns)?j.concerns:[];
-      remoteExpiry=(j.expiry&&typeof j.expiry==='object')?j.expiry:{};
+      /* A deployment that predates this endpoint answers the fallback reply —
+         ok:true, and no `concerns` at all. Taken as an empty list that reads as
+         "nobody has reported anything", under a line claiming to speak for
+         everybody. Could-not-ask must never render as the-answer-is-no, so the
+         shape is checked and not just the status. */
+      if(!Array.isArray(j.concerns) || !j.expiry || typeof j.expiry!=='object'){
+        stateFetch.error='the spreadsheet is running an older copy of the script '+
+                         '(paste the current one and redeploy)';
+        return false;
+      }
+      remoteConcerns=j.concerns;
+      remoteExpiry=j.expiry;
       stateFetch.error=''; stateFetch.at=Date.now();
+      stateFetch.sig=JSON.stringify([remoteConcerns,remoteExpiry]);
+      // The only moment there is a trustworthy answer to "does this key still
+      // hold anything down".
+      pruneResolvedKeys();
       return true;
     })
     .catch(function(e){
@@ -5429,6 +5514,103 @@ function concernWhen(v){
   return String(v);
 }
 
+/* ---- staying current while somebody is looking at it -----------------------
+   Every sheet-backed view read once, on arrival, and then sat there. That is
+   fine for a screen you open, read and leave, and wrong for the two that get
+   left open: the Office Manager keeps the tracker up for a whole duty period
+   while other people file into it, and the officer keeps Reported Problems up
+   while a call is running. Both quietly went stale, and a stale tracker is the
+   one that costs something — a room reads as outstanding and somebody redoes it.
+
+   So while a sheet-backed view is on screen it asks again on a timer, and asks
+   immediately when the tab comes back (a phone locking and unlocking fires the
+   same event, which is most of how this site is used).
+
+   Two things keep it cheap. It repaints only when the answer actually CHANGED,
+   compared as a signature, so an unchanged sheet costs nothing on screen and
+   never interrupts somebody mid-scroll. And it backs off while nothing is
+   happening — this runs against an Apps Script deployment with a daily runtime
+   budget, and a page left open on a desk all afternoon must not spend it. */
+var LIVE_MIN=45000, LIVE_MAX=180000;
+var liveView='', liveTimer=null, liveWait=LIVE_MIN;
+
+var LIVE={
+  log:        {get:fetchSharedState,  st:function(){return stateFetch;},   draw:function(){ renderLog(); }},
+  readiness:  {get:fetchSharedState,  st:function(){return stateFetch;},   draw:function(){ renderReadiness(); }},
+  expiring:   {get:fetchSharedState,  st:function(){return stateFetch;},   draw:function(){ renderExpiring(); }},
+  toget:      {get:fetchRestock,      st:function(){return restockState;}, draw:function(){ renderToGet(); }},
+  tracker:    {get:fetchDutyPeriods,  st:function(){return dpState;},      draw:function(){ renderTracker(); }},
+  'room-check':{get:fetchDutyPeriods, st:function(){return dpState;},      draw:function(){ renderDpState('room-check'); }}
+};
+
+function liveStop(){
+  if(liveTimer){ clearTimeout(liveTimer); liveTimer=null; }
+}
+function liveArm(){
+  liveStop();
+  if(!LIVE[liveView]) return;
+  liveTimer=setTimeout(liveTick, liveWait);
+}
+/* Started fresh on every arrival, so walking onto a view is itself a refresh
+   and the backoff does not carry over from the last screen. */
+function liveStart(v){
+  liveView=LIVE[v]?v:'';
+  liveWait=LIVE_MIN;
+  liveArm();
+}
+function liveTick(){
+  var v=liveView, ent=LIVE[v];
+  if(!ent) return;
+  // Backgrounded: do not spend a request on a screen nobody is looking at.
+  // visibilitychange brings it straight back when they return.
+  if(document.hidden){ liveArm(); return; }
+  var st=ent.st();
+  if(st.loading){ liveArm(); return; }
+  var before=st.sig;
+  ent.get().then(function(){
+    // Navigated away while the request was in the air. Repainting now would
+    // draw the old view over the new one.
+    if(liveView!==v) return;
+    if(ent.st().sig!==before){ liveWait=LIVE_MIN; ent.draw(); }
+    else liveWait=Math.min(LIVE_MAX, Math.round(liveWait*1.5));
+    liveArm();
+  }).catch(function(){ liveArm(); });
+}
+/* Coming back to the tab — or unlocking the phone — is the moment the answer on
+   screen is most likely to be old, so it asks then and there rather than
+   waiting out whatever was left on the timer. */
+document.addEventListener('visibilitychange',function(){
+  if(document.hidden || !LIVE[liveView]) return;
+  liveWait=LIVE_MIN;
+  liveStop();
+  liveTick();
+});
+
+/* Where the numbers came from, how old they are, and a way to ask again. One
+   line, in the same grey as the rest of the source notes. */
+function liveClock(ms){
+  if(!ms) return '';
+  try{ return new Date(ms).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}); }
+  catch(e){ return ''; }
+}
+function liveNote(st, have, mine, ours, retry){
+  if(st.error){
+    /* WHY it failed goes only to somebody who can act on it. A member standing
+       at the cupboard cannot redeploy an Apps Script, and three lines of red
+       across the top of the board they are picking a bag from costs them
+       attention they need for the bags. They get the fact — this is not
+       everybody's list — and that is the part that changes what they do. */
+    var why=(typeof ROLE!=='undefined' && ROLE!=='member') ? ' \u2014 '+esc(st.error) : '';
+    return '<p class="dpsrc bad">Showing this device\u2019s '+ours+' only'+why+'. '+
+           '<button type="button" class="btn xs" onclick="'+retry+'">Try again</button></p>';
+  }
+  if(!have) return '<p class="dpsrc">Reading the spreadsheet\u2026</p>';
+  var t=liveClock(st.at);
+  return '<p class="dpsrc">From the spreadsheet \u2014 everyone\u2019s '+ours+
+         (t?', <span class="when">updated '+esc(t)+'</span>':'')+'. '+
+         '<button type="button" class="btn xs" onclick="'+retry+'">Refresh</button></p>';
+}
+
 /* ---- the duty period, as the SHEET has it -----------------------------------
    The tracker cannot be built from synced content. Filing a form needs no
    sign-in, which is why members can file at all — but PUBLISHING shared content
@@ -5442,7 +5624,7 @@ function concernWhen(v){
    device that just filed shows its own check immediately rather than waiting on
    a round trip, and drops the overlay once the same sid comes back. */
 var remoteDP=null;                 // {dpKey:{roomId:[{cs,sid,date}]}}
-var dpState={loading:false, error:'', at:0};
+var dpState={loading:false, error:'', at:0, sig:''};
 
 function fetchDutyPeriods(){
   var url=(DB.api&&DB.api.url)||'';
@@ -5453,6 +5635,7 @@ function fetchDutyPeriods(){
       dpState.loading=false;
       if(!j||!j.ok||!j.dp||typeof j.dp!=='object'){ dpState.error='the sheet did not answer with duty periods'; return false; }
       remoteDP=j.dp; dpState.error=''; dpState.at=Date.now();
+      dpState.sig=JSON.stringify(remoteDP);
       return true;
     })
     .catch(function(e){
@@ -5577,16 +5760,24 @@ function tasksSig(r){
 /* Three states, not two. "Confirmed, then edited" is its own answer — treating
    it as confirmed would vouch for the edit, and treating it as never-confirmed
    would throw away the fact that somebody has been through it. */
+/* A stamp with no usable time — one merged in from a device whose clock or
+   payload was wrong — used to render the words "Invalid Date" into the sentence
+   a manager reads. The date is dropped instead: who checked it over is the part
+   that matters, and a sentence missing a date still reads as English. */
+function stampDay(v){
+  if(!v) return '';
+  var d=new Date(v);
+  return isNaN(d.getTime()) ? '' : d.toLocaleDateString();
+}
 function roomState(r){
   var c=(DB.roomConfirmed||{})[r.id];
-  if(!c) return {state:'new', cls:'todo', chip:'Not checked over', note:''};
+  if(!c || typeof c!=='object') return {state:'new', cls:'todo', chip:'Not checked over', note:''};
+  var when=stampDay(c.at), on=when?' on '+when:'';
   if(c.sig && c.sig!==tasksSig(r))
     return {state:'stale', cls:'stale', chip:'Edited since',
-            note:'Checked over by '+(c.by||'a manager')+' on '+
-                 new Date(c.at).toLocaleDateString()+', and edited since then.'};
+            note:'Checked over by '+(c.by||'a manager')+on+', and edited since then.'};
   return {state:'ok', cls:'ok', chip:'Checked over',
-          note:'Checked over by '+(c.by||'a manager')+' on '+
-               new Date(c.at).toLocaleDateString()+'.'};
+          note:'Checked over by '+(c.by||'a manager')+on+'.'};
 }
 
 function confirmRoomTasks(id){
@@ -5904,7 +6095,12 @@ function renderReadiness(){
   if(!units.length){ host.innerHTML='<div class="card"><p class="hint" style="margin:0">'+
     'No bags in service.</p></div>'; return; }
 
-  var h='<div class="legend"><span class="item"><span class="tag ok">Ready</span></span>'+
+  /* This board is the one that decides which bag somebody picks up, and every
+     flag on it was raised by somebody else. Saying how old the answer is
+     matters more here than anywhere. */
+  var h=liveNote(stateFetch, !!remoteConcerns, 'reported', 'reports',
+                 'fetchSharedState().then(renderReadiness)');
+  h+='<div class="legend"><span class="item"><span class="tag ok">Ready</span></span>'+
         '<span class="item"><span class="tag warn">Check first</span></span>'+
         '<span class="item"><span class="tag crit">Do not take</span></span></div>';
   h+='<div class="readygrid">';
@@ -6189,8 +6385,10 @@ function onToGet(key){
 function renderExpiring(){
   var host=document.getElementById('expiringHost'); if(!host) return;
   var rows=expiringRows();
+  var note=liveNote(stateFetch, !!remoteExpiry, 'recorded', 'dates',
+                    'fetchSharedState().then(renderExpiring)');
   if(!rows.length){
-    host.innerHTML='<div class="card"><p class="hint" style="margin:0">No expiry dates '+
+    host.innerHTML=note+'<div class="card"><p class="hint" style="margin:0">No expiry dates '+
       'recorded yet. They are entered on a Full Contents Check, beside any item '+
       'marked with an expiry, and appear here once saved.</p></div>';
     return;
@@ -6199,7 +6397,7 @@ function renderExpiring(){
   var m30=rows.filter(function(r){return r.days>=0&&r.days<=30;});
   var m90=rows.filter(function(r){return r.days>30&&r.days<=90;});
 
-  var h='<div class="repgrid">'+
+  var h=note+'<div class="repgrid">'+
     '<div class="repstat"><div class="rs-n">'+expired.length+'</div><div class="rs-l">expired</div></div>'+
     '<div class="repstat"><div class="rs-n">'+m30.length+'</div><div class="rs-l">within 30 days</div></div>'+
     '<div class="repstat"><div class="rs-n">'+m90.length+'</div><div class="rs-l">31 to 90 days</div></div>'+
@@ -6365,7 +6563,7 @@ function renderToGet(){
    fallback so the view still works offline and before a backend exists. One
    source at a time, deliberately — merging two done-flags with no idea which is
    newer is how an item gets bought twice or not at all. */
-var remoteRestock=null, restockState={loading:false, error:''};
+var remoteRestock=null, restockState={loading:false, error:'', at:0, sig:''};
 
 function fetchRestock(){
   var url=(DB.api&&DB.api.url)||'';
@@ -6377,6 +6575,8 @@ function fetchRestock(){
       restockState.loading=false;
       if(!j||!j.ok||!j.restock) throw 0;
       remoteRestock=j.restock;
+      restockState.at=Date.now();
+      restockState.sig=JSON.stringify(remoteRestock);
       return remoteRestock;
     })
     .catch(function(){
@@ -6777,16 +6977,8 @@ function dutyPeriodsHTML(){
      to what this device filed, which under-reports without saying so — exactly
      the failure the sheet-backed read exists to end. A view that cannot answer
      the question must say it cannot, not answer it wrongly. */
-  var note='';
-  if(dpState.error){
-    note='<p class="dpsrc bad">Showing only what this device filed — '+
-         esc(dpState.error)+'. <button type="button" class="btn xs" '+
-         'onclick="fetchDutyPeriods().then(renderTracker)">Try again</button></p>';
-  }else if(remoteDP){
-    note='<p class="dpsrc">From the spreadsheet — everyone\u2019s checks, not just this device.</p>';
-  }else{
-    note='<p class="dpsrc">Reading the spreadsheet\u2026</p>';
-  }
+  var note=liveNote(dpState, !!remoteDP, 'filed', 'checks',
+                    'fetchDutyPeriods().then(renderTracker)');
   if(!keys.length){
     return note+'<div class="card"><p class="hint" style="margin:0">No duty period has been '+
       'started for '+esc(acadLabel(acadYear()))+' yet. One starts when somebody files '+
@@ -7418,16 +7610,8 @@ function renderLog(){
   var all=allConcerns();
   var open=all.filter(function(i){return i.open;});
   var closed=all.filter(function(i){return !i.open;});
-  var h='';
-  if(stateFetch.error){
-    h+='<p class="dpsrc bad">Showing only what this device reported — '+
-       esc(stateFetch.error)+'. <button type="button" class="btn xs" '+
-       'onclick="fetchSharedState().then(renderLog)">Try again</button></p>';
-  }else if(remoteConcerns){
-    h+='<p class="dpsrc">From the spreadsheet — everyone\u2019s reports, not just this device.</p>';
-  }else{
-    h+='<p class="dpsrc">Reading the spreadsheet\u2026</p>';
-  }
+  var h=liveNote(stateFetch, !!remoteConcerns, 'reported', 'reports',
+                 'fetchSharedState().then(renderLog)');
   if(!all.length){
     h+='<div class="card"><p class="hint" style="margin:0">Nothing has been reported yet. '+
       'Anything left unticked on a check, and anything filed through Report a Problem, lands here.</p></div>';
