@@ -13,15 +13,18 @@ var BRAND = '#8c1c2b';
 var SHEETS = {
   'Room Checks': {
     name: 'Room Checks', freeze: 3,
-    // `dp` is the duty period, written as "DP 4 · 2026–27". It is the permanent
-    // record: the site keeps a live copy of the current year only, so a filter
-    // on this column is how anybody reads a past term. `callsign` replaces
-    // `andrew` here — a room check is identified by call sign and name, which
-    // is what the paper tracker always recorded, and asking for an Andrew ID as
-    // well made the shortest form on the site the one with the most typing.
-    keys:    ['date','time','dp','callsign','name','subject','result','missingCount','missing','restock','maint','sid'],
-    headers: ['Date','Time','Duty Period','Call Sign','Name','Room','Result','Missing','What Was Missing','Restock Needed','Maintenance','Submission ID'],
-    widths:  [95, 70, 120, 90, 150, 150, 150, 80, 320, 260, 260, 120]
+    /* NEW COLUMNS GO ON THE END. Inserting one in the middle does not delete a
+       single row, but it moves every existing value one place sideways under
+       headers that no longer describe them — which is worse than losing them,
+       because it looks like data.
+
+       So `Duty Period` and `Call Sign` are appended, and `Andrew ID` stays in
+       its original position holding the room checks already filed under it. The
+       room-check form no longer asks for one, so that column simply stops
+       filling; the history under it stays readable. */
+    keys:    ['date','time','name','andrew','subject','result','missingCount','missing','restock','maint','sid','dp','callsign'],
+    headers: ['Date','Time','Name','Andrew ID','Room','Result','Missing','What Was Missing','Restock Needed','Maintenance','Submission ID','Duty Period','Call Sign'],
+    widths:  [95, 70, 150, 100, 150, 150, 80, 320, 260, 260, 120, 120, 90]
   },
   'Checkouts': {
     name: 'Checkouts', freeze: 3,
@@ -31,11 +34,13 @@ var SHEETS = {
   },
   'Bag Checks': {
     name: 'Bag Checks', freeze: 3,
-    // No Seal column: the agency does not seal its kits, so the form stopped
-    // asking for a number that does not exist.
-    keys:    ['date','time','name','andrew','subject','result','missingCount','expired','expiringSoon','sid'],
-    headers: ['Date','Time','Name','Andrew ID','Bag','Result','Missing','Expired','Expiring Soon','Submission ID'],
-    widths:  [95, 70, 150, 100, 150, 150, 80, 220, 220, 120]
+    /* The form stopped asking for a seal number — the agency does not seal its
+       kits. The COLUMN stays exactly where it was, because removing it would
+       pull Submission ID one place left and every row already filed would show
+       its seal value under that heading. It just stops filling. */
+    keys:    ['date','time','name','andrew','subject','result','missingCount','expired','expiringSoon','seal','sid'],
+    headers: ['Date','Time','Name','Andrew ID','Bag','Result','Missing','Expired','Expiring Soon','Seal (no longer used)','Submission ID'],
+    widths:  [95, 70, 150, 100, 150, 150, 80, 220, 220, 100, 120]
   },
   'Post-Call': {
     name: 'Post-Call', freeze: 3,
@@ -43,13 +48,19 @@ var SHEETS = {
     // restock, so the old column asked everybody to account for something that
     // was never their job and the honest answer was always "all of it". This
     // records the exception instead: what they put back themselves.
-    // `meds` is what was GIVEN on the call, named and counted but with no
-    // location — the same drug sits on more than one shelf and the form does
-    // not ask which, because a guess would be a wrong location against a real
-    // drug. Optional: most members cannot give medications at all.
-    keys:    ['date','time','name','callnum','result','usageCount','usageText','meds','replaced','usageJson','sid'],
-    headers: ['Date','Time','Name','Call Number','Result','Units Used','What Was Used','Medications Given','Replaced By Member','Used (data)','Submission ID'],
-    widths:  [95, 70, 150, 110, 150, 90, 380, 260, 260, 200, 120]
+    /* `Could Not Replace` keeps its original position and its original heading,
+       holding the answers already filed under it. The form no longer asks that
+       question — it asks the opposite, per item — so the column stops filling
+       and `Replaced By Member` is appended instead. Renaming it in place would
+       have left old answers meaning the exact reverse of their new heading.
+
+       `Medications Given` is what was given on the call, named and counted but
+       with no location: the same drug sits on more than one shelf and the form
+       does not ask which, because a guess would be a wrong location against a
+       real drug. Optional — most members cannot give medications at all. */
+    keys:    ['date','time','name','callnum','result','usageCount','usageText','short','usageJson','sid','replaced','meds'],
+    headers: ['Date','Time','Name','Call Number','Result','Units Used','What Was Used','Could Not Replace (no longer used)','Used (data)','Submission ID','Replaced By Member','Medications Given'],
+    widths:  [95, 70, 150, 110, 150, 90, 380, 200, 200, 120, 260, 260]
   },
   'Reports': {
     name: 'Reports', freeze: 3,
@@ -988,9 +999,11 @@ function doGet(e) {
    than by when they happen to get created, so the file reads as a table of
    contents: the operations forms, then the bike forms, then the two worklists,
    then the machinery nobody opens by choice. */
-var TAB_ORDER = ['Room Checks', 'Checkouts', 'Bag Checks', 'Post-Call', 'Reports',
-                 'Bike Jumpkit Checks', 'Bike Safety Checks',
-                 'Restock', 'Bike Restock', 'Items'];
+/* Checkouts first and Restock second: the two anybody actually opens the file
+   to read. Moved with moveActiveSheet, which reorders without touching a row. */
+var TAB_ORDER = ['Checkouts', 'Restock', 'Room Checks', 'Bag Checks', 'Post-Call',
+                 'Reports', 'Bike Jumpkit Checks', 'Bike Safety Checks',
+                 'Bike Restock', 'Items'];
 
 /* Run by hand (Run ▸ tidyUp) after pasting an updated script.
 
