@@ -137,9 +137,15 @@ var BIKE_SHEETS = {
   safety: {
     name: 'Bike Safety Checks', freeze: 3,
     was: ['Bicycle Checks','Bike Checks','Safety Checks'],
+    /* `Bike ID` and `Status` appended LAST, so nothing already filed shifts. The
+       bike site derives a bike's status from its most recent check, and that
+       lived only in published content — which a member cannot write. Recording
+       the id and the ok/warn/oos class here is what lets the fleet board show
+       everybody's checks instead of the viewer's own. */
     headers: ['Date','Time','Name','Andrew ID','Bike','Result','Missing',
-              'What Was Missing','Weather Grounded','Conditions Flagged','Notes','Submission ID'],
-    widths:  [95, 70, 150, 100, 96, 210, 74, 320, 130, 240, 260, 120]
+              'What Was Missing','Weather Grounded','Conditions Flagged','Notes','Submission ID',
+              'Bike ID','Status'],
+    widths:  [95, 70, 150, 100, 96, 210, 74, 320, 130, 240, 260, 120, 96, 80]
   }
 };
 
@@ -565,6 +571,68 @@ function saveBikeExpiry(p) {
     var e = by[k] || {};
     return { k: k, bag: String(p.bag || ''), item: String(e.l || k), date: String(e.d || '') };
   }), 'bike', who);
+}
+
+/* The most recent check per bike, for the fleet board.
+
+   A bike's status is its last check, and that has only ever lived in published
+   content — which a manager can write and a member cannot. So a member's
+   pre-ride check reached this spreadsheet and never reached anybody else's
+   screen, and every bike read "never checked" to everyone but the person who
+   checked it. This is the same rule as everything else in this file: what has
+   to aggregate across people is read from here.
+
+   Weather-grounded checks are skipped. Grounding says the conditions are unsafe
+   to ride in, not that the bike is — the site does not set a bike's status from
+   one either. */
+function bikeCheckRows() {
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(BIKE_SHEETS.safety.name);
+  if (!sh || sh.getLastRow() < 2) return {};
+  var n = BIKE_SHEETS.safety.headers.length;
+  var tz = Session.getScriptTimeZone();
+  var asDate = function (v) {
+    if (!v) return '';
+    return (v instanceof Date) ? Utilities.formatDate(v, tz, 'yyyy-MM-dd') : String(v);
+  };
+  /* Every check already in this tab predates the two columns above, and
+     dropping all of them would mean the fleet board says "never checked" about a
+     fleet that has been checked all term — until somebody happens to file again.
+     So they are read back as well as can be honestly managed:
+
+       - the bike, by matching the NAME column against the published bike list.
+         Names are editable, so this is a guess and only ever used when there is
+         no id. A name that matches nothing is skipped rather than invented.
+       - the verdict, from the wording the site itself wrote into Result. Also a
+         guess, and also only used when the class column is empty.
+
+     New rows carry both explicitly and never reach either fallback. */
+  var byName = {};
+  var stored = readContent('bike');
+  var bikes = (stored && stored.content && stored.content.bikes) || [];
+  bikes.forEach(function (b) { if (b && b.name) byName[String(b.name).trim().toLowerCase()] = b.id; });
+
+  var classOf = function (result) {
+    var v = String(result || '');
+    if (/^Cleared for bike response/i.test(v)) return 'ok';
+    if (/Expired item/i.test(v)) return 'oos';
+    if (/^Not cleared/i.test(v)) return 'warn';
+    if (/^Cleared/i.test(v)) return 'warn';   // cleared, but with something noted
+    return '';
+  };
+
+  var out = {};
+  sh.getRange(2, 1, sh.getLastRow() - 1, n).getValues().forEach(function (r) {
+    if (String(r[8] || '') === 'YES') return;
+    var id = String(r[12] || '').trim() || byName[String(r[4] || '').trim().toLowerCase()] || '';
+    var cls = String(r[13] || '').trim() || classOf(r[5]);
+    if (!id || !cls) return;
+    var date = asDate(r[0]), time = String(r[1] || '');
+    var stamp = date + ' ' + time;
+    if (out[id] && out[id].stamp > stamp) return;
+    out[id] = { stamp: stamp, date: date, verdict: cls,
+                note: String(r[5] || ''), by: String(r[2] || '') };
+  });
+  return out;
 }
 
 function concernRows(site) {
@@ -1082,6 +1150,8 @@ function writeBikeRow(p) {
     p.notes || '',
     p.submissionId || ''
   ]);
+  // Only the bike check carries these; the jumpkit tab has neither column.
+  if (!isJk) row = row.concat([p.bikeId || '', p.statusClass || '']);
 
   // The row and the header row are built in two different places, so they can
   // drift. When they do, every value lands one column off, which reads as a
@@ -1649,7 +1719,10 @@ function doGet(e) {
   }
   if (p.state) {
     var st = siteOf(p);
-    return json({ ok: true, site: st, concerns: concernRows(st), expiry: expiryRows(st) });
+    var o = { ok: true, site: st, concerns: concernRows(st), expiry: expiryRows(st) };
+    // Only the bike site has a fleet whose status is derived from checks.
+    if (st === 'bike') o.checks = bikeCheckRows();
+    return json(o);
   }
   if (p.names) {
     PropertiesService.getScriptProperties().setProperty('NAMES', p.names);

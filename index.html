@@ -1341,7 +1341,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260821171329';
+var BUILD='20260821192420';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -4418,6 +4418,36 @@ function editPostCall(){
     });
 }
 
+/* One label per item, unique across the checklist being rendered.
+
+   Everything downstream identifies an item by its LABEL: the ticked map, the
+   missing list, the row that reaches the spreadsheet, and the what|where
+   signature a concern is keyed on. Two items sharing a label collapse into one,
+   so ticking one and not the other reports the wrong thing — and the MCI Bag
+   has two "(3) CATs" and two "(2) MCI triage fanny packs", which meant two of
+   its items were dropping out of every check it ever had.
+
+   A label that is unique is left exactly as written. A repeated one is
+   qualified by the compartment it sits in, here rather than in the stored
+   lists, so an equipment manager adding a duplicate later is safe too. */
+function sectionLabels(secs){
+  var count={}, out={};
+  (secs||[]).forEach(function(sec){
+    (sec.items||[]).forEach(function(it){
+      var l=String(it.label||''); count[l]=(count[l]||0)+1;
+    });
+  });
+  (secs||[]).forEach(function(sec){
+    var nm=String(sec.name||'');
+    var tail=nm.split('\u2014').pop().trim() || nm;
+    (sec.items||[]).forEach(function(it){
+      var l=String(it.label||'');
+      out[it.id] = count[l]>1 ? (l+' ('+tail+')') : l;
+    });
+  });
+  return out;
+}
+
 function checkBody(fid){
   var c=fcfg(fid);
   if(c.freeform) return '';
@@ -4442,6 +4472,7 @@ function checkBody(fid){
          '<div class="pcap">'+esc(room.name)+'<small>Tap to enlarge</small></div></button></div>';
     }
   }
+  var uniqLabel=sectionLabels(secs);
   secs.forEach(function(sec){
     h+='<div class="card mt"><h3>'+esc(sec.name)+'</h3>';
     (sec.items||[]).forEach(function(it){
@@ -4450,7 +4481,7 @@ function checkBody(fid){
       // reads as the date belonging to the item below — and the item below was
       // a pair of safety glasses.
       h+='<label class="checkline'+(it.exp?' hasexp':'')+'"><input type="checkbox" data-item="'+esc(it.id)+'" '+
-         'data-label="'+esc(it.label)+'" onchange="onFormInput(\''+fid+'\')">'+
+         'data-label="'+esc(uniqLabel[it.id]||it.label)+'" onchange="onFormInput(\''+fid+'\')">'+
          '<span class="lbl">'+esc(it.label)+'</span>'+
          (it.qty?'<span class="qty">'+esc(it.qty)+'</span>':'')+'</label>';
       if(it.exp){
