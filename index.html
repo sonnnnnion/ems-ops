@@ -1341,7 +1341,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260821192420';
+var BUILD='20260821193602';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -6563,17 +6563,26 @@ function rowsForConsumable(cid){
    or nothing has ever been counted — an unmapped item is not an error, it is a
    row the Equipment Manager has not linked yet, and inventing a starting count
    for it would be worse than leaving it alone. */
+/* A refill takes ONE item out of the world, so it comes off ONE shelf.
+
+   This used to decrement every shelf linked to that consumable, and two of them
+   are: glucose strips and lancets are stocked in both the CC Pod and the Blue
+   Bag. So one member putting one strip back charged the agency two — both
+   counts drifted down all term, both crossed their par line early, and the buy
+   list ordered strips nobody needed.
+
+   Which shelf it actually came off is not knowable: the form records the bag the
+   item went INTO, and nothing maps a bag to a shelf. So it comes off the fullest
+   counted one — the shelf somebody would naturally reach for, and the choice
+   that cannot push an already-low shelf further down. A shelf that has never
+   been counted is left alone, as before: null means unknown, not zero. */
 function stockUse(consumableId,qty){
-  var rows=rowsForConsumable(consumableId);
+  var rows=rowsForConsumable(consumableId).filter(function(r){ return stockOf(r.id)!=null; });
   if(!rows.length) return false;
-  var touched=false;
-  rows.forEach(function(r){
-    var cur=stockOf(r.id);
-    if(cur==null) return;
-    stockSet(r.id, cur-(qty||1));
-    touched=true;
-  });
-  return touched;
+  rows.sort(function(a,b){ return stockOf(b.id)-stockOf(a.id); });
+  var r=rows[0];
+  stockSet(r.id, stockOf(r.id)-(qty||1));
+  return true;
 }
 
 function belowPar(r){
