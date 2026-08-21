@@ -275,6 +275,56 @@ function expiryRows(site) {
 /* One row per distinct problem. `sig` is what|where lowercased, the same
    signature the site has always used to decide whether two reports are the same
    thing — so a tick on either side means the same tick. */
+/* Opening wording of the flag a post-call raises against the bag it used. The
+   site matches on this same prefix, so the two must not drift. */
+var USED_ON_CALL = 'Used on a call';
+
+/* A bag that came back from a call is not known-complete — something came out
+   of it. This raises the amber flag the readiness board reads.
+
+   It belongs HERE and not only on the site, for the reason everything else in
+   this file does: the site raises it for the phone that filed the post-call,
+   and that phone cannot publish. Without this, a jumpkit used on a call read
+   "Check first" to the member who filed and "Ready" to the next person to pick
+   it up, which is the single thing that board exists to prevent.
+
+   Which bag types get flagged is configuration only the site holds, so the
+   decision arrives already made, in `flagUnits`. */
+function noteUsedOnCall(p) {
+  if (p.form !== 'Post-Call' || !p.flagUnits) return;
+  var list;
+  try { list = JSON.parse(p.flagUnits); } catch (err) { return; }
+  if (!Array.isArray(list) || !list.length) return;
+
+  var sh = ensureConcerns();
+  var n = CONCERNS.headers.length;
+  var last = sh.getLastRow();
+  var rows = last > 1 ? sh.getRange(2, 1, last - 1, n).getValues() : [];
+  /* One OPEN flag per bag, matching the site. A jumpkit used on four calls
+     before anybody gets to it is still one thing to go and check, and four
+     dated rows would bury the real concerns underneath them. A resolved row
+     does not count — somebody has been through the bag since. */
+  var openFor = {};
+  rows.forEach(function (r) {
+    if (r[0] === true) return;
+    if (rowSite(r[12]) !== 'ops') return;
+    if (String(r[2] || '').indexOf(USED_ON_CALL) !== 0) return;
+    openFor[String(r[4] || '')] = 1;
+  });
+
+  var when = p.date ||
+    Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  var items = [];
+  list.forEach(function (u) {
+    if (!u || !u.id || openFor[u.id]) return;
+    var what = USED_ON_CALL + ' ' + when;
+    var where = String(u.name || u.id);
+    items.push({ sig: concernSig(what, where), what: what, where: where,
+                 unit: String(u.id), area: 'Equipment', urgency: 'Soon' });
+  });
+  putConcerns(items, 'ops', p.name || p.callsign || '');
+}
+
 function concernSig(what, where) {
   return String(what || '').trim().toLowerCase() + '|' +
          String(where || '').trim().toLowerCase();
@@ -723,6 +773,7 @@ function doPost(e) {
     writeItems(p);
     addToRestock(p);
     noteConcerns(p);
+    noteUsedOnCall(p);
     saveExpiry(p);
     return json({ result: 'saved' });
   } catch (err) {
@@ -815,6 +866,11 @@ function wantsFrom(p) {
        device that filed it knew perfectly well which jumpkit was now short. The
        shopping was right and the putting-away was guesswork. */
     list.forEach(function (u) {
+      // `r` means the member put it back on the spot. The bag is whole and the
+      // shelf is one down — that is a stock movement, not something to order,
+      // and buying another of the one item that is NOT missing is the mistake
+      // the refill tick exists to prevent.
+      if (u && u.r) return;
       out.push({ item: names[u.i] || u.i, qty: Number(u.q) || 1, cat: 'Equipment',
                  kind: 'buy', where: units[u.f] || u.f || '' });
     });
@@ -840,10 +896,25 @@ function wantsFrom(p) {
     if (m) out.push({ item: m + ' \u2014 expiring soon', qty: 1, cat: 'Equipment', kind: 'report' });
   });
   if (p.restock) out.push({ item: String(p.restock), qty: 1, cat: 'Office', kind: 'report' });
-  // Medications given on a call: replace what went out, so a purchase.
-  if (p.meds) String(p.meds).split(' | ').forEach(function (m) {
-    if (m) out.push({ item: m, qty: 1, cat: 'Medication', kind: 'buy' });
-  });
+  /* Medications given on a call: replace what went out, so a purchase.
+
+     Read from `medsJson`, which carries the quantity as a number. `meds` is the
+     readable cell a person skims on the Post-Call tab, and taking the count off
+     the end of it by string surgery is how this list ended up with an item
+     named "Epinephrine auto-injector 0.3 mg x2" at quantity one. The old field
+     is still honoured for a page cached from before this shipped. */
+  if (p.medsJson) {
+    var meds;
+    try { meds = JSON.parse(p.medsJson); } catch (err) { meds = []; }
+    if (Array.isArray(meds)) meds.forEach(function (m) {
+      if (m && m.n) out.push({ item: String(m.n), qty: Number(m.q) || 1,
+                               cat: 'Medication', kind: 'buy', where: '' });
+    });
+  } else if (p.meds) {
+    String(p.meds).split(' | ').forEach(function (m) {
+      if (m) out.push({ item: m, qty: 1, cat: 'Medication', kind: 'buy', where: '' });
+    });
+  }
   return out;
 }
 

@@ -1341,7 +1341,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260820235727';
+var BUILD='20260821171329';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -4987,17 +4987,47 @@ function doSubmit(fid,s){
   if(s.usage && s.usage.length){
     payload.usageText=s.usage.map(function(r){
       return r.qty+'x '+r.itemName+' ('+r.fromName+')'; }).join(' | ');
+    /* `r` marks what the member put back themselves. The spreadsheet builds the
+       buy list too, and without this it ordered a replacement for the one item
+       that is NOT missing — the exact mistake the refill tick exists to prevent,
+       made on the list everybody else reads. */
     payload.usageJson=JSON.stringify(s.usage.map(function(r){
-      return {i:r.item,q:r.qty,f:r.from}; }));
+      return r.refilled ? {i:r.item,q:r.qty,f:r.from,r:1} : {i:r.item,q:r.qty,f:r.from}; }));
     payload.usageCount=s.usage.reduce(function(a,r){return a+r.qty;},0);
     // Named and counted, never located. The same drug is on three shelves and
     // this form cannot know which one it came off.
     payload.meds=(s.meds||[]).map(function(m){
       return m.name+(m.qty>1?' x'+m.qty:''); }).join(' | ');
+    /* The same drugs with the quantity as a NUMBER. `meds` above is one readable
+       cell for a person; parsing " x2" back off the end of it to get a count is
+       how the shared buy list ended up with an item literally named
+       "Epinephrine auto-injector 0.3 mg x2", quantity one. */
+    payload.medsJson=JSON.stringify((s.meds||[]).map(function(m){
+      return {n:m.name, q:m.qty||1}; }));
     // The sheet's "Replaced By Member" column, built from the ticks rather than
     // from a free-text box, so it names actual items.
     payload.replaced=s.usage.filter(function(r){return r.refilled;})
       .map(function(r){ return r.itemName+(r.qty>1?' x'+r.qty:''); }).join(' | ');
+    /* Which bags this call opened, and their names, so the SPREADSHEET can raise
+       the same flag this device raises below.
+
+       Without it that flag lived on one phone. The readiness board reads shared
+       concerns, so a jumpkit used on a call showed "Check first" to the member
+       who filed the post-call and "Ready" to the next person to pick it up —
+       which is the one thing that board exists to prevent. Whether a bag type
+       gets flagged after use is configuration only this side knows, so the
+       decision is made here and the result is sent. */
+    var flagUnits=[], seenUnit={};
+    s.usage.forEach(function(r){
+      if(!r.from || seenUnit[r.from]) return;
+      var u=(DB.bagUnits||[]).filter(function(x){return x.id===r.from;})[0];
+      if(!u) return;
+      var ty=(DB.bags||[]).filter(function(b){return b.id===u.type;})[0];
+      if(!ty || !ty.checkAfterUse) return;
+      seenUnit[r.from]=1;
+      flagUnits.push({id:u.id, name:u.name});
+    });
+    if(flagUnits.length) payload.flagUnits=JSON.stringify(flagUnits);
     // Local mirror, so reports work before the backend exists.
     var stamp=Date.now();
     s.usage.forEach(function(r){
