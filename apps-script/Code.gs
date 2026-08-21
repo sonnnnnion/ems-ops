@@ -325,9 +325,13 @@ function noteConcerns(p) {
                            urgency: 'Soon', unit: unit });
   });
 
+  /* Expired stock is a fault: the kit is carrying something it must not carry,
+     so it blocks. Expiring-soon is NOT a concern — the item is in date today,
+     and flagging a bag "Check first" for something that has not happened yet
+     teaches people to ignore the board. It goes on the restock list only. */
   if (p.expired) String(p.expired).split(' | ').forEach(function (m) {
-    if (m) items.push({ what: m + ' (expired)', where: subj, area: area,
-                        urgency: 'Soon', unit: unit });
+    if (m) items.push({ what: m + ' is expired', where: subj, area: area,
+                        urgency: 'Blocking', unit: unit });
   });
   if (!items.length) return;
   putConcerns(items.map(function (it) {
@@ -820,8 +824,20 @@ function wantsFrom(p) {
       if (m) out.push({ item: m, qty: 1, cat: 'Equipment', kind: 'report' });
     });
   }
+  /* Dated stock. Expired is a fault and expiring-soon is notice, but both are
+     the same thing on THIS list: something to go and replace. Expiring-soon used
+     to produce nothing anywhere — it reached the check row as a cell and stopped
+     there, so the only way to find it was to open the file and read across, and
+     by the time anything actionable existed the item had already lapsed.
+
+     The wording matches the site exactly. It has to: the site builds this list
+     for the device that filed and this builds it for everybody else, and two
+     spellings of one item is two rows for one job. */
   if (p.expired) String(p.expired).split(' | ').forEach(function (m) {
-    if (m) out.push({ item: m + ' (expired)', qty: 1, cat: 'Equipment', kind: 'report' });
+    if (m) out.push({ item: m + ' \u2014 expired', qty: 1, cat: 'Equipment', kind: 'report' });
+  });
+  if (p.expiringSoon) String(p.expiringSoon).split(' | ').forEach(function (m) {
+    if (m) out.push({ item: m + ' \u2014 expiring soon', qty: 1, cat: 'Equipment', kind: 'report' });
   });
   if (p.restock) out.push({ item: String(p.restock), qty: 1, cat: 'Office', kind: 'report' });
   // Medications given on a call: replace what went out, so a purchase.

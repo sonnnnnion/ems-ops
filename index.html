@@ -1341,7 +1341,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260820232804';
+var BUILD='20260820235727';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -4472,7 +4472,13 @@ function checkBody(fid){
         // grammar, which a plural/singular guess would only half fix.
         var expLbl = it.expOf ? 'Expires — '+esc(it.expOf) : 'Expires';
         h+='<div class="exprow"><label for="x-'+esc(fid)+'-'+esc(it.id)+'">'+expLbl+'</label>'+
-           '<input type="date" id="x-'+esc(fid)+'-'+esc(it.id)+'" data-exp="'+esc(it.id)+'" value="'+esc(known)+'" '+
+           '<input type="date" id="x-'+esc(fid)+'-'+esc(it.id)+'" data-exp="'+esc(it.id)+'" '+
+           // What is actually dated, for the lists that name it later. Without
+           // this they can only reach for the whole checklist line, and
+           // "(1) red pouch with (10) 2x2 gauze, (4) 4x4 gauze, (2) 5x9 combine
+           // pads, and (2) petroleum gauze pads — expiring soon" is not a line
+           // anybody can shop from.
+           'data-expname="'+esc(it.expOf||it.label||it.id)+'" value="'+esc(known)+'" '+
            'onchange="setExpiry(\''+jsq(fid)+'\',\''+jsq(it.id)+'\',this.value);onFormInput(\''+fid+'\')">'+
            '<span class="expbadge" data-expbadge="'+esc(it.id)+'"></span></div>';
       }
@@ -4633,8 +4639,16 @@ function paintExpiry(fid){
     // Read the field, not the store: the field is what this bag's key filled in,
     // and it is also what the member has just typed but not yet blurred.
     var n=daysUntil(el.value);
-    var lbl=(host.querySelector('[data-item="'+id+'"]')||{}).getAttribute
-      ? host.querySelector('[data-item="'+id+'"]').getAttribute('data-label') : id;
+    /* The part that carries the date, not the whole line it sits on. A pouch
+       listing six things where only the petroleum gauze is dated should report
+       the petroleum gauze — naming the pouch says the wrong thing expired and
+       makes an unshoppable list entry. Falls back to the full label for items
+       that are simply themselves. */
+    var lbl=el.getAttribute('data-expname');
+    if(!lbl){
+      var itEl=host.querySelector('[data-item="'+id+'"]');
+      lbl=(itEl && itEl.getAttribute('data-label')) || id;
+    }
     if(!badge) return;
     if(n===null){ badge.textContent=''; badge.className='expbadge'; return; }
     if(n<0){ badge.textContent='Expired'; badge.className='expbadge bad'; out.expired.push(lbl); }
@@ -5072,11 +5086,35 @@ function doSubmit(fid,s){
     addIssue({area:s.radios.area||'Other', urgency:s.radios.urgency||'Whenever',
       what:s.extras.what||'', where:s.extras.where||'', by:openedBy});
   }
-  // Expired stock is a blocking problem wherever it is found.
+  /* Dated stock, in the two states that mean something different.
+
+     EXPIRED is a fault: a kit is carrying something it must not carry, so it
+     raises a blocking concern as well as landing on the list.
+
+     EXPIRING SOON used to raise nothing at all. It reached the spreadsheet as a
+     cell on the check row and stopped there — so an Equipment Manager could only
+     find out about it by opening the file and reading across, and by the time
+     anything reached a list she could act on, the item had already lapsed and
+     the kit had been carrying it. Sixty days is exactly the notice needed to
+     order a replacement, and throwing it away was the whole cost.
+
+     It is NOT a concern, deliberately. The kit is fine — the item is in date
+     today — and flagging the bag "Check first" for something that has not
+     happened yet would train people to ignore the board. It is a line on the
+     list and nothing more.
+
+     The suffixes keep the two apart on a list where the same item can appear in
+     both states, and keep each one a stable row that can be ticked off. */
+  var expUnit=(c.pick&&c.pick.from==='units')?s.pick:'';
   (s.expired||[]).forEach(function(m){
     addIssue({area:'Equipment', urgency:'Blocking', what:m+' is expired',
-      where:s.pickName, unit:(c.pick&&c.pick.from==='units')?s.pick:'', by:openedBy});
-    wantItem({name:m, cat:'Equipment', where:s.pickName, by:openedBy});
+      where:s.pickName, unit:expUnit, by:openedBy});
+    wantItem({kind:'report', name:m+' \u2014 expired', cat:'Equipment',
+      where:s.pickName, by:openedBy});
+  });
+  (s.soon||[]).forEach(function(m){
+    wantItem({kind:'report', name:m+' \u2014 expiring soon', cat:'Equipment',
+      where:s.pickName, by:openedBy});
   });
   // A bag that came back from a call is not known-complete — something came out
   // of it. Flagging it amber makes the next person open it before they rely on
