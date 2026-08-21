@@ -992,6 +992,16 @@
     .qrcard .qrlink{font-size:11px;padding-top:26px}
   }
 
+  /* Five columns is one too many at 375px, and the one that has to give is the
+     name of whoever reported it — on a phone it moves under the item instead of
+     taking a column of its own. Same information, one column fewer.
+
+     Declared BEFORE the media query on purpose. Put after it, this rule has the
+     same specificity and simply wins on source order, and the line never
+     appears — which is exactly the trap the touch-sizing block at the bottom of
+     this stylesheet already carries a warning about. */
+  .mob-only{display:none}
+
   /* ---------- the worklists, on a phone --------------------------------
      Every one of these tables carried `min-width:600px`, so on a 375px screen
      the Equipment Manager ticking off a restock had to scroll sideways to see
@@ -1015,8 +1025,11 @@
     .invtable th,.invtable td{padding:9px 8px;font-size:12.9px}
     .invtable th{font-size:10px;letter-spacing:.05em}
     .mob-hide{display:none}
-    /* The item is the thing being read; let it have the room. */
-    .invtable td:nth-child(2){word-break:break-word}
+    .mob-only{display:block}
+    /* Break only where a word genuinely cannot fit, never mid-word: with the
+       column squeezed, `word-break` was rendering "Adhesive bandages" as
+       "Adhesiv / e / bandage / s". */
+    .invtable td:nth-child(2){overflow-wrap:break-word}
   }
 
   /* ---------- touch sizing, last on purpose ----------------------------
@@ -1328,7 +1341,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260820141622';
+var BUILD='20260820232804';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -2011,7 +2024,7 @@ var DEFAULTS={
          {id:'ev-ace', label:'(2 ea.) 2", 4" ace bandages'},
          {id:'ev-tri', label:'(5) triangular bandages'}]},
        {name:'Right side compartment', items:[
-         {id:'ev-petro', label:'(2) 4x4 petroleum gauze', exp:true},
+         {id:'ev-petro', label:'(2) 5x9 petroleum gauze', exp:true},
          {id:'ev-gauze', label:'Plenty of 2x2 and 4x4 gauze'},
          {id:'ev-combine', label:'(5) combine pads'},
          {id:'ev-redpouch', label:'Red pouch — PAWS'},
@@ -2083,7 +2096,7 @@ var DEFAULTS={
          {id:'sp-burn', label:'(2) burn sheets'},
          {id:'sp-multitrauma', label:'(2) multi-trauma dressings'},
          {id:'sp-gauze', label:'Assorted 2x2, 4x4 gauze, combine pads'},
-         {id:'sp-petro', label:'(4) 4x4 petroleum gauze', exp:true},
+         {id:'sp-petro', label:'(4) 5x9 petroleum gauze', exp:true},
          {id:'sp-mylar', label:'(2) Mylar blankets'},
          {id:'sp-cat', label:'(2) CATs'},
          {id:'sp-shears', label:'(1) pair trauma shears'}]}
@@ -2520,6 +2533,41 @@ function migrateAccess(a){
   return changed;
 }
 
+/* Wording corrections to seeded checklist items, applied by item ID.
+
+   Changing a label in DEFAULTS alone fixes nothing on a device that already has
+   a stored copy, and bumping `seed` to force a re-seed would wipe every list a
+   manager has edited through the site — a sledgehammer for a two-character fix.
+   Worse, the published copy would simply put the old wording back on the next
+   content pull.
+
+   So: corrections are listed here by the item's stable id, applied to whatever
+   copy this device is holding, and applied AGAIN after shared content arrives so
+   a stale published copy cannot reintroduce them. Idempotent, so it costs
+   nothing to keep running. An entry can be deleted once the published copy has
+   been through a manager's device and gone back up corrected.
+
+   `ev-petro` / `sp-petro`: reported by the Equipment Manager 2026-08-20 — the
+   petroleum gauze in the event and specialty bags is 5x9, not 4x4. The jumpkit's
+   red pouch says "petroleum gauze pads" with no size and is left alone. */
+var LABEL_FIXES={
+  'ev-petro':'(2) 5x9 petroleum gauze',
+  'sp-petro':'(4) 5x9 petroleum gauze'
+};
+
+function applyLabelFixes(){
+  var n=0;
+  (DB.bags||[]).forEach(function(b){
+    (b.sections||[]).forEach(function(sec){
+      (sec.items||[]).forEach(function(it){
+        if(!it || !LABEL_FIXES[it.id]) return;
+        if(it.label!==LABEL_FIXES[it.id]){ it.label=LABEL_FIXES[it.id]; n++; }
+      });
+    });
+  });
+  return n;
+}
+
 function loadDB(){
   var raw=null;
   try{ raw=JSON.parse(localStorage.getItem(LS_DB)||'null'); }catch(e){ raw=null; }
@@ -2537,6 +2585,7 @@ function loadDB(){
           : JSON.parse(JSON.stringify(DEFAULTS[k]));
   });
   DB.seed=DEFAULTS.seed;
+  applyLabelFixes();
   // `access` is never re-seeded — it holds the People list, and wiping that on
   // every content release would be worse than any stale value in it, so its
   // shape changes have to be migrated by hand.
@@ -3473,6 +3522,12 @@ function applyContentInner(obj){
     if(mine.indexOf(k)<0) base[k]=obj[k];
   });
   setContentBase(base);
+  /* Again, over what just arrived. Without this a published copy holding the old
+     wording would put it straight back every time anybody opened the site, and
+     the correction would look like it had never been made. Marked dirty when it
+     changes something, so the next publish carries the fix upstream and the
+     entry can eventually be retired. */
+  if(applyLabelFixes()){ n++; markContentDirty(); }
   if(n) saveDB();
   return n>0;
 }
@@ -6572,7 +6627,7 @@ function renderToGet(){
         // whenever the sheet answered — which is the normal case for a manager,
         // so the split existed only on a device that had never synced.
         return {name:r.item, cat:r.cat||'Equipment', qty:r.qty, times:r.times,
-                last:r.last, where:r.where, done:r.got, item:r.item,
+                last:r.last, where:r.where, done:r.got, item:r.item, by:r.who||'',
                 kind:(r.kind==='report'?'report':'buy'), remote:true};
       })
     : (DB.toGet||[]);
@@ -6609,25 +6664,36 @@ function renderToGet(){
      '<div class="rs-l">handled</div></div></div>';
 
   function rowsTable(rows, cols3){
+    /* WHO reported it, beside WHEN. Both lists knew — every entry has carried a
+       name since the beginning and the spreadsheet has a Who column — and
+       neither ever showed it, so the only question a manager actually asks of
+       this screen ("is the thing so-and-so told me about on here?") was the one
+       question it could not answer. You had to open the spreadsheet, find their
+       row, and match it up by hand. */
     var t2='<div class="invwrap"><table class="invtable"><thead><tr>'+
        '<th></th><th>Item</th>'+(cols3?'<th>Qty</th>':'')+
        '<th>Where</th><th class="mob-hide">Asked</th>'+
-       '<th class="mob-hide">Last</th><th></th></tr></thead><tbody>';
+       '<th class="mob-hide">Reported by</th><th></th></tr></thead><tbody>';
     rows.forEach(function(t){
       var tick=t.remote
         ? 'toggleRestock(\''+jsq(t.item)+'\',true,\''+jsq(t.where||'')+'\')'
         : 'toggleToGet(\''+jsq(t.key)+'\')';
       var w=toGetWhere(t);
+      var whoLine=(t.by?esc(t.by):'\u2014')+' \u00b7 '+esc(toGetDate(t));
       t2+='<tr><td><input type="checkbox" onchange="'+tick+'" aria-label="Mark handled"></td>'+
          '<td>'+esc(toGetName(t))+'<br><span style="font-size:11px;color:var(--ink-faint)">'+
-         esc(t.cat)+'</span></td>'+
+         esc(t.cat)+'</span>'+
+         '<span class="mob-only" style="font-size:11px;color:var(--ink-faint)">'+whoLine+'</span></td>'+
          (cols3?'<td class="num">'+esc(String(t.qty||1))+
            (t.unit&&t.unit!=='each'?' '+esc(t.unit):'')+'</td>':'')+
          // Every place that asked, not just the last one to ask.
          '<td style="font-size:12px">'+(w?esc(w):'<span class="dim">anywhere</span>')+'</td>'+
          '<td class="num mob-hide"'+((t.times||1)>1?' style="font-weight:700;color:var(--warn)"':'')+'>'+
          (t.times||1)+'</td>'+
-         '<td class="mob-hide" style="font-size:12px">'+esc(toGetDate(t))+'</td>'+
+         // The name is what gets matched against "so-and-so said the pod was
+         // short"; the date is what tells you whether it is still true.
+         '<td class="mob-hide" style="font-size:12px">'+(t.by?esc(t.by):'<span class="dim">—</span>')+
+         '<br><span style="font-size:11px;color:var(--ink-faint)">'+esc(toGetDate(t))+'</span></td>'+
          '<td>'+(t.remote?'':'<button class="btn xs" onclick="delToGet(\''+jsq(t.key)+'\')">✕</button>')+
          '</td></tr>';
     });
