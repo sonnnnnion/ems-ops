@@ -380,7 +380,21 @@
   th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--rule-soft)}
   th{font-family:var(--font-mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-faint);border-bottom:1.5px solid var(--rule)}
 
-  .checkline{display:flex;align-items:flex-start;gap:12px;padding:11px 2px;border-bottom:1px dashed var(--rule-soft)}
+  /* A tap has to feel like a tap.
+
+     Mobile browsers hold a click back for a moment in case it becomes a
+     double-tap zoom; `touch-action: manipulation` says it never will, and the
+     tap lands at once. And nothing changed under the finger on the way down —
+     the only feedback was the label greying AFTER the box toggled, so a press
+     that had registered looked like one that had not. The row is already a
+     <label>, so the whole strip is the target; it just never said so. */
+  .checkline{display:flex;align-items:flex-start;gap:12px;padding:11px 2px;
+             border-bottom:1px dashed var(--rule-soft);
+             touch-action:manipulation;-webkit-tap-highlight-color:transparent;
+             border-radius:6px;cursor:pointer;
+             transition:background-color .09s ease}
+  .checkline:active{background:var(--bg-2)}
+  .checkline.done{background:rgba(47,122,74,.05)}
   /* An item that owns an expiry field hands its rule to that field, so the line
      closes the PAIR. Otherwise the separator sits between the item and its own
      date and the date reads as the next item's — which is how a pair of safety
@@ -392,6 +406,11 @@
   .checkline .lbl small{display:block;color:var(--ink-faint);font-size:12px}
   .checkline .qty{font-family:var(--font-mono);font-size:11.5px;color:var(--ink-faint);white-space:nowrap}
   .checkline.done .lbl{color:var(--ink-faint)}
+  /* Everything else a thumb lands on, for the same reason. */
+  .btn,.sb-item,.roompick,.acchead,label,input[type=checkbox],input[type=radio],select,button{
+    touch-action:manipulation}
+  .btn,.sb-item,.roompick{-webkit-tap-highlight-color:transparent}
+  .btn:active,.roompick:active{transform:translateY(1px)}
 
   .verdict{margin-top:16px;padding:16px;border:2px solid var(--rule);box-shadow:var(--shadow-md);font-weight:700;display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap}
   .verdict.ok{background:var(--ok-wash)} .verdict.warn{background:var(--warn-wash)} .verdict.oos{background:var(--oos-wash)}
@@ -1341,7 +1360,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260821193602';
+var BUILD='20260823215308';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -4648,11 +4667,24 @@ function renderAndrewMsg(fid){
    its dates key on the type; that is a different scope from any one kit on
    purpose, rather than silently writing over all six. */
 function expiryKey(fid,itemId){ return (formPick[fid]||'-')+'|'+itemId; }
+/* Persisting something the machinery did, or something somebody is part-way
+   through typing — not an edit to the site. Held inside `applyingContent` so the
+   publish path leaves it alone: routing form-filling through that path is how a
+   manager got "not saved for everyone, sign in again" in the middle of a check
+   they had not even submitted. */
+function saveDBQuiet(){
+  var was=applyingContent;
+  applyingContent=true;
+  try{ saveDB(); } finally{ applyingContent=was; }
+}
+
 function setExpiry(fid,id,v){
   DB.expiry=DB.expiry||{};
   var k=expiryKey(fid,id);
   if(v) DB.expiry[k]=v; else delete DB.expiry[k];
-  saveDB();
+  // Filling in a form, not publishing. The date rides to the spreadsheet with
+  // the submission (see expiryJson in doSubmit).
+  saveDBQuiet();
 }
 function daysUntil(iso){
   if(!iso) return null;
