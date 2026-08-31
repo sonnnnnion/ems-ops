@@ -1,0 +1,253 @@
+[
+ {
+  "name": "checkout: 1 missing + damaged note",
+  "payload": {
+   "form": "Checkouts",
+   "date": "2026-08-20",
+   "sid": "s-1",
+   "callsign": "P1",
+   "name": "Test Member",
+   "andrew": "tmember",
+   "radio": "P1",
+   "dp": "",
+   "dpKey": "",
+   "roomId": "",
+   "unitId": "jk-a",
+   "bagId": "",
+   "subject": "Jumpkit A",
+   "missing": "(1) stethoscope",
+   "doneCount": 33,
+   "missingCount": 1,
+   "expired": "",
+   "expiringSoon": "",
+   "detail": "Couldn't find eyewash anywhere"
+  },
+  "toGet": [
+   {
+    "kind": "report",
+    "name": "(1) stethoscope",
+    "qty": 1,
+    "wheres": [
+     "Jumpkit A"
+    ]
+   }
+  ],
+  "issues": [
+   {
+    "what": "Couldn't find eyewash anywhere",
+    "where": "Jumpkit A"
+   },
+   {
+    "what": "(1) stethoscope missing",
+    "where": "Jumpkit A"
+   }
+  ]
+ },
+ {
+  "name": "bag check: 1 missing",
+  "payload": {
+   "form": "Bag Checks",
+   "date": "2026-08-20",
+   "sid": "s-2",
+   "callsign": "P1",
+   "name": "Test Member",
+   "andrew": "tmember",
+   "radio": "",
+   "unitId": "",
+   "bagId": "jumpkit",
+   "subject": "Jumpkit",
+   "missing": "Clipboard with pen",
+   "doneCount": 33,
+   "missingCount": 1,
+   "expired": "",
+   "expiringSoon": ""
+  },
+  "toGet": [
+   {
+    "kind": "report",
+    "name": "Clipboard with pen",
+    "qty": 1,
+    "wheres": [
+     "Jumpkit"
+    ]
+   }
+  ],
+  "issues": [
+   {
+    "what": "Clipboard with pen missing",
+    "where": "Jumpkit"
+   }
+  ]
+ },
+ {
+  "name": "room check: 1 missing + restock + maint",
+  "payload": {
+   "form": "Room Checks",
+   "date": "2026-08-20",
+   "sid": "s-3",
+   "callsign": "P1",
+   "name": "Test Member",
+   "andrew": "",
+   "dp": "DP 4",
+   "dpKey": "2026:4",
+   "roomId": "equipment",
+   "subject": "Equipment Room",
+   "missing": "Restock the blue bins",
+   "doneCount": 5,
+   "missingCount": 1,
+   "expired": "",
+   "expiringSoon": "",
+   "restock": "We are out of paper towels",
+   "maint": "The door handle is loose"
+  },
+  "toGet": [
+   {
+    "kind": "report",
+    "name": "We are out of paper towels",
+    "qty": 1,
+    "wheres": [
+     "Equipment Room"
+    ]
+   }
+  ],
+  "issues": [
+   {
+    "what": "The door handle is loose",
+    "where": "Equipment Room"
+   },
+   {
+    "what": "We are out of paper towels",
+    "where": "Equipment Room"
+   },
+   {
+    "what": "Restock the blue bins missing",
+    "where": "Equipment Room"
+   }
+  ]
+ },
+ {
+  "name": "bag check: one expiring soon, one already expired",
+  "payload": {
+   "form": "Bag Checks",
+   "date": "2026-08-20",
+   "sid": "s-dated",
+   "callsign": "Tech 1",
+   "name": "Test Member",
+   "andrew": "tmember",
+   "subject": "Jumpkit",
+   "bagId": "jumpkit",
+   "unitId": "",
+   "missing": "",
+   "missingCount": 0,
+   "done": "",
+   "doneCount": 0,
+   "expired": "(1) glucose packet",
+   "expiringSoon": "petroleum gauze pads"
+  },
+  "toGet": [
+   {
+    "kind": "report",
+    "name": "petroleum gauze pads — expiring soon",
+    "wheres": [
+     "Jumpkit"
+    ]
+   },
+   {
+    "kind": "report",
+    "name": "(1) glucose packet — expired",
+    "wheres": [
+     "Jumpkit"
+    ]
+   }
+  ],
+  "issues": [
+   {
+    "what": "(1) glucose packet is expired",
+    "where": "Jumpkit"
+   }
+  ]
+ },
+ {
+  "name": "post-call: one item put back, one not, plus a drug given",
+  "payload": {
+   "form": "Post-Call",
+   "date": "2026-08-21",
+   "sid": "pc-1",
+   "name": "Test Member",
+   "callsign": "P1",
+   "callnum": "2026-114",
+   "usageJson": "[{\"i\":\"c-bandaid\",\"q\":1,\"f\":\"jk-a\",\"r\":1},{\"i\":\"c-gauze4\",\"q\":2,\"f\":\"jk-b\"}]",
+   "usageCount": 3,
+   "usageText": "1x Adhesive bandages (Jumpkit A) | 2x Sterile gauze 4x4 (Jumpkit B)",
+   "meds": "Epinephrine auto-injector 0.3 mg x2",
+   "medsJson": "[{\"n\":\"Epinephrine auto-injector 0.3 mg\",\"q\":2}]",
+   "replaced": "Adhesive bandages",
+   "flagUnits": "[{\"id\":\"jk-a\",\"name\":\"Jumpkit A\"},{\"id\":\"jk-b\",\"name\":\"Jumpkit B\"}]",
+   "missing": "Wiped down anything used | Kit back where it belongs",
+   "missingCount": 2,
+   "expired": "",
+   "expiringSoon": ""
+  },
+  "names": {
+   "items": {
+    "c-bandaid": "Adhesive bandages",
+    "c-gauze4": "Sterile gauze 4x4"
+   },
+   "units": {
+    "jk-a": "Jumpkit A",
+    "jk-b": "Jumpkit B"
+   }
+  },
+  "toGet": [
+   {
+    "kind": "buy",
+    "name": "Epinephrine auto-injector 0.3 mg",
+    "qty": 2,
+    "wheres": []
+   },
+   {
+    "kind": "buy",
+    "name": "Sterile gauze 4x4",
+    "qty": 2,
+    "wheres": [
+     "Jumpkit B"
+    ]
+   }
+  ],
+  "issues": [
+   {
+    "what": "Used on a call 2026-08-21",
+    "where": "Jumpkit B"
+   },
+   {
+    "what": "Used on a call 2026-08-21",
+    "where": "Jumpkit A"
+   }
+  ]
+ },
+ {
+  "name": "report a problem",
+  "payload": {
+   "form": "Reports",
+   "date": "2026-08-21",
+   "sid": "rp-1",
+   "name": "Test Member",
+   "callsign": "P1",
+   "area": "Equipment",
+   "urgency": "Blocking",
+   "what": "The cot strap is torn",
+   "where": "Squad car",
+   "missing": "",
+   "missingCount": 0,
+   "expired": "",
+   "expiringSoon": ""
+  },
+  "toGet": [],
+  "issues": [
+   {
+    "what": "The cot strap is torn",
+    "where": "Squad car"
+   }
+  ]
+ }
+]

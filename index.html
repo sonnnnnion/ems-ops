@@ -1360,7 +1360,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260823215308';
+var BUILD='20260831165858';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -7743,8 +7743,11 @@ function reportData(p){
       byUnit[f]=(byUnit[f]||0)+b.from[f]; }); });
     return {since:r.since, remote:true, buy:buy, byUnit:byUnit,
             usage:[{qty:buy.reduce(function(a,x){return a+x.qty;},0)}],
+            /* Open means the SHEET has not ticked it and this device has not
+               either. It used to consult only the local list, so a concern a
+               manager had closed on another device still counted as open here. */
             issuesOpen:(r.concerns||[])
-              .filter(function(c){ return !isResolvedConcern(c.what,c.where); })
+              .filter(function(c){ return !c.resolved && !isResolvedConcern(c.what,c.where); })
               .map(function(c){ return {what:c.what, where:c.where, urgency:c.urgency, open:true}; }),
             issuesAll:(r.concerns||[]), calls:r.calls||0};
   }

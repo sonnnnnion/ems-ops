@@ -328,7 +328,7 @@ function noteUsedOnCall(p) {
     items.push({ sig: concernSig(what, where), what: what, where: where,
                  unit: String(u.id), area: 'Equipment', urgency: 'Soon' });
   });
-  putConcerns(items, 'ops', p.name || p.callsign || '');
+  putConcerns(items, 'ops', p.name || p.callsign || '', when);
 }
 
 function concernSig(what, where) {
@@ -393,13 +393,18 @@ function noteConcerns(p) {
   putConcerns(items.map(function (it) {
     return { sig: concernSig(it.what, it.where), what: it.what, where: it.where,
              unit: it.unit, area: it.area, urgency: it.urgency };
-  }), 'ops', p.name || p.callsign || '');
+  }), 'ops', p.name || p.callsign || '', p.date);
 }
 
 /* The upsert both sites share. Keyed on site AND signature, so the two sites
    cannot land on each other's rows — "missing gauze" is a real thing to report
    on both, and one tick must not silently close the other. */
-function putConcerns(items, site, who) {
+/* `day` is the date the problem was REPORTED — the submission's own date, not
+   the moment this row happened to be written. The same thing for a check filed
+   today; they part company for anything backdated, and when they do a concern
+   falls in a different week from the form row that raised it, so the weekly
+   report disagrees with the tab it came from. */
+function putConcerns(items, site, who, day) {
   if (!items || !items.length) return;
   var sh = ensureConcerns();
   var n = CONCERNS.headers.length;
@@ -408,7 +413,9 @@ function putConcerns(items, site, who) {
   var at = {};
   for (var i = 0; i < have.length; i++)
     at[rowSite(have[i][12]) + '\u0001' + String(have[i][1])] = i + 2;
-  var when = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  var when = /^\d{4}-\d{2}-\d{2}$/.test(String(day || ''))
+    ? String(day)
+    : Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
   var fresh = [];
   /* One submission can name the same thing twice — two checklist lines with the
      same wording, or a note that repeats a fault. Collapsed here, because the
@@ -523,7 +530,7 @@ function noteBikeConcerns(p) {
   putConcerns(items.map(function (it) {
     return { sig: bikeConcernSig(bike, bag, it.key), what: it.what, where: where,
              unit: isJk ? bag : bike, area: area, urgency: BIKE_URGENCY[it.sev] || 'Whenever' };
-  }), 'bike', who);
+  }), 'bike', who, p.date);
 
   retireBikeConcerns(bike, bag, missing, expiryBad);
 }
@@ -1659,23 +1666,26 @@ function collectReport(period) {
     });
   }
 
-  // Concerns come from wherever somebody can raise one.
-  [['Reports', 'what', 'where', 'urgency'],
-   ['Room Checks', 'maint', 'subject', null],
-   ['Bag Checks', 'expired', 'subject', null],
-   ['Checkouts', 'detail', 'subject', null],
-   ['Checkouts', 'expired', 'subject', null]].forEach(function (spec) {
-    var d = rowsSince(spec[0], since);
-    if (!d.rows.length) return;
-    var iw = d.cols.indexOf(spec[1]), il = d.cols.indexOf(spec[2]),
-        iu = spec[3] ? d.cols.indexOf(spec[3]) : -1;
-    if (iw < 0) return;
-    d.rows.forEach(function (r) {
-      if (!r[iw]) return;
-      concerns.push({ what: String(r[iw]), where: r[il] || '',
-                      urgency: iu >= 0 ? (r[iu] || 'Whenever') : 'Soon',
-                      source: spec[0] });
-    });
+  /* Concerns come from the Concerns tab, which is the one place every problem
+     lands however it was raised.
+
+     This used to re-read a handful of raw form columns — a Report's free text, a
+     room check's maintenance note, an expired item, a checkout's damage note —
+     which is a THIRD way of deciding what a problem is, alongside the site's and
+     noteConcerns'. It missed everything those two file and this one did not:
+     every unticked box, every restock request, every note on a check, every bag
+     used on a call. A week in which five things were reported showed a report
+     saying nothing had been.
+
+     Dates on that tab are yyyy-MM-dd strings, so the period cut is made on the
+     same shape rather than by parsing back into a Date. */
+  var sinceDay = Utilities.formatDate(new Date(since), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  concernRows('ops').forEach(function (c) {
+    var day = String(c.last || c.first || '');
+    if (day && day < sinceDay) return;
+    concerns.push({ what: c.what, where: c.where, urgency: c.urgency || 'Soon',
+                    by: c.by || '', times: c.times || 1, resolved: !!c.resolved,
+                    source: 'Concerns' });
   });
 
   return { period: period, since: since, used: used,
