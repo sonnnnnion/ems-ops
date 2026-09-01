@@ -179,6 +179,77 @@ var BIKE_RESTOCK = {
    it looks like somebody typed the sheet wrong. Appended, an older row simply
    has the cell empty, and empty reads as 'ops' below, which is what those rows
    are. */
+/* WHAT WE DID, as opposed to what came up.
+
+   Every other tab in this file records a PROBLEM: something missing, something
+   expired, something somebody typed. None of them records the answer — that a
+   manager went and bought the gauze, or looked at the cot and decided it was
+   fine. The Restock and Concerns tabs carry a tick, but a tick has no date and
+   no name on it, so "what did we actually get through this month" was a question
+   the spreadsheet could not answer and the report could not show.
+
+   One row per action, appended, never edited. It is a ledger: ticking something
+   and un-ticking it are both events and both stay. */
+var ACTIONS = {
+  name: 'Actions',
+  headers: ['Date','Time','Who','Site','Did','What','Where'],
+  widths:  [95, 70, 150, 70, 120, 340, 170]
+};
+
+function ensureActions() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(ACTIONS.name);
+  if (!sh) { sh = ss.insertSheet(ACTIONS.name); sh.appendRow(ACTIONS.headers); }
+  var have = sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), 1)).getValues()[0];
+  if (have.join('|') !== ACTIONS.headers.join('|'))
+    sh.getRange(1, 1, 1, ACTIONS.headers.length).setValues([ACTIONS.headers]);
+  return sh;
+}
+
+/* Never throws. A ledger entry is worth having and never worth losing the thing
+   it describes over — if this fails the tick still happened. */
+function logAction(site, who, did, what, where) {
+  try {
+    var sh = ensureActions();
+    var tz = Session.getScriptTimeZone(), now = new Date();
+    sh.appendRow([Utilities.formatDate(now, tz, 'yyyy-MM-dd'),
+                  Utilities.formatDate(now, tz, 'HH:mm'),
+                  String(who || ''), site === 'bike' ? 'bike' : 'ops',
+                  String(did || ''), String(what || ''), String(where || '')]);
+  } catch (err) {
+    logError('could not record an action: ' + err, [site, who, did, what, where].join(' | '));
+  }
+}
+
+/* Everything done in a period, newest first. */
+function actionRows(site, sinceDay) {
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(ACTIONS.name);
+  if (!sh || sh.getLastRow() < 2) return [];
+  var tz = Session.getScriptTimeZone();
+  var asDate = function (v) {
+    if (!v) return '';
+    return (v instanceof Date) ? Utilities.formatDate(v, tz, 'yyyy-MM-dd') : String(v);
+  };
+  return sh.getRange(2, 1, sh.getLastRow() - 1, ACTIONS.headers.length).getValues()
+    .map(function (r, i) {
+      return { date: asDate(r[0]), time: String(r[1] || ''), who: String(r[2] || ''),
+               site: rowSite(r[3]), did: String(r[4] || ''), what: String(r[5] || ''),
+               where: String(r[6] || ''), n: i };
+    })
+    .filter(function (a) {
+      if (a.site !== (site === 'bike' ? 'bike' : 'ops')) return false;
+      return !sinceDay || !a.date || a.date >= sinceDay;
+    })
+    /* Newest first, and the row's own position breaks a tie. Several actions
+       land in the same minute — ticking a list off is half a dozen taps — and
+       sorting on the clock alone put them back in an arbitrary order, so
+       "ticked, then un-ticked" could read as the other way round. Rows are only
+       ever appended, so position IS the order they happened in. */
+    .sort(function (x, y) {
+      return (y.date + y.time).localeCompare(x.date + x.time) || (y.n - x.n);
+    });
+}
+
 var EXPIRY = {
   name: 'Expiry',
   headers: ['Key','Bag','Item','Expires','Last Reported By','Updated','Site'],
@@ -680,6 +751,8 @@ function setConcernResolved(p) {
     if (String(rows[i][1]) === String(p.sig) && rowSite(rows[i][12]) === site) {
       sh.getRange(i + 2, 1).setValue(p.resolved === true);
       sh.getRange(i + 2, 12).setValue(p.resolved === true ? c.name : '');
+      logAction(site, c.name, p.resolved === true ? 'Resolved' : 'Reopened',
+                String(rows[i][2] || ''), String(rows[i][3] || ''));
       return json({ ok: true, set: true });
     }
   }
@@ -1240,6 +1313,27 @@ function addToBikeRestock(p, missing) {
   paintBikeRestock(sh);
 }
 
+/* The bike kit's shopping list, in the same shape the site already knows how to
+   draw. It has no category, quantity or kind of its own — a bike check reports
+   that something is missing, which is a report, never a counted purchase. */
+function bikeRestockRows() {
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(BIKE_RESTOCK.name);
+  if (!sh || sh.getLastRow() < 2) return [];
+  var tz = Session.getScriptTimeZone();
+  var asDate = function (v) {
+    if (!v) return '';
+    return (v instanceof Date) ? Utilities.formatDate(v, tz, 'yyyy-MM-dd') : String(v);
+  };
+  return sh.getRange(2, 1, sh.getLastRow() - 1, BIKE_RESTOCK.headers.length).getValues()
+    .filter(function (r) { return String(r[1] || '').trim() !== ''; })
+    .map(function (r) {
+      return { got: r[0] === true, item: String(r[1]), cat: 'Equipment',
+               qty: 1, times: Number(r[2]) || 1,
+               first: asDate(r[3]), last: asDate(r[4]),
+               where: String(r[5] || ''), who: String(r[6] || ''), kind: 'report' };
+    });
+}
+
 function paintBikeRestock(sh) {
   var last = sh.getLastRow();
   if (last < 2) return;
@@ -1564,7 +1658,8 @@ function dutyPeriodRows() {
   return out;
 }
 
-function restockRows() {
+function restockRows(site) {
+  if (site === 'bike') return bikeRestockRows();
   var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(RESTOCK.name);
   if (!sh) return [];
   var last = sh.getLastRow();
@@ -1590,11 +1685,30 @@ function restockRows() {
 }
 
 function setRestockGot(p) {
-  if (!writerName(p)) return json({ ok: false, error: 'not allowed' });
-  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(RESTOCK.name);
+  var who = writerName(p);
+  if (!who) return json({ ok: false, error: 'not allowed' });
+  /* Two lists, the same act. The bike kit is shopped for from its own tab, and
+     it had no way to tick anything off at all — the list was written and never
+     read back, so it only ever grew. */
+  var site = siteOf(p);
+  var conf = site === 'bike' ? BIKE_RESTOCK : RESTOCK;
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(conf.name);
   if (!sh) return json({ ok: false, error: 'no restock tab' });
   var last = sh.getLastRow();
   if (last < 2) return json({ ok: false, error: 'nothing to tick' });
+  if (site === 'bike') {
+    // Bike Restock is Got | Item | Times Asked | First | Last | Where | Who
+    var brows = sh.getRange(2, 1, last - 1, BIKE_RESTOCK.headers.length).getValues();
+    for (var b = 0; b < brows.length; b++) {
+      if (String(brows[b][1]) !== String(p.item)) continue;
+      sh.getRange(b + 2, 1).setValue(p.got === true);
+      logAction('bike', who, p.got === true ? 'Restocked' : 'Put back on the list',
+                String(brows[b][1]), String(brows[b][5] || ''));
+      paintBikeRestock(sh);
+      return json({ ok: true, set: true });
+    }
+    return json({ ok: false, error: 'not found' });
+  }
   /* Matched on item AND place, which together are what addToRestock indexes on
      — anything reported on a check is one line per place, so several rows can
      share an item name and ticking by name alone closed whichever came first.
@@ -1608,6 +1722,8 @@ function setRestockGot(p) {
     if (String(rows[i][1]) !== String(p.item)) continue;
     if (want !== null && String(rows[i][7] || '') !== want) continue;
     sh.getRange(i + 2, 1).setValue(p.got === true);
+    logAction('ops', who, p.got === true ? 'Restocked' : 'Put back on the list',
+              String(rows[i][1]), String(rows[i][7] || ''));
     paintRestock(sh);
     return json({ ok: true, set: true });
   }
@@ -1650,11 +1766,18 @@ function collectReport(period) {
   var since = periodStartMs(period);
   var used = {}, calls = {}, concerns = [];
 
+  var callCount = 0;
   var pc = rowsSince('Post-Call', since);
   if (pc.rows.length) {
     var iJson = pc.cols.indexOf('usageJson'), iCall = pc.cols.indexOf('callnum');
+    var unnumbered = 0;
     pc.rows.forEach(function (r) {
-      if (r[iCall]) calls[r[iCall]] = 1;
+      /* A post-call form IS a call. The call number only decides whether two
+         forms describe the SAME one — two people filing for one call is one
+         call. Counting only the rows that carried a number meant a form filed
+         without one vanished from the count entirely, so the report said fewer
+         calls than the tab plainly showed. */
+      if (r[iCall]) calls[String(r[iCall])] = 1; else unnumbered++;
       if (!r[iJson]) return;
       var list;
       try { list = JSON.parse(r[iJson]); } catch (err) { return; }
@@ -1664,6 +1787,7 @@ function collectReport(period) {
         e.from[u.f] = (e.from[u.f] || 0) + (Number(u.q) || 0);
       });
     });
+    callCount = Object.keys(calls).length + unnumbered;
   }
 
   /* Concerns come from the Concerns tab, which is the one place every problem
@@ -1688,8 +1812,8 @@ function collectReport(period) {
                     source: 'Concerns' });
   });
 
-  return { period: period, since: since, used: used,
-           concerns: concerns, calls: Object.keys(calls).length };
+  return { period: period, since: since, used: used, concerns: concerns,
+           calls: callCount, actions: actionRows('ops', sinceDay) };
 }
 
 function nameMap() {
@@ -1716,7 +1840,7 @@ function doGet(e) {
     return json({ ok: true, report: collectReport(p.report) });
   }
   if (p.restock) {
-    return json({ ok: true, restock: restockRows() });
+    return json({ ok: true, restock: restockRows(siteOf(p)) });
   }
   if (p.dp) {
     return json({ ok: true, dp: dutyPeriodRows() });
@@ -1811,7 +1935,7 @@ function checkTabShapes() {
 var TAB_ORDER = ['Checkouts', 'Restock', 'Room Checks', 'Bag Checks', 'Post-Call',
                  'Reports', 'Concerns', 'Expiry',
                  'Bike Jumpkit Checks', 'Bike Safety Checks',
-                 'Bike Restock', 'Items'];
+                 'Bike Restock', 'Actions', 'Items'];
 
 /* Run by hand (Run ▸ tidyUp) after pasting an updated script.
 
@@ -1854,7 +1978,8 @@ function tidyUp() {
   }
   paintRestock(ensureRestock());
   paintBikeRestock(ensureBikeRestock());
-  [ [ensureExpiry(), EXPIRY], [ensureConcerns(), CONCERNS] ].forEach(function (pair) {
+  [ [ensureExpiry(), EXPIRY], [ensureConcerns(), CONCERNS],
+    [ensureActions(), ACTIONS] ].forEach(function (pair) {
     var sh = pair[0], conf = pair[1];
     sh.setFrozenRows(1);
     sh.getRange(1, 1, 1, conf.headers.length)

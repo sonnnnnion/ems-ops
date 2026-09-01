@@ -944,6 +944,9 @@
     box-shadow:var(--shadow-sm)}
   .repstat .rs-n{font-family:var(--font-display);font-size:26px;font-weight:700;line-height:1;color:var(--brand)}
   .repstat .rs-l{font-size:11.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-faint);margin-top:6px}
+  /* The one count that is a question rather than an achievement. */
+  .repstat.open{border-color:#E8D3A8;background:var(--warn-wash)}
+  .repstat.open .rs-n{color:var(--warn)}
   .periodbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
   .periodbar button{padding:9px 15px;border-radius:999px;border:1.5px solid var(--rule-strong);
     background:var(--card);cursor:pointer;font:inherit;font-size:13.5px;font-weight:600;color:var(--ink-soft)}
@@ -1360,7 +1363,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260831165858';
+var BUILD='20260831223020';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -7719,6 +7722,16 @@ function fetchReport(p){
     .catch(function(){ return null; });
 }
 
+/* One decision about whether a concern is open, used by every list that shows
+   it. The sheet's tick and this device's tick both close it. */
+function concernsWithState(list){
+  return (list||[]).map(function(c){
+    return {what:c.what, where:c.where, urgency:c.urgency||'Soon',
+            by:c.by||'', times:c.times||1,
+            open: !c.resolved && !isResolvedConcern(c.what,c.where)};
+  });
+}
+
 function reportData(p){
   var r=remoteReport[p];
   if(r){
@@ -7746,13 +7759,19 @@ function reportData(p){
             /* Open means the SHEET has not ticked it and this device has not
                either. It used to consult only the local list, so a concern a
                manager had closed on another device still counted as open here. */
-            issuesOpen:(r.concerns||[])
-              .filter(function(c){ return !c.resolved && !isResolvedConcern(c.what,c.where); })
-              .map(function(c){ return {what:c.what, where:c.where, urgency:c.urgency, open:true}; }),
-            issuesAll:(r.concerns||[]), calls:r.calls||0};
+            /* Open means the SHEET has not ticked it and this device has not
+               either. Decided ONCE, here, and carried on every row — the
+               resolved list used to test `!i.open` against sheet rows that have
+               no `open` property at all, so every concern was "resolved" and the
+               same three appeared in both halves of the card, one offering Mark
+               resolved and the other Reopen. */
+            issuesOpen:concernsWithState(r.concerns).filter(function(c){ return c.open; }),
+            issuesAll:concernsWithState(r.concerns), calls:r.calls||0,
+            actions:(r.actions||[])};
   }
   var since=periodStart(p);
   var usage=(DB.usage||[]).filter(function(u){ return u.at>=since; });
+  // Nothing local records what a manager DID — that only exists on the sheet.
   var issues=(DB.issues||[]).filter(function(i){ return i.at>=since; });
 
   // Sum by ID, never by display name — on BOTH axes. A row filed before a bag
@@ -7825,12 +7844,28 @@ function renderReports(){
       : live ? 'Reading the spreadsheet…'
       : 'From this device.')+'</p>';
 
+  /* Two questions, in this order: what came up, and what we did about it.
+
+     The report used to answer only the first, so a month of solid work showed a
+     wall of problems and no evidence anybody had touched them. The counts are
+     paired deliberately — reported against handled, so the gap between them is
+     the thing worth reading. */
+  var acts=d.actions||[];
+  var didRestock=acts.filter(function(a){ return a.did==='Restocked'; });
+  var didResolve=acts.filter(function(a){ return a.did==='Resolved'; });
+  h+='<h3 class="tgsec">What came up</h3>';
   h+='<div class="repgrid">'+
-     '<div class="repstat"><div class="rs-n">'+d.buy.length+'</div><div class="rs-l">items to restock</div></div>'+
+     '<div class="repstat"><div class="rs-n">'+d.calls+'</div><div class="rs-l">calls</div></div>'+
      '<div class="repstat"><div class="rs-n">'+d.usage.reduce(function(a,u){return a+u.qty;},0)+
        '</div><div class="rs-l">units used</div></div>'+
-     '<div class="repstat"><div class="rs-n">'+d.issuesOpen.length+'</div><div class="rs-l">open concerns</div></div>'+
-     '<div class="repstat"><div class="rs-n">'+d.calls+'</div><div class="rs-l">calls logged</div></div>'+
+     '<div class="repstat"><div class="rs-n">'+d.issuesAll.length+'</div><div class="rs-l">problems raised</div></div>'+
+     '</div>';
+  h+='<h3 class="tgsec">What we did</h3>';
+  h+='<div class="repgrid">'+
+     '<div class="repstat"><div class="rs-n">'+didRestock.length+'</div><div class="rs-l">items restocked</div></div>'+
+     '<div class="repstat"><div class="rs-n">'+didResolve.length+'</div><div class="rs-l">problems closed</div></div>'+
+     '<div class="repstat'+(d.issuesOpen.length?' open':'')+'"><div class="rs-n">'+d.issuesOpen.length+
+       '</div><div class="rs-l">still open</div></div>'+
      '</div>';
 
   /* ---- equipment to buy ---- */
@@ -7878,6 +7913,25 @@ function renderReports(){
          '<span class="chev">▾</span></button>'+
          '<div class="accbody"><ul class="isslist">'+
          closedList.slice(0,50).map(function(i){return crow(i,false);}).join('')+'</ul></div></div>';
+  }
+  h+='</div>';
+
+  /* ---- the running total: everything done in this period ---- */
+  h+='<div class="card mt"><h3>What we got through</h3>';
+  if(!acts.length){
+    h+='<p class="hint" style="margin:0">Nothing has been ticked off in this period. '+
+       'Restocking something or marking a problem resolved records it here, with '+
+       'who did it and when.</p>';
+  }else{
+    h+='<ul class="isslist">'+acts.slice(0,60).map(function(a){
+      var tone = a.did==='Restocked' ? 'ok' : a.did==='Resolved' ? 'ok' : 'brand';
+      return '<li><span class="tag '+tone+'">'+esc(a.did)+'</span>'+
+        '<b>'+esc(a.what)+'</b>'+
+        (a.where?' <span style="color:var(--ink-faint)">— '+esc(a.where)+'</span>':'')+
+        '<div style="font-size:11.5px;color:var(--ink-faint);margin-top:2px">'+
+        esc(a.who||'somebody')+' · '+esc(concernWhen(a.date))+'</div></li>';
+    }).join('')+'</ul>';
+    if(acts.length>60) h+='<p class="hint">Showing the most recent 60 of '+acts.length+'.</p>';
   }
   h+='</div>';
 
