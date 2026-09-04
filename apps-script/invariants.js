@@ -38,17 +38,41 @@ window.__invariants=function(site){
       var items=[]; (r.sections||[]).forEach(function(s){ (s.items||[]).forEach(function(i){ items.push(i); }); });
       dupes(items, function(i){return i.id;}, 'item ids', 'room "'+r.name+'"');
     });
-    // medications are keyed by lowercased NAME in medState
+    /* Medications. The naive check here — "no two inventory rows may share a
+       case-folded name" — fired on every run, because the same drug genuinely
+       sits on three shelves and each shelf is its own row with its own id. That
+       is the design, not a fault, and a checker that reports it as one every
+       single time teaches whoever runs it to skim past real findings.
+
+       The agreement that DOES have to hold: the post-call form offers drugs by
+       lowercased name, so every medication row must reach exactly one offered
+       entry, and no two offered entries may share a key. */
     var meds=(DB.inventory||[]).filter(function(r){return r.cat==='Medication';});
-    dupes(meds, function(m){return String(m.item||'').toLowerCase();}, 'medication names (case-folded)', 'DB.inventory');
+    var offered=medList();
+    dupes(offered, function(m){return m.key;}, 'keys', 'the medication picker');
+    var offeredKeys={}; offered.forEach(function(m){ offeredKeys[m.key]=1; });
+    meds.forEach(function(m){
+      if(!offeredKeys[String(m.item||'').toLowerCase()])
+        fail('DANGLING','medication "'+m.item+'" is in inventory but the post-call form never offers it');
+    });
     // ---------- B. dangling --------------------------------------------
     var bagIds={}; (DB.bags||[]).forEach(function(b){bagIds[b.id]=1;});
     (DB.bagUnits||[]).forEach(function(u){
       if(u.type && !bagIds[u.type]) fail('DANGLING','unit "'+u.name+'" is of type "'+u.type+'", which is not a bag type');
     });
+    /* stockLink maps an INVENTORY ROW to the consumable it restocks — a shelf,
+       and the thing that comes off it. This check had the direction backwards
+       and tested the keys against consumable ids, so it reported all four links
+       as dangling on every run while all four were correct. Both ends are
+       checked now, each against the list it actually belongs to. */
     var consIds={}; (DB.consumables||[]).forEach(function(c){consIds[c.id]=1;});
+    var invIds={}; (DB.inventory||[]).forEach(function(r){invIds[r.id]=1;});
     Object.keys(DB.stockLink||{}).forEach(function(k){
-      if(!consIds[k]) fail('DANGLING','stockLink names consumable "'+k+'", which does not exist');
+      if(!invIds[k])
+        fail('DANGLING','stockLink is keyed on "'+k+'", which is not an inventory row');
+      var v=DB.stockLink[k];
+      if(v && !consIds[v])
+        fail('DANGLING','stockLink sends "'+k+'" to consumable "'+v+'", which does not exist');
     });
     (DB.postCall&&DB.postCall.sections||[]).forEach(function(s){
       dupes(s.items, function(i){return i.id;}, 'item ids', 'post-call section "'+s.name+'"');

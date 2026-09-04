@@ -1383,7 +1383,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260903232655';
+var BUILD='20260904181536';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -4791,7 +4791,14 @@ function renderDpState(fid){
    Kept out of DB on purpose: a half-finished form is one person's device state,
    not site content, and must never end up in an export. */
 function readDrafts(){ try{ return JSON.parse(localStorage.getItem(LS_DRAFT)||'{}'); }catch(e){ return {}; } }
-function writeDrafts(d){ try{ localStorage.setItem(LS_DRAFT,JSON.stringify(d)); }catch(e){} }
+/* Reports whether the write actually landed. Storage can be full, or blocked
+   outright in a private window, and swallowing that quietly was worse than the
+   failure: the form went on saying "Saved on this device" underneath work that
+   was not being saved anywhere, right up until the member closed the tab. */
+function writeDrafts(d){
+  try{ localStorage.setItem(LS_DRAFT,JSON.stringify(d)); return true; }
+  catch(e){ return false; }
+}
 
 /* WHO IS HOLDING THIS PHONE
    ----------------------------------------------------------------------------
@@ -4861,8 +4868,15 @@ function saveDraft(fid){
           radio:s.radio, dpRaw:s.dpRaw,
           pick:s.pick,ticked:ticked,radios:s.radios,extras:s.extras,
           usage:rows.map(function(r){return {item:r.item,qty:r.qty,from:r.from,other:r.other||''};})};
-  writeDrafts(d);
-  var m=document.getElementById(fid+'-savemsg'); if(m) m.textContent='Saved on this device';
+  var stored=writeDrafts(d);
+  var m=document.getElementById(fid+'-savemsg');
+  if(m){
+    m.textContent = stored ? 'Saved on this device'
+                           : 'Could not save a draft — finish and submit without closing this page';
+    // Set on the element, because the span carries an inline colour that any
+    // class would lose to.
+    m.style.color = stored ? 'var(--ink-faint)' : 'var(--oos)';
+  }
   renderDraftNote(fid);
 }
 
@@ -5411,14 +5425,54 @@ function filedLine(fid){
   return '<div id="'+fid+'-filed" class="'+cls+'">'+txt+'</div>';
 }
 
+/* What this filing actually says, in the words of the form that was filed.
+
+   Every form used to end on a green tick reading "Filed — everything accounted
+   for", because that verdict was computed from the checklist alone. Two forms
+   have no checklist, and both got the reassuring answer by default:
+
+     Report a problem — somebody had just written down that the cot strap is
+     torn, and the site answered "everything accounted for" with a green tick.
+     It congratulated them for the fault they had come to report.
+
+     Post-Call — three gauze and an aspirin had come out of the bag and nothing
+     had been put back, and it also said everything was accounted for. The bag
+     is short. That is the opposite of the truth, on the one screen a member
+     reads before walking away from it.
+
+   The verdict now comes from what the form is for. The subtitle likewise: it
+   was falling back to the TAB NAME, so a problem report signed off as
+   "Reports". */
+function doneVerdict(fid, s){
+  var c=fcfg(fid);
+  if(c.tab==='Reports')
+    return {cls:'warn', tick:'!', head:'Filed — passed on to a manager',
+            sub:(s.extras&&s.extras.what) ? s.extras.what : 'Problem reported'};
+  if(c.tab==='Post-Call'){
+    var used=(s.usage||[]).reduce(function(a,r){return a+(r.qty||1);},0)+
+             (s.meds||[]).reduce(function(a,m){return a+(m.qty||1);},0);
+    var back=(s.usage||[]).filter(function(r){return r.refilled;}).length;
+    if(!used) return {cls:'ok', tick:'✓', head:'Filed — nothing used',
+                      sub:s.pickName||'Post-call'};
+    var short=(s.usage||[]).filter(function(r){return !r.refilled;}).length;
+    return {cls: short?'warn':'ok', tick: short?'!':'✓',
+            head: short ? 'Filed — the bag is short until it is restocked'
+                        : 'Filed — used and put back',
+            sub: used+' item'+(used===1?'':'s')+' used'+(back?', '+back+' put back':'')};
+  }
+  var clean = !s.missing || !s.missing.length;
+  return {cls: clean?'ok':'warn', tick: clean?'✓':'!',
+          head: clean?'Filed — everything accounted for':'Filed — with follow-ups',
+          sub: s.pickName||c.tab};
+}
+
 function donePanel(fid){
   var r=lastResult[fid]||{}, s=r.s||{};
-  var clean = !s.missing || !s.missing.length;
-  var cls = clean?'ok':'warn';
-  var h='<div class="donecard '+cls+'">'+
-    '<div class="donetick">'+(clean?'✓':'!')+'</div>'+
-    '<h3>'+(clean?'Filed — everything accounted for':'Filed — with follow-ups')+'</h3>'+
-    '<div class="doneverdict">'+esc(s.pickName||fcfg(fid).tab)+'</div>';
+  var v=doneVerdict(fid,s);
+  var h='<div class="donecard '+v.cls+'">'+
+    '<div class="donetick">'+v.tick+'</div>'+
+    '<h3>'+esc(v.head)+'</h3>'+
+    '<div class="doneverdict">'+esc(v.sub)+'</div>';
   if(s.missing && s.missing.length){
     h+='<div class="donemissing"><b>Passed on for follow-up</b><ul>';
     s.missing.slice(0,12).forEach(function(m){ h+='<li>'+esc(m)+'</li>'; });
@@ -8027,7 +8081,7 @@ function fallbackCopy(t,done){
    Read from the form tabs that already hold every submission. Paged on the
    server: a term runs to thousands of rows, and pulling all of them would make
    this screen slower every week it is used. */
-var actRows=[], actState={loading:false, error:'', at:0, total:0, more:false, offset:0};
+var actRows=[], actState={loading:false, error:'', at:0, total:0, more:false};
 var actFilter={period:'month', kit:'', who:'', kind:''};
 
 function actSince(){
@@ -8041,6 +8095,10 @@ function actSince(){
 function fetchActivity(more){
   var url=(DB.api&&DB.api.url)||'';
   if(!url){ actState.error='no spreadsheet is connected'; return Promise.resolve(false); }
+  // One request at a time. "Load more" says "Loading…" but stayed pressable, so
+  // a second tap asked for the SAME offset and appended page two twice — the
+  // list then showed every one of those rows in duplicate.
+  if(actState.loading) return Promise.resolve(false);
   var offset=more?actRows.length:0;
   actState.loading=true; if(!more) actState.error='';
   var q=url+(url.indexOf('?')<0?'?':'&')+'activity=1&site=ops&limit=60&offset='+offset+
@@ -8068,20 +8126,48 @@ function fetchActivity(more){
     });
 }
 
-function setActPeriod(p){ actFilter.period=p; actRows=[]; renderActivity();
-  fetchActivity(false).then(renderActivity); }
-function setActFilter(k,v){ actFilter[k]=v; renderActivity(); }
+function setActPeriod(p){
+  actFilter.period=p; actRows=[];
+  // The previous period's count and timestamp described rows that are gone. Left
+  // in place they read as fact: "everything filed, 214 in this period" above an
+  // empty table. Clearing them puts the header back to "Reading…" until the new
+  // answer lands.
+  actState.total=0; actState.more=false; actState.at=0;
+  renderActivity();
+  fetchActivity(false).then(renderActivity);
+}
+/* Only the rows repaint. Rebuilding the whole panel replaced the search box
+   mid-keystroke, so it lost focus — and on a phone the keyboard closed — after
+   exactly one character. The filter controls already hold the right values:
+   the person just set them. */
+function setActFilter(k,v){ actFilter[k]=v; renderActRows(); }
+function clearActFilters(){ actFilter.kit=''; actFilter.who=''; actFilter.kind=''; renderActivity(); }
 function moreActivity(){ fetchActivity(true).then(renderActivity); }
 
 /* Filtering happens on what has been fetched. The period is the server's cut —
    that is the one that bounds how much travels — and kit, person and kind
    narrow what is already here. */
+function actSubjects(a){
+  if(!a) return [];
+  // A post-call that opened two bags names both. Kept as a list rather than one
+  // "Jumpkit A, Jumpkit B" string, because an exact-match filter on that string
+  // matched neither bag — so the calls that used the most equipment were the
+  // ones the kit filter could not find.
+  if(Array.isArray(a.subjects) && a.subjects.length) return a.subjects;
+  var s=String(a.subject||'').trim();
+  return s ? s.split(/\s*,\s*/).filter(Boolean) : [];
+}
+
+function actFiltered(){
+  return actFilter.kit || actFilter.who.trim() || actFilter.kind;
+}
+
 function actVisible(){
   var kit=actFilter.kit, who=actFilter.who.trim().toLowerCase(), kind=actFilter.kind;
   return actRows.filter(function(a){
     if(!a||typeof a!=='object') return false;
     if(kind && a.kind!==kind) return false;
-    if(kit && String(a.subject||'')!==kit) return false;
+    if(kit && actSubjects(a).indexOf(kit)<0) return false;
     if(who){
       var hay=(String(a.who||'')+' '+String(a.andrew||'')).toLowerCase();
       if(hay.indexOf(who)<0) return false;
@@ -8093,15 +8179,22 @@ function actVisible(){
 function actKits(){
   var seen={}, out=[];
   actRows.forEach(function(a){
-    var k=a&&String(a.subject||'').trim();
-    if(k && !seen[k]){ seen[k]=1; out.push(k); }
+    actSubjects(a).forEach(function(k){
+      k=k.trim(); if(k && !seen[k]){ seen[k]=1; out.push(k); }
+    });
   });
-  return out.sort();
+  out.sort();
+  // A kit picked in one period may not appear in the next. Dropping it from the
+  // list did not drop it from the filter: the picker snapped back to "Every kit
+  // and room" while the rows were still being filtered out, and the screen then
+  // said nothing had been filed at all. Keep the choice visible so it can be seen
+  // and undone.
+  if(actFilter.kit && out.indexOf(actFilter.kit)<0) out.unshift(actFilter.kit);
+  return out;
 }
 
 function renderActivity(){
   var host=document.getElementById('activityHost'); if(!host) return;
-  var rows=actVisible();
   var kindLabel={check:'Check', usage:'Used on a call', report:'Reported'};
 
   var h='<div class="periodbar">'+
@@ -8116,9 +8209,9 @@ function renderActivity(){
        ? '<span class="bad">'+esc(actState.error)+'</span> <button type="button" class="btn xs" '+
          'onclick="fetchActivity(false).then(renderActivity)">Try again</button>'
        : actState.at
-         ? 'From the spreadsheet \u2014 every form filed, '+actState.total+' in this period.'+
+         ? 'From the spreadsheet — every form filed, '+actState.total+' in this period.'+
            ' <button type="button" class="btn xs" onclick="fetchActivity(false).then(renderActivity)">Refresh</button>'
-         : 'Reading the spreadsheet\u2026')+'</p>';
+         : 'Reading the spreadsheet…')+'</p>';
 
   /* Filters. A kit picker rather than a search box: the question this screen
      answers is "has anybody touched Jumpkit C", and that is a pick, not a
@@ -8135,41 +8228,68 @@ function renderActivity(){
        ['check','usage','report'].map(function(k){
          return '<option value="'+k+'"'+(actFilter.kind===k?' selected':'')+'>'+kindLabel[k]+'</option>';
        }).join('')+'</select>'+
-     '<input type="search" placeholder="Who \u2014 name or Andrew ID" value="'+esc(actFilter.who)+'" '+
+     '<input type="search" placeholder="Who — name or Andrew ID" value="'+esc(actFilter.who)+'" '+
        'aria-label="Who filed it" oninput="setActFilter(\'who\',this.value)">'+
-     '</div>';
+     '<button type="button" class="btn xs" id="actClear" onclick="clearActFilters()"'+
+       (actFiltered()?'':' hidden')+'>Clear filters</button>'+
+     '</div><div id="actRowsHost"></div>';
+  host.innerHTML=h;
+  renderActRows();
+}
+
+function renderActRows(){
+  var host=document.getElementById('actRowsHost'); if(!host) return;
+  var clear=document.getElementById('actClear'); if(clear) clear.hidden=!actFiltered();
+  var rows=actVisible(), h='';
 
   if(!rows.length){
-    h+='<div class="card"><p class="hint" style="margin:0">'+
-       (actRows.length ? 'Nothing matches those filters.'
-                       : 'Nothing has been filed in this period.')+'</p></div>';
-    host.innerHTML=h; return;
+    /* Three different situations that used to share one sentence. Saying
+       "nothing has been filed in this period" while a filter was quietly
+       excluding everything was the worst of them: it reported an absence that
+       was not true. */
+    var msg = actState.loading ? 'Reading the spreadsheet…'
+            : actFiltered()    ? (actRows.length
+                                    ? 'Nothing in what has loaded matches those filters.'
+                                    : 'Nothing loaded yet to match against.')
+            : actState.at      ? 'Nothing has been filed in this period.'
+            : 'Reading the spreadsheet…';
+    h+='<div class="card"><p class="hint" style="margin:0">'+msg+'</p></div>';
+  }else{
+    h+='<div class="invwrap"><table class="invtable"><thead><tr>'+
+       '<th>When</th><th>Who</th><th>What</th>'+
+       '<th class="mob-hide">Kit or room</th><th class="mob-hide">Details</th>'+
+       '</tr></thead><tbody>';
+    rows.forEach(function(a){
+      var tone = a.kind==='usage' ? 'brand' : a.kind==='report' ? 'warn' : (a.missing>0?'warn':'ok');
+      var subj = actSubjects(a).join(', ');
+      h+='<tr>'+
+         '<td style="font-size:12px;white-space:nowrap">'+esc(a.date)+
+           '<br><span style="color:var(--ink-faint)">'+esc(a.time)+'</span></td>'+
+         '<td>'+esc(a.who||'—')+
+           (a.andrew?'<br><span style="font-size:11px;color:var(--ink-faint)">'+esc(a.andrew)+'</span>':'')+'</td>'+
+         '<td><span class="tag '+tone+'">'+esc(a.form)+'</span>'+
+           '<span class="mob-only" style="font-size:11.5px;color:var(--ink-faint)">'+
+           (subj?esc(subj)+' · ':'')+esc(a.summary)+'</span></td>'+
+         '<td class="mob-hide" style="font-size:12.5px">'+(subj?esc(subj):'<span class="dim">—</span>')+'</td>'+
+         '<td class="mob-hide" style="font-size:12.5px">'+esc(a.summary)+'</td>'+
+         '</tr>';
+    });
+    h+='</tbody></table></div>';
   }
 
-  h+='<div class="invwrap"><table class="invtable"><thead><tr>'+
-     '<th>When</th><th>Who</th><th>What</th>'+
-     '<th class="mob-hide">Kit or room</th><th class="mob-hide">Details</th>'+
-     '</tr></thead><tbody>';
-  rows.forEach(function(a){
-    var tone = a.kind==='usage' ? 'brand' : a.kind==='report' ? 'warn' : (a.missing>0?'warn':'ok');
-    h+='<tr>'+
-       '<td style="font-size:12px;white-space:nowrap">'+esc(a.date)+
-         '<br><span style="color:var(--ink-faint)">'+esc(a.time)+'</span></td>'+
-       '<td>'+esc(a.who||'\u2014')+
-         (a.andrew?'<br><span style="font-size:11px;color:var(--ink-faint)">'+esc(a.andrew)+'</span>':'')+'</td>'+
-       '<td><span class="tag '+tone+'">'+esc(a.form)+'</span>'+
-         '<span class="mob-only" style="font-size:11.5px;color:var(--ink-faint)">'+
-         (a.subject?esc(a.subject)+' \u00b7 ':'')+esc(a.summary)+'</span></td>'+
-       '<td class="mob-hide" style="font-size:12.5px">'+(a.subject?esc(a.subject):'<span class="dim">\u2014</span>')+'</td>'+
-       '<td class="mob-hide" style="font-size:12.5px">'+esc(a.summary)+'</td>'+
-       '</tr>';
-  });
-  h+='</tbody></table></div>';
-
-  if(actState.more)
-    h+='<div class="row mt"><button class="btn" onclick="moreActivity()">'+
-       (actState.loading?'Loading\u2026':'Load more')+'</button>'+
-       '<span class="hint">Showing '+actRows.length+' of '+actState.total+'</span></div>';
+  /* Outside the empty branch on purpose. It used to sit after an early return,
+     so filtering to somebody whose entries were on page two produced "nothing
+     matches" and no way to look any further — the answer was one press away and
+     the button had been taken off the screen. */
+  if(actState.more){
+    var shown = actFiltered()
+      ? 'Showing '+rows.length+' of the '+actRows.length+' loaded · '+actState.total+' in this period'
+      : 'Showing '+actRows.length+' of '+actState.total;
+    h+='<div class="row mt"><button class="btn" onclick="moreActivity()"'+
+       (actState.loading?' disabled':'')+'>'+
+       (actState.loading?'Loading…':'Load more')+'</button>'+
+       '<span class="hint">'+shown+'</span></div>';
+  }
   host.innerHTML=h;
 }
 

@@ -1865,8 +1865,14 @@ function activityRows(site, sinceDay, offset, limit) {
       }
 
       /* Which bags a post-call opened. Names, not ids, and deduped — one call
-         that takes two things out of one jumpkit is one bag. */
-      var kits = subject;
+         that takes two things out of one jumpkit is one bag.
+
+         Sent as a LIST as well as a readable string. A call that opened two bags
+         reads "Jumpkit A, Jumpkit B", and filtering the Activity screen to
+         "Jumpkit A" compared against that whole string — so the calls that used
+         the most equipment were exactly the ones the kit filter could not
+         find. The string is for the eye; the list is what the filter asks. */
+      var kits = subject ? [subject] : [];
       if (spec.kind === 'usage' && spec.iUsage >= 0) {
         var raw = cell(r, spec.iUsage), seenU = {}, names = [];
         if (raw) {
@@ -1878,14 +1884,15 @@ function activityRows(site, sinceDay, offset, limit) {
             if (!seenU[nm]) { seenU[nm] = 1; names.push(nm); }
           });
         }
-        kits = names.join(', ');
+        kits = names;
       }
 
       out.push({ date: date, time: asTime(cell(r, spec.iTime)), who: who,
                  andrew: String(cell(r, spec.iAndrew) || '').trim(),
                  site: site === 'bike' ? 'bike' : 'ops',
                  form: spec.form, kind: spec.kind,
-                 subject: kits, missing: missing, summary: summary });
+                 subject: kits.join(', '), subjects: kits,
+                 missing: missing, summary: summary });
     });
   });
 
