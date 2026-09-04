@@ -854,6 +854,17 @@
   /* "10:07 AM" is one thing to read, and it was breaking across two lines with
      the AM stranded beside the button. */
   .dpsrc .when{white-space:nowrap}
+  .dpsrc .bad{color:var(--oos)}
+
+  /* The filter row on Activity. Wraps rather than scrolls: three controls on a
+     phone are two lines, and a line that scrolls sideways hides the control on
+     the end of it. */
+  .actfilters{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}
+  .actfilters select,.actfilters input{flex:1 1 170px;min-width:0;
+    padding:9px 11px;border:1.5px solid var(--rule-strong);border-radius:var(--radius);
+    background:#fff;color:var(--ink);font-family:var(--font-body);font-size:14px;
+    touch-action:manipulation}
+  @media(max-width:560px){ .actfilters select,.actfilters input{flex:1 1 100%} }
   .dpnew{font-size:12.5px;color:var(--ink-mute);margin:10px 0 0}
   .dpopen{font-size:13px;color:var(--ink-soft);margin:10px 0 6px}
   .dpdone{font-size:12.5px;color:var(--ok);font-weight:600;margin:8px 0 0}
@@ -1170,6 +1181,7 @@
     <button type="button" class="sb-item" data-need="office" data-view="restock"><span class="ic">▤</span>Office Restock List</button>
 
     <div class="sb-label" data-need="mgr">Oversight</div>
+    <button type="button" class="sb-item" data-need="mgr" data-view="activity"><span class="ic">≡</span>Activity</button>
     <button type="button" class="sb-item" data-need="mgr" data-view="reports"><span class="ic">▤</span>Reports</button>
     <!-- No data-need: see MANAGER_VIEWS. A member who reports something can
          now see whether it was dealt with, which is the question they were
@@ -1315,6 +1327,14 @@
       <div id="reportsHost"></div>
     </section>
 
+    <!-- ===== ACTIVITY =======================================================
+         The raw trail: who filed what, when, on which kit. Read across the form
+         tabs that already hold it — never a store of its own. -->
+    <section class="view" data-view="activity">
+      <h2 class="view-title">Activity</h2>
+      <div id="activityHost"></div>
+    </section>
+
     <!-- ===== REPORTED PROBLEMS ============================================== -->
     <section class="view" data-view="log">
       <h2 class="view-title">Reported <em>problems</em></h2>
@@ -1363,7 +1383,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260831223020';
+var BUILD='20260903232655';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -2807,7 +2827,7 @@ var MANAGER_VIEWS={
   tracker:'office', restock:'office', rooms:'office',
   inventory:'equipment', 'bag-check':'equipment', toget:'equipment',
   expiring:'equipment',
-  reports:'mgr', roles:'mgr', qr:'mgr', settings:'mgr',
+  reports:'mgr', activity:'mgr', roles:'mgr', qr:'mgr', settings:'mgr',
   people:'ops'
 };
 
@@ -3926,6 +3946,7 @@ function go(v,fromHash){
   // the checkout form — nothing tells the readiness board its status changed, so
   // it kept showing every bag as ready until something else triggered a render.
   if(v==='reports'){ remoteReport[REPORT_PERIOD]=null; renderReports(); }
+  if(v==='activity'){ renderActivity(); if(!actRows.length) fetchActivity(false).then(renderActivity); }
   if(v==='log'){ renderLog(); fetchSharedState().then(function(){ renderLog(); }); }
   if(v==='readiness'){ renderReadiness(); fetchSharedState().then(function(){ renderReadiness(); }); }
   // Paint what we have immediately, then replace it with the sheet's copy when
@@ -7998,6 +8019,158 @@ function fallbackCopy(t,done){
     uiAlert('Could not copy automatically. Print instead, or select the text by hand.','Copy failed');
   }
   document.body.removeChild(ta);
+}
+
+/* ============================================================================
+   ACTIVITY — who filed what, when, on which kit
+   ============================================================================
+   Read from the form tabs that already hold every submission. Paged on the
+   server: a term runs to thousands of rows, and pulling all of them would make
+   this screen slower every week it is used. */
+var actRows=[], actState={loading:false, error:'', at:0, total:0, more:false, offset:0};
+var actFilter={period:'month', kit:'', who:'', kind:''};
+
+function actSince(){
+  var p=actFilter.period;
+  if(p==='all') return '';
+  var d=new Date(periodStart(p));
+  var z=function(n){ return (n<10?'0':'')+n; };
+  return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate());
+}
+
+function fetchActivity(more){
+  var url=(DB.api&&DB.api.url)||'';
+  if(!url){ actState.error='no spreadsheet is connected'; return Promise.resolve(false); }
+  var offset=more?actRows.length:0;
+  actState.loading=true; if(!more) actState.error='';
+  var q=url+(url.indexOf('?')<0?'?':'&')+'activity=1&site=ops&limit=60&offset='+offset+
+        (actSince()?'&since='+actSince():'');
+  return fetchJSONTries(q, 3, 12000)
+    .then(function(j){
+      actState.loading=false;
+      // The SHAPE, not just the status: a deployment that predates this answers
+      // the fallback reply, and an empty list would read as "nobody has done
+      // anything" rather than "this cannot be asked yet".
+      if(!j||!j.ok||!Array.isArray(j.activity)){
+        actState.error='the spreadsheet is running an older copy of the script '+
+                       '(paste the current one and redeploy)';
+        return false;
+      }
+      actRows = more ? actRows.concat(j.activity) : j.activity;
+      actState.total=j.total||actRows.length;
+      actState.more=!!j.more; actState.at=Date.now();
+      return true;
+    })
+    .catch(function(){
+      actState.loading=false;
+      actState.error='could not reach the spreadsheet';
+      return false;
+    });
+}
+
+function setActPeriod(p){ actFilter.period=p; actRows=[]; renderActivity();
+  fetchActivity(false).then(renderActivity); }
+function setActFilter(k,v){ actFilter[k]=v; renderActivity(); }
+function moreActivity(){ fetchActivity(true).then(renderActivity); }
+
+/* Filtering happens on what has been fetched. The period is the server's cut —
+   that is the one that bounds how much travels — and kit, person and kind
+   narrow what is already here. */
+function actVisible(){
+  var kit=actFilter.kit, who=actFilter.who.trim().toLowerCase(), kind=actFilter.kind;
+  return actRows.filter(function(a){
+    if(!a||typeof a!=='object') return false;
+    if(kind && a.kind!==kind) return false;
+    if(kit && String(a.subject||'')!==kit) return false;
+    if(who){
+      var hay=(String(a.who||'')+' '+String(a.andrew||'')).toLowerCase();
+      if(hay.indexOf(who)<0) return false;
+    }
+    return true;
+  });
+}
+
+function actKits(){
+  var seen={}, out=[];
+  actRows.forEach(function(a){
+    var k=a&&String(a.subject||'').trim();
+    if(k && !seen[k]){ seen[k]=1; out.push(k); }
+  });
+  return out.sort();
+}
+
+function renderActivity(){
+  var host=document.getElementById('activityHost'); if(!host) return;
+  var rows=actVisible();
+  var kindLabel={check:'Check', usage:'Used on a call', report:'Reported'};
+
+  var h='<div class="periodbar">'+
+    [['week','This week'],['month','This month'],['ytd','Year to date'],['all','Everything']]
+      .map(function(o){
+        return '<button type="button" class="'+(actFilter.period===o[0]?'on':'')+
+               '" onclick="setActPeriod(\''+o[0]+'\')">'+o[1]+'</button>';
+      }).join('')+'</div>';
+
+  h+='<p class="dpsrc">'+
+     (actState.error
+       ? '<span class="bad">'+esc(actState.error)+'</span> <button type="button" class="btn xs" '+
+         'onclick="fetchActivity(false).then(renderActivity)">Try again</button>'
+       : actState.at
+         ? 'From the spreadsheet \u2014 every form filed, '+actState.total+' in this period.'+
+           ' <button type="button" class="btn xs" onclick="fetchActivity(false).then(renderActivity)">Refresh</button>'
+         : 'Reading the spreadsheet\u2026')+'</p>';
+
+  /* Filters. A kit picker rather than a search box: the question this screen
+     answers is "has anybody touched Jumpkit C", and that is a pick, not a
+     spelling test. */
+  var kits=actKits();
+  h+='<div class="actfilters">'+
+     '<select aria-label="Which kit" onchange="setActFilter(\'kit\',this.value)">'+
+       '<option value="">Every kit and room</option>'+
+       kits.map(function(k){
+         return '<option value="'+esc(k)+'"'+(actFilter.kit===k?' selected':'')+'>'+esc(k)+'</option>';
+       }).join('')+'</select>'+
+     '<select aria-label="Which kind" onchange="setActFilter(\'kind\',this.value)">'+
+       '<option value="">Everything</option>'+
+       ['check','usage','report'].map(function(k){
+         return '<option value="'+k+'"'+(actFilter.kind===k?' selected':'')+'>'+kindLabel[k]+'</option>';
+       }).join('')+'</select>'+
+     '<input type="search" placeholder="Who \u2014 name or Andrew ID" value="'+esc(actFilter.who)+'" '+
+       'aria-label="Who filed it" oninput="setActFilter(\'who\',this.value)">'+
+     '</div>';
+
+  if(!rows.length){
+    h+='<div class="card"><p class="hint" style="margin:0">'+
+       (actRows.length ? 'Nothing matches those filters.'
+                       : 'Nothing has been filed in this period.')+'</p></div>';
+    host.innerHTML=h; return;
+  }
+
+  h+='<div class="invwrap"><table class="invtable"><thead><tr>'+
+     '<th>When</th><th>Who</th><th>What</th>'+
+     '<th class="mob-hide">Kit or room</th><th class="mob-hide">Details</th>'+
+     '</tr></thead><tbody>';
+  rows.forEach(function(a){
+    var tone = a.kind==='usage' ? 'brand' : a.kind==='report' ? 'warn' : (a.missing>0?'warn':'ok');
+    h+='<tr>'+
+       '<td style="font-size:12px;white-space:nowrap">'+esc(a.date)+
+         '<br><span style="color:var(--ink-faint)">'+esc(a.time)+'</span></td>'+
+       '<td>'+esc(a.who||'\u2014')+
+         (a.andrew?'<br><span style="font-size:11px;color:var(--ink-faint)">'+esc(a.andrew)+'</span>':'')+'</td>'+
+       '<td><span class="tag '+tone+'">'+esc(a.form)+'</span>'+
+         '<span class="mob-only" style="font-size:11.5px;color:var(--ink-faint)">'+
+         (a.subject?esc(a.subject)+' \u00b7 ':'')+esc(a.summary)+'</span></td>'+
+       '<td class="mob-hide" style="font-size:12.5px">'+(a.subject?esc(a.subject):'<span class="dim">\u2014</span>')+'</td>'+
+       '<td class="mob-hide" style="font-size:12.5px">'+esc(a.summary)+'</td>'+
+       '</tr>';
+  });
+  h+='</tbody></table></div>';
+
+  if(actState.more)
+    h+='<div class="row mt"><button class="btn" onclick="moreActivity()">'+
+       (actState.loading?'Loading\u2026':'Load more')+'</button>'+
+       '<span class="hint">Showing '+actRows.length+' of '+actState.total+'</span></div>';
+  host.innerHTML=h;
 }
 
 /* ---- problem log ---- */

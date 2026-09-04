@@ -1762,6 +1762,143 @@ function rowsSince(name, since) {
   };
 }
 
+/* ============================================================================
+   ACTIVITY — the raw trail, read rather than recorded
+   ============================================================================
+   Every submission already lands as a row carrying a date, a time, who filed it
+   and what it was about. Nothing has ever needed storing for this: the records
+   exist across seven tabs and no view reads ACROSS them, so "who has actually
+   been opening Jumpkit C, and when" meant opening the file and scrolling seven
+   times.
+
+   So this is a query, never a write. No tab of its own, no column of its own,
+   nothing that can drift out of step with the rows it describes — which is the
+   fault this file has had to be corrected for repeatedly, in the shape of one
+   fact derived two ways.
+
+   Note the difference from the Actions ledger. That records a DECISION somebody
+   made — resolved, restocked — which exists nowhere else and therefore has to be
+   written down. This records SUBMISSIONS, which are already written down. */
+
+/* One row's worth of trail, whatever form it came off.
+   `kind` is 'check' for a checklist, 'usage' for something consumed on a call,
+   'report' for a problem filed directly. `summary` is derived at read time from
+   fields the row already carries. */
+function activitySpec(site) {
+  if (site === 'bike') return [
+    { form: 'Bike Jumpkit Check', conf: BIKE_SHEETS.jumpkit, kind: 'check',
+      iDate:0, iTime:1, iWho:2, iAndrew:3, iSubject:4, iResult:6, iMissing:7, iNotes:11 },
+    { form: 'Bike Safety Check', conf: BIKE_SHEETS.safety, kind: 'check',
+      iDate:0, iTime:1, iWho:2, iAndrew:3, iSubject:4, iResult:5, iMissing:6, iNotes:10 }
+  ];
+  return [
+    { form: 'Checkout',    conf: SHEETS['Checkouts'],   kind: 'check',
+      iDate:0, iTime:1, iWho:2, iAndrew:3, iSubject:5, iResult:6, iMissing:7, iNotes:10 },
+    { form: 'Contents check', conf: SHEETS['Bag Checks'], kind: 'check',
+      iDate:0, iTime:1, iWho:2, iAndrew:3, iSubject:4, iResult:5, iMissing:6, iNotes:-1 },
+    { form: 'Room check',  conf: SHEETS['Room Checks'], kind: 'check',
+      iDate:0, iTime:1, iWho:2, iAndrew:3, iSubject:4, iResult:5, iMissing:6, iNotes:9 },
+    /* A post-call has no subject column, but it knows which bags were opened —
+       `usageJson` carries the unit each item came out of. Resolved to bag names
+       below, so "what has Jumpkit C actually been used for" is answerable. That
+       is the whole question this screen exists for; leaving it as a bare
+       "on a call" would have made the usage rows the one thing you could not
+       filter by kit. */
+    { form: 'Post-call',   conf: SHEETS['Post-Call'],   kind: 'usage',
+      iDate:0, iTime:1, iWho:2, iAndrew:-1, iSubject:-1, iResult:4, iMissing:-1, iNotes:6,
+      iUsage:8 },
+    { form: 'Report',      conf: SHEETS['Reports'],     kind: 'report',
+      iDate:0, iTime:1, iWho:2, iAndrew:-1, iSubject:6, iResult:-1, iMissing:-1, iNotes:5 }
+  ];
+}
+
+/* Everything filed, newest first.
+
+   Paged on the server. A term across both sites runs to thousands of rows, and
+   answering with all of them would make the view slower every week it is used —
+   so `offset` and `limit` cut the page here and `more` says whether to ask
+   again. Sorting happens before the cut, or page two would not follow page one. */
+function activityRows(site, sinceDay, offset, limit) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var tz = Session.getScriptTimeZone();
+  var map = nameMap(), units = map.units || {};
+  var asDate = function (v) {
+    if (!v) return '';
+    return (v instanceof Date) ? Utilities.formatDate(v, tz, 'yyyy-MM-dd') : String(v);
+  };
+  var asTime = function (v) {
+    if (!v) return '';
+    return (v instanceof Date) ? Utilities.formatDate(v, tz, 'HH:mm') : String(v);
+  };
+  var cell = function (r, i) { return i >= 0 && i < r.length ? r[i] : ''; };
+
+  var out = [];
+  activitySpec(site).forEach(function (spec) {
+    var sh = ss.getSheetByName(spec.conf.name);
+    if (!sh || sh.getLastRow() < 2) return;
+    var width = spec.conf.headers.length;
+    var vals = sh.getRange(2, 1, sh.getLastRow() - 1, width).getValues();
+    vals.forEach(function (r) {
+      var date = asDate(cell(r, spec.iDate));
+      // A row with no date cannot be placed on a timeline. Skipped rather than
+      // dropped at the top or the bottom, where it would read as recent.
+      if (!date) return;
+      if (sinceDay && date < sinceDay) return;
+
+      var who = String(cell(r, spec.iWho) || '').trim();
+      var subject = String(cell(r, spec.iSubject) || '').trim();
+      var missing = Number(cell(r, spec.iMissing)) || 0;
+      var result = String(cell(r, spec.iResult) || '').trim();
+      var notes = String(cell(r, spec.iNotes) || '').trim();
+
+      /* The one line that says what happened, built from what the row already
+         holds. A count of what was missing is the most useful thing about a
+         check; for a post-call it is what came out of the bag. */
+      var summary;
+      if (spec.kind === 'usage') {
+        summary = notes ? notes.split('\n').join(', ') : (result || 'Nothing logged');
+      } else if (spec.kind === 'report') {
+        summary = String(cell(r, 5) || '').trim() || 'Reported a problem';
+      } else {
+        summary = missing > 0 ? (missing + ' missing') : (result || 'Complete');
+        if (notes) summary += ' \u00b7 ' + notes.split('\n')[0];
+      }
+
+      /* Which bags a post-call opened. Names, not ids, and deduped — one call
+         that takes two things out of one jumpkit is one bag. */
+      var kits = subject;
+      if (spec.kind === 'usage' && spec.iUsage >= 0) {
+        var raw = cell(r, spec.iUsage), seenU = {}, names = [];
+        if (raw) {
+          var list;
+          try { list = JSON.parse(raw); } catch (err) { list = []; }
+          if (Array.isArray(list)) list.forEach(function (u) {
+            if (!u || !u.f) return;
+            var nm = units[u.f] || u.f;
+            if (!seenU[nm]) { seenU[nm] = 1; names.push(nm); }
+          });
+        }
+        kits = names.join(', ');
+      }
+
+      out.push({ date: date, time: asTime(cell(r, spec.iTime)), who: who,
+                 andrew: String(cell(r, spec.iAndrew) || '').trim(),
+                 site: site === 'bike' ? 'bike' : 'ops',
+                 form: spec.form, kind: spec.kind,
+                 subject: kits, missing: missing, summary: summary });
+    });
+  });
+
+  out.sort(function (a, b) {
+    return (b.date + ' ' + b.time).localeCompare(a.date + ' ' + a.time);
+  });
+
+  var start = Math.max(0, Number(offset) || 0);
+  var take = Math.min(Math.max(Number(limit) || 60, 1), 200);
+  return { rows: out.slice(start, start + take), total: out.length,
+           offset: start, more: start + take < out.length };
+}
+
 function collectReport(period) {
   var since = periodStartMs(period);
   var used = {}, calls = {}, concerns = [];
@@ -1838,6 +1975,12 @@ function doGet(e) {
   }
   if (p.report) {
     return json({ ok: true, report: collectReport(p.report) });
+  }
+  if (p.activity) {
+    var aSince = p.since && /^\d{4}-\d{2}-\d{2}$/.test(String(p.since)) ? String(p.since) : '';
+    var a = activityRows(siteOf(p), aSince, p.offset, p.limit);
+    return json({ ok: true, site: siteOf(p), activity: a.rows, total: a.total,
+                  offset: a.offset, more: a.more });
   }
   if (p.restock) {
     return json({ ok: true, restock: restockRows(siteOf(p)) });
