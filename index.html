@@ -739,6 +739,7 @@
   .keyswatch{display:inline-block;width:15px;height:11px;vertical-align:-1px;margin-right:6px;
     border:1px solid var(--rule-strong);background:var(--card)}
   .keyswatch.high{background:var(--brand-tint);border-color:var(--brand)}
+  .keyswatch.done{background:var(--ok-wash);border-color:var(--ok)}
   .trackhead{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;
     border-bottom:2px solid var(--ink);padding-bottom:10px;margin-bottom:4px}
   .trackhead .th-t{font-family:var(--font-display);font-size:21px;font-weight:700}
@@ -917,7 +918,13 @@
   .trackpick label{margin:0}
   .trackpick select{width:auto;min-width:190px}
   .trackhead{margin-top:26px}
-  .tracker .slot.done{font-family:var(--font-mono);font-size:12px;text-align:center;
+  /* Written to out-rank `.tracker tr.high td.slot`, which sets its own
+     background and is the more specific selector of the two — so on a PRIORITY
+     room a filled slot stayed the plain card colour while the same slot on an
+     ordinary room went green. Two identical facts, two different colours, and
+     nothing on the page explaining the difference. Whether a slot is done
+     matters more than which tier the room is, so it wins. */
+  .tracker tr td.slot.done{font-family:var(--font-mono);font-size:12px;text-align:center;
     color:var(--ink);background:var(--ok-wash)}
 
   /* ---------- stock ---------- */
@@ -1420,7 +1427,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260905141418';
+var BUILD='20260905141950';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -8140,16 +8147,25 @@ function renderTracker(){
      still the default at the start of a period, and still what you want if the
      board is being filled in by hand. */
   var keys=dpKeysThisYear();
-  // Not chosen yet: open on the one that is running. Chosen and since gone
-  // (a period deleted, or the year rolled over) falls back to a blank sheet
-  // rather than to a stale selection.
-  if(trackerDP===null) trackerDP=currentDP();
+  /* Not chosen yet: open on the one that is running.
+
+     Only once there is something to open on. This view paints immediately and
+     the duty periods arrive from the sheet a moment later, so the first render
+     has no keys at all — and latching then set the choice to "a blank sheet"
+     permanently, so the answer that arrived a second later was never shown. It
+     stays unchosen until there is a real period to choose. */
+  if(trackerDP===null && keys.length) trackerDP=currentDP();
   if(trackerDP && keys.indexOf(trackerDP)<0) trackerDP='';
+  /* `null` is "not chosen yet", `''` is "blank sheet, chosen". They render the
+     same; only the first is still waiting on the sheet to answer. Declared here
+     because the picker below reads it — `var` would hoist as undefined and
+     quietly select nothing. */
+  var picked=trackerDP||'';
   h+='<div class="row noprint trackpick"><label for="trackDp">Show</label>'+
      '<select id="trackDp" onchange="setTrackerDP(this.value)">'+
      '<option value="">A blank sheet</option>'+
      keys.map(function(k){
-       return '<option value="'+esc(k)+'"'+(trackerDP===k?' selected':'')+'>'+esc(dpLabel(k))+'</option>';
+       return '<option value="'+esc(k)+'"'+(picked===k?' selected':'')+'>'+esc(dpLabel(k))+'</option>';
      }).join('')+'</select></div>';
 
   h+='<div class="row noprint"><button class="btn solid" onclick="window.print()">Print tracker</button>'+
@@ -8176,6 +8192,8 @@ function renderTracker(){
   h+='<div class="legend trackkey">'+
      '<span class="item"><span class="keyswatch high"></span>Priority room, 3 call signs &mdash; '+high+'</span>'+
      '<span class="item"><span class="keyswatch"></span>2 call signs &mdash; '+(DB.rooms.length-high)+'</span>'+
+     // The green was on the sheet with nothing saying what it meant.
+     '<span class="item"><span class="keyswatch done"></span>Already covered</span>'+
      '<span class="item"><b>'+DB.rooms.length+'</b> rooms, <b>'+slots+'</b> call-sign slots</span>'+
      '</div>';
 
