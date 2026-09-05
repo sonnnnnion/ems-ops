@@ -221,6 +221,52 @@ function logAction(site, who, did, what, where) {
   }
 }
 
+/* WHICH THINGS KEEP GOING MISSING.
+   ----------------------------------------------------------------------------
+   A one-off and a chronic disappearance look identical on the buy list, and
+   they need opposite answers. Replacing a bottle of eyewash for the sixth time
+   is not restocking, it is paying for the same fault over and over: the real
+   answer is a spare, or a different place to keep it, or a label people can
+   actually find it under.
+
+   NOT read off the Restock tab's "Times Asked". That column is deliberately
+   reset to 1 whenever a row is ticked off, because within one cycle it means
+   "three people have asked for this, so bring three". It cannot answer a
+   question that spans cycles, and reading it as though it could would be
+   inventing a fact.
+
+   Counted from the Actions ledger instead, which records one row each time
+   somebody actually ticked something off: one restock, one occurrence. Three
+   people noticing the same absence is one occurrence, not three, which is
+   exactly what this has to count and what the check rows could not.
+
+   Keyed on item AND place, the same pairing the buy list itself uses: eyewash
+   going missing from Jumpkit A four times is a fact about Jumpkit A, and
+   merging it with Jumpkit D would hide both. */
+function recurrenceRows(site) {
+  var out = {};
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(ACTIONS.name);
+  if (!sh || sh.getLastRow() < 2) return out;
+  var tz = Session.getScriptTimeZone();
+  var want = (site === 'bike') ? 'bike' : 'ops';
+  var rows = sh.getRange(2, 1, sh.getLastRow() - 1, ACTIONS.headers.length).getValues();
+  rows.forEach(function (r) {
+    if (rowSite(r[3]) !== want) return;
+    // Only a restock counts. "Put back on the list" is somebody undoing a tick,
+    // and counting it would make a mis-tap look like the item vanished again.
+    if (String(r[4] || '') !== 'Restocked') return;
+    var item = String(r[5] || '').trim();
+    if (!item) return;
+    var place = String(r[6] || '').trim();
+    var key = item.toLowerCase() + '|' + place.toLowerCase();
+    var day = (r[0] instanceof Date) ? Utilities.formatDate(r[0], tz, 'yyyy-MM-dd') : String(r[0] || '');
+    var e = out[key] || (out[key] = { item: item, where: place, times: 0, last: '' });
+    e.times++;
+    if (day && day > e.last) e.last = day;
+  });
+  return out;
+}
+
 /* Everything done in a period, newest first. */
 function actionRows(site, sinceDay) {
   var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(ACTIONS.name);
@@ -2058,7 +2104,8 @@ function doGet(e) {
                   offset: a.offset, more: a.more });
   }
   if (p.restock) {
-    return json({ ok: true, restock: restockRows(siteOf(p)) });
+    return json({ ok: true, restock: restockRows(siteOf(p)),
+                  recur: recurrenceRows(siteOf(p)) });
   }
   if (p.dp) {
     return json({ ok: true, dp: dutyPeriodRows() });

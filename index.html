@@ -854,6 +854,20 @@
      known to be wrong — it is one nobody can vouch for, which is a different
      thing and must not compete with an actual fault on the same screen. */
   .lastcheck.stale{color:var(--warn);font-weight:600}
+  /* A thing that keeps coming back. Quiet on purpose — it is context for
+     somebody already reading the row, not a fault competing with the real ones
+     on the same screen. */
+  .horizon{list-style:none;margin:10px 0 0;padding:0}
+  .horizon li{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px;
+    padding:8px 0;border-top:1px solid var(--rule-soft);font-size:13.5px}
+  .horizon li:first-child{border-top:0}
+  .horizon b{flex:1 1 auto;min-width:0;font-weight:600}
+  .hz-when{font-family:var(--font-mono);font-size:12px;color:var(--ink-mute);white-space:nowrap}
+  .hz-when.near{color:var(--warn);font-weight:700}
+  .hz-where{flex:0 0 100%;font-size:11.5px;color:var(--ink-faint)}
+  .recur{display:inline-block;margin-left:8px;font-size:11px;font-weight:600;
+    color:var(--ink-mute);background:var(--bg-2);border:1px solid var(--rule);
+    border-radius:999px;padding:1px 8px;vertical-align:middle;white-space:nowrap}
   .rc-stale{font-size:12px;color:var(--warn);font-weight:600;margin:8px 0 0}
   .lastcheck.none{font-style:italic}
   /* A standing instruction above a form. Not a .notice and not a banner — it is
@@ -1403,7 +1417,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260905130234';
+var BUILD='20260905135806';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -1875,7 +1889,7 @@ var DEFAULTS={
      older seed, so a corrected bag list actually reaches people instead of
      sitting behind whatever they cached weeks ago. Their own data — submissions,
      the To Get list, the spreadsheet link, who has access — is never touched. */
-  seed:11,
+  seed:12,
 
   // ONE Apps Script Web App in front of ONE spreadsheet. Every form writes to
   // its own tab in that file, so Equipment and Office data sit side by side and
@@ -1933,6 +1947,9 @@ var DEFAULTS={
      the agency's cadence — and a threshold nobody agreed to is one everybody
      learns to ignore. */
   staleDays:30,
+  /* How far ahead the "to have bought" list looks, in days. A term is roughly
+     this, which is the rhythm an order actually follows. */
+  horizonDays:90,
 
   /* ---------- rooms ------------------------------------------------------
      `slots` is how many members may claim the room in one duty period: three
@@ -2854,6 +2871,46 @@ function applyGates(root){
   if(ln) ln.hidden = !(DB.learnPublic || can('ops'));
 }
 function canSeeLearn(){ return !!DB.learnPublic || can('ops'); }
+
+/* How far ahead the buy list looks. A setting for the same reason the check
+   cadence is one: the right horizon is a purchasing rhythm, and a term, a
+   semester and a financial year are all different numbers. */
+function horizonDays(){
+  var n=parseInt(DB.horizonDays,10);
+  return (n>0 && n<400) ? n : 90;
+}
+function setHorizonDays(v){
+  var n=parseInt(v,10);
+  if(!(n>0 && n<400)) return;
+  DB.horizonDays=n; saveDB(); renderExpiring();
+}
+
+/* Plain text, because it is going into an email or a purchase form. */
+function copyHorizon(){
+  var hz=horizonDays();
+  var due=expiringRows().filter(function(r){ return r.days<=hz; });
+  var byItem={};
+  due.forEach(function(r){
+    var g=byItem[r.item]||(byItem[r.item]={places:[], soonest:r.days});
+    if(r.place && g.places.indexOf(r.place)<0) g.places.push(r.place);
+    if(r.days<g.soonest) g.soonest=r.days;
+  });
+  var lines=Object.keys(byItem).sort(function(a,b){ return byItem[a].soonest-byItem[b].soonest; })
+    .map(function(k){
+      var g=byItem[k];
+      var when=g.soonest<0?'expired':(g.soonest===0?'today':'in '+g.soonest+'d');
+      return '- '+k+'  ('+when+(g.places.filter(Boolean).length?' \u2014 '+g.places.filter(Boolean).join(', '):'')+')';
+    });
+  if(!lines.length){ uiAlert('Nothing lapses in the next '+hz+' days.','Nothing to order'); return; }
+  var text='Expiring within '+hz+' days \u2014 '+todayISO()+'\n'+lines.join('\n');
+  // Same two-route copy the buy list uses: the async clipboard where it is
+  // allowed, and the old selection trick where it is not.
+  var done=function(){ uiAlert(lines.length+' item'+(lines.length===1?'':'s')+
+                               ' copied. Paste it into the order.','Copied'); };
+  if(navigator.clipboard&&navigator.clipboard.writeText)
+    navigator.clipboard.writeText(text).then(done,function(){ fallbackCopy(text,done); });
+  else fallbackCopy(text,done);
+}
 
 function setStaleDays(v){
   var n=parseInt(v,10);
@@ -7228,6 +7285,38 @@ function expiringRows(){
   return rows.sort(function(a,b){ return a.days-b.days; });
 }
 
+/* WHAT KEEPS COMING BACK.
+   ----------------------------------------------------------------------------
+   Said only where it is true. A thing that has gone missing once is the normal
+   case and needs no comment; a thing that has gone missing five times is a
+   different problem wearing the same clothes, and the answer to it is a spare,
+   a different home, or a better label — not a fifth replacement.
+
+   Deliberately quiet: no colour, no badge, no exclamation. It is context for
+   somebody already looking at the row, and shouting it would put it in
+   competition with the actual faults on the same screen. */
+function recurOf(item,where){
+  if(!remoteRecur) return null;
+  var k=String(item||'').trim().toLowerCase()+'|'+String(where||'').trim().toLowerCase();
+  var e=remoteRecur[k];
+  return (e && e.times>1) ? e : null;
+}
+function ordinal(n){
+  var s=['th','st','nd','rd'], v=n%100;
+  return n+(s[(v-20)%10]||s[v]||s[0]);
+}
+/* `alreadyDone` matters: the ledger counts completed restocks, so a row still
+   waiting to be dealt with is the NEXT one, and a row already ticked is the one
+   the count just included. Off by one either way if this is guessed. */
+function recurNote(item,where,alreadyDone){
+  var e=recurOf(item,where); if(!e) return '';
+  var n=alreadyDone ? e.times : e.times+1;
+  if(n<2) return '';
+  return '<span class="recur" title="Counted from what has actually been ticked off">'+
+         esc(ordinal(n))+' time'+
+         (e.last?' \u00b7 last replaced '+esc(concernWhen(e.last)):'')+'</span>';
+}
+
 function onToGet(key){
   return (DB.toGet||[]).some(function(t){ return t.key===key && !t.done; });
 }
@@ -7252,6 +7341,58 @@ function renderExpiring(){
     '<div class="repstat"><div class="rs-n">'+m30.length+'</div><div class="rs-l">within 30 days</div></div>'+
     '<div class="repstat"><div class="rs-n">'+m90.length+'</div><div class="rs-l">31 to 90 days</div></div>'+
     '</div>';
+
+  /* ONE ORDER, NOT A ROLLING SERIES OF SURPRISES.
+     ------------------------------------------------------------------------
+     The table below answers "what lapses when", item by item, which is the
+     right shape for checking a kit and the wrong shape for buying anything.
+     Ordering is a single act done a few times a year against a budget, and the
+     question it needs answering is "what do I need to have bought by the end of
+     the term" — one list, everything already counted in.
+
+     Each item's own label is repeated verbatim rather than parsed into a
+     number. The labels say "(2) Adult Epi-Pens", and a human reading that knows
+     they need two; a parser pulling the 2 out of the prose would be wrong the
+     first time somebody writes a label in a slightly different shape, and would
+     be wrong silently, on a purchase order. */
+  var hz=horizonDays();
+  var due=rows.filter(function(r){ return r.days<=hz; });
+  h+='<div class="card mt"><div class="dphead"><h3>To have bought</h3>'+
+     '<span class="dpcount">next '+hz+' days</span></div>';
+  if(!due.length){
+    h+='<p class="hint" style="margin:6px 0 0">Nothing lapses in the next '+hz+' days.</p>';
+  }else{
+    /* Grouped by item, because the same thing expiring in three bags is one
+       line on an order and three places to walk afterwards. */
+    var byItem={};
+    due.forEach(function(r){
+      var k=String(r.item||'');
+      var g=byItem[k]||(byItem[k]={item:k, places:[], soonest:r.days});
+      // `place`, not `where`: expiringRows names it that, and reading the wrong
+      // field emptied every location without emptying the line it sat on.
+      if(r.place && g.places.indexOf(r.place)<0) g.places.push(r.place);
+      if(r.days<g.soonest) g.soonest=r.days;
+    });
+    var groups=Object.keys(byItem).map(function(k){return byItem[k];})
+      .sort(function(a,b){ return a.soonest-b.soonest; });
+    h+='<ul class="horizon">'+groups.map(function(g){
+      var when = g.soonest<0 ? 'already expired'
+               : g.soonest===0 ? 'expires today'
+               : 'in '+g.soonest+' day'+(g.soonest===1?'':'s');
+      return '<li><b>'+esc(g.item)+'</b>'+
+             '<span class="hz-when'+(g.soonest<=30?' near':'')+'">'+esc(when)+'</span>'+
+             '<span class="hz-where">'+esc(g.places.filter(Boolean).join(', '))+'</span></li>';
+    }).join('')+'</ul>'+
+    /* Both numbers, said together. The card header used to carry the count of
+       DATES and the footer the count of ITEMS, a few inches apart with nothing
+       explaining why they differed — and a screen showing "5" and "3" for the
+       same list without saying why is a screen people stop trusting. Five dates
+       collapsing into three things to buy is the whole point of the card. */
+    '<div class="row mt"><button class="btn sm" onclick="copyHorizon()">Copy this list</button>'+
+    '<span class="hint">'+groups.length+' item'+(groups.length===1?'':'s')+' to order'+
+    (due.length!==groups.length ? ', covering '+due.length+' dates' : '')+'</span></div>';
+  }
+  h+='</div>';
 
   h+='<p class="explegend"><span class="expbadge bad">Expired</span> past its date'+
      '<span class="expbadge soon">60d</span> 60 days or fewer'+
@@ -7365,7 +7506,8 @@ function renderToGet(){
       var w=toGetWhere(t);
       var whoLine=(t.by?esc(t.by):'\u2014')+' \u00b7 '+esc(toGetDate(t));
       t2+='<tr><td><input type="checkbox" onchange="'+tick+'" aria-label="Mark handled"></td>'+
-         '<td>'+esc(toGetName(t))+'<br><span style="font-size:11px;color:var(--ink-faint)">'+
+         '<td>'+esc(toGetName(t))+recurNote(t.item,t.where,!!t.got||!!t.done)+
+         '<br><span style="font-size:11px;color:var(--ink-faint)">'+
          esc(t.cat)+'</span>'+
          '<span class="mob-only" style="font-size:11px;color:var(--ink-faint)">'+whoLine+'</span></td>'+
          (cols3?'<td class="num">'+esc(String(t.qty||1))+
@@ -7426,6 +7568,10 @@ function renderToGet(){
    source at a time, deliberately — merging two done-flags with no idea which is
    newer is how an item gets bought twice or not at all. */
 var remoteRestock=null, restockState={loading:false, error:'', at:0, sig:''};
+/* How many times each thing has actually had to be replaced, keyed
+   item|place, from the Actions ledger. Null until the sheet answers — an empty
+   object would read as "nothing has ever recurred", which is a claim. */
+var remoteRecur=null;
 
 function fetchRestock(){
   var url=(DB.api&&DB.api.url)||'';
@@ -7442,6 +7588,8 @@ function fetchRestock(){
          restocking is a blank screen rather than a message. */
       if(!j||!j.ok||!Array.isArray(j.restock)) throw 0;
       remoteRestock=j.restock;
+      // Absent from an older deployment; left null rather than emptied.
+      if(j.recur && typeof j.recur==='object') remoteRecur=j.recur;
       restockState.at=Date.now();
       restockState.sig=JSON.stringify(remoteRestock);
       return remoteRestock;
@@ -8279,6 +8427,9 @@ function setPeriod(p){
 // Filled by the backend when the report endpoint answers. Null means the
 // spreadsheet has not been read yet, in which case the local mirror is used.
 var remoteReport={week:null,month:null,ytd:null};
+// Set when the sheet answered with something that was not a report — an older
+// deployment. Says so rather than leaving the page reading "Reading…" forever.
+var reportStale=false;
 
 function fetchReport(p){
   var url=(DB.api&&DB.api.url)||'';
@@ -8286,7 +8437,20 @@ function fetchReport(p){
   return fetch(url+(url.indexOf('?')<0?'?':'&')+'report='+encodeURIComponent(p))
     .then(function(r){ return r.json(); })
     .then(function(j){
-      if(!j||!j.report) return null;
+      /* The SHAPE, not just the presence — the same rule every other feed here
+         follows, and the one this function was missing.
+
+         A truthy check adopts a string, a number or an array just as happily as
+         a report. Everything downstream then reads `.used` and `.calls` off it,
+         finds nothing, and renders a full week of zeros under the words "From
+         the spreadsheet." — which is a fabricated answer wearing the authority
+         of a real one. A week where nothing happened and a week that could not
+         be read are opposite facts and must never look the same. */
+      if(!j || !j.report || typeof j.report!=='object' || Array.isArray(j.report)){
+        reportStale=true;
+        return null;
+      }
+      reportStale=false;
       remoteReport[p]=j.report;
       return j.report;
     })
@@ -8412,6 +8576,8 @@ function renderReports(){
   // know whether it covers the whole team or only this phone.
   h+='<p class="hint" style="margin-top:2px">'+
      (d.remote ? 'From the spreadsheet.'
+      : reportStale ? '<span class="bad">The spreadsheet is running an older copy of the '+
+        'script, so this covers this device only (paste the current one and redeploy).</span>'
       : live ? 'Reading the spreadsheet…'
       : 'From this device.')+'</p>';
 
@@ -8900,6 +9066,14 @@ function renderSettings(){
     '<p class="hint" style="margin:6px 0 0">Days since the last full contents check. '+
     'The bag stays green on the readiness board \u2014 this only says nobody has '+
     'counted it lately.</p></div>';
+
+  h+='<div class="card mt" data-need="equipment"><h3>Buy-ahead window</h3>'+
+    '<div class="field"><label for="horizonDays">List anything lapsing within</label>'+
+    '<input type="number" id="horizonDays" min="1" max="399" value="'+esc(horizonDays())+'" '+
+    'onchange="setHorizonDays(this.value)"></div>'+
+    '<p class="hint" style="margin:6px 0 0">Days. Sets the \u201cTo have bought\u201d '+
+    'list at the top of Expiring Soon \u2014 make it match how often you actually '+
+    'put an order in.</p></div>';
 
   h+='<div class="card mt" data-need="ops"><h3>Videos &amp; lectures</h3>'+
     '<label class="checkline"><input type="checkbox" id="learnPublic"'+

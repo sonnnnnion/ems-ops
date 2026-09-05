@@ -46,5 +46,39 @@ const bad=JSON.parse(ctx.doPost({postData:{contents:JSON.stringify({form:'__rest
 t('an unsigned tick is refused', bad.ok, false);
 t('and leaves no trace', (dump(sheets,'Actions')||[]).length, before);
 
+/* WHAT KEEPS COMING BACK.
+   ---------------------------------------------------------------------------
+   Counted from the ledger, because the Restock tab's "Times Asked" is reset to
+   1 every time a row is ticked off — it answers "how many people asked this
+   cycle", not "how often has this happened", and reading it as the latter would
+   be inventing a fact. One completed restock is one occurrence. */
+const {ctx:rc, sheets:rs}=fresh();
+rc.PropertiesService.getScriptProperties().setProperty('PUBLISH_KEY','k');
+const zz=n=>String(n).padStart(2,'0');
+const dd=n=>{const x=new Date(Date.now()+n*864e5); return x.getFullYear()+'-'+zz(x.getMonth()+1)+'-'+zz(x.getDate());};
+const cycle=(day,item,place)=>{
+  post(rc,{form:'Bag Checks',date:day,sid:'r'+day+item+Math.random(),name:'A Member',andrew:'am',
+    bagId:'jumpkit',subject:place,missing:item,missingCount:1,done:'',doneCount:0});
+  post(rc,{form:'__restock',item:item,where:place,got:true,key:'k'});
+};
+cycle(dd(-60),'(1) small bottle of eyewash','Jumpkit A');
+cycle(dd(-40),'(1) small bottle of eyewash','Jumpkit A');
+cycle(dd(-20),'(1) small bottle of eyewash','Jumpkit A');
+cycle(dd(-10),'(1) small bottle of eyewash','Jumpkit D');   // a DIFFERENT bag
+cycle(dd(-8), '(1) stethoscope','Jumpkit A');               // a one-off
+// undoing a tick is somebody correcting a mis-tap, not the item vanishing again
+post(rc,{form:'__restock',item:'(1) stethoscope',where:'Jumpkit A',got:false,key:'k'});
+const recur=()=>get(rc,{restock:'1'}).recur||{};
+t('a thing replaced three times says three',
+  recur()['(1) small bottle of eyewash|jumpkit a'].times, 3);
+t('the same thing in another bag is counted separately, not merged',
+  recur()['(1) small bottle of eyewash|jumpkit d'].times, 1);
+t('a one-off stays a one-off', recur()['(1) stethoscope|jumpkit a'].times, 1);
+t('un-ticking does not look like the item vanishing again',
+  Object.keys(recur()).length, 3);
+t('and it says when it was last replaced',
+  /^\d{4}-\d{2}-\d{2}$/.test(recur()['(1) small bottle of eyewash|jumpkit a'].last), true);
+t('the bike site keeps its own count', Object.keys(get(rc,{restock:'1',site:'bike'}).recur||{}), []);
+
 console.log((fail?'*** '+fail+' FAILED ***':'ALL PASS')+'\n'+R.join('\n'));
 process.exit(fail?1:0);
