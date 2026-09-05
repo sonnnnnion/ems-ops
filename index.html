@@ -1383,7 +1383,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260904181536';
+var BUILD='20260904230055';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -4814,16 +4814,67 @@ function writeDrafts(d){
    person's own name on their own phone and must never travel. Nothing here is
    secret, and it is cleared from the form with one tap by whoever it is not. */
 var LS_ME='emsops_me_v1';
+
+/* WHO IS HOLDING THIS PHONE — and the fact that they are the same person on
+   both sites.
+
+   Operations and Bike Ops are separate sites with separate code, and they stay
+   that way. But GitHub Pages serves both from sonnnnnion.github.io, which means
+   one origin and therefore ONE localStorage. The same rider was typing the same
+   first name, last name and Andrew ID into two stores on the same phone —
+   `emsops_me_v1` here, `bikeops_me_v1` there — because nothing had ever said
+   they were the same person.
+
+   So they agree on a third key and nothing else. Neither site loads a line of
+   the other's code, neither can break the other by changing its own storage, and
+   if either one disappears the other keeps working off its own key. An agreed
+   name is the whole of the coupling.
+
+   `emsops_me_v1` is still written, so a phone holding a cached older copy of
+   this page keeps working, and so nothing is lost if this is ever undone. */
+var LS_ME_SHARED='cmuems_me_v1';
+
 function readMe(){
-  try{ return JSON.parse(localStorage.getItem(LS_ME)||'null')||null; }catch(e){ return null; }
+  var read=function(k){
+    try{ return JSON.parse(localStorage.getItem(k)||'null')||null; }catch(e){ return null; }
+  };
+  var shared=read(LS_ME_SHARED);
+  if(shared && shared.first && shared.last) return shared;
+  // Nothing shared yet: adopt what this site already knew, so nobody who has
+  // used it before has to introduce themselves again.
+  var mine=read(LS_ME);
+  if(mine && mine.first && mine.last){ saveMe(mine); return mine; }
+  return null;
 }
+
 function saveMe(s){
   if(!s||!s.first||!s.last) return;
-  try{ localStorage.setItem(LS_ME,JSON.stringify(
-    {first:s.first,last:s.last,andrew:s.andrew||'',callsign:s.callsign||''})); }catch(e){}
+  var rec={first:s.first,last:s.last,andrew:s.andrew||'',callsign:s.callsign||''};
+  try{
+    // Merge rather than replace. The bike site does not know what a callsign is,
+    // so a plain write from there would silently drop the one this site asks for
+    // every single time somebody filed a bike check.
+    var prev=JSON.parse(localStorage.getItem(LS_ME_SHARED)||'null');
+    if(prev && typeof prev==='object')
+      Object.keys(prev).forEach(function(k){ if(!rec[k]) rec[k]=prev[k]; });
+  }catch(e){}
+  try{ localStorage.setItem(LS_ME_SHARED,JSON.stringify(rec)); }catch(e){}
+  try{ localStorage.setItem(LS_ME,JSON.stringify(rec)); }catch(e){}
 }
+
+/* Every key on this phone that can name a person — including the one the bike
+   site owns.
+
+   Clearing fewer than all of them does not forget anybody. Clear the shared key
+   and this site's own, and the next read falls back to whichever legacy key was
+   left behind and ADOPTS that person straight back into the shared key: the
+   button reports success and the previous member is filed on the next form.
+   These are per-device conveniences, not records, so clearing the other site's
+   copy costs nothing and leaving it costs somebody their name on a report. */
+var ME_KEYS=[LS_ME_SHARED, LS_ME, 'bikeops_me_v1'];
+
 function forgetMe(fid){
-  try{ localStorage.removeItem(LS_ME); }catch(e){}
+  ME_KEYS.forEach(function(k){ try{ localStorage.removeItem(k); }catch(e){} });
   ['fn','ln','aid','cs'].forEach(function(k){
     var el=document.getElementById(fid+'-'+k); if(el) el.value='';
   });
