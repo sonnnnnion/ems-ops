@@ -44,5 +44,35 @@ post(c2,{form:'Checkouts',date:old,sid:'o1',name:'A',andrew:'x',radio:'P1',unitI
 t('an old concern is out of the week', get(c2,{report:'week'}).report.concerns.length, 0);
 t('but inside year-to-date', get(c2,{report:'ytd'}).report.concerns.length>=0, true);
 
+/* THE BOUNDARY DAY.
+   ---------------------------------------------------------------------------
+   The week starts on a Saturday, so on a Saturday the period begins today. The
+   cut used to parse 'YYYY-MM-DD' back into a Date, which JavaScript reads as
+   UTC midnight, and compared it against a LOCAL midnight boundary — so in
+   Pittsburgh a row filed today read as five hours before a period that started
+   today, and dropped out of it.
+
+   It only ever showed on the day a period opened: every Saturday for the week,
+   every 1st for the month, every 1 August for the year. It was found by a test
+   run that happened to cross midnight into a Saturday, which is not a thing to
+   rely on twice, so the boundary is now pinned explicitly for each period. */
+['week','month','ytd'].forEach(function(period){
+  const {ctx:c2}=fresh();
+  c2.PropertiesService.getScriptProperties().setProperty('NAMES',
+    JSON.stringify({items:{'c-gauze4':'Sterile gauze 4x4'},units:{'jk-a':'Jumpkit A'}}));
+  // Dated the first instant the period covers — the day the bug ate.
+  const startDay=(function(){
+    const d=new Date(c2.periodStartMs(period));
+    const z=n=>String(n).padStart(2,'0');
+    return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate());
+  })();
+  post(c2,{form:'Post-Call',date:startDay,sid:'edge-'+period,name:'Edge',callnum:'2026-999',
+    usageJson:JSON.stringify([{i:'c-gauze4',q:1,f:'jk-a'}]),usageCount:1,usageText:'x',
+    missing:'',missingCount:0});
+  const r=get(c2,{report:period}).report;
+  t('a call filed on the first day of the '+period+' is inside it', r.calls, 1);
+  t('and what it used is counted', Object.keys(r.used||{}), ['c-gauze4']);
+});
+
 console.log((fail?'*** '+fail+' FAILED ***':'ALL PASS')+'\n'+R.join('\n'));
 process.exit(fail?1:0);

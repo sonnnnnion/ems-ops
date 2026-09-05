@@ -1801,11 +1801,31 @@ function rowsSince(name, since) {
   var cols = SHEETS[name].keys;
   var vals = sh.getRange(2, 1, sh.getLastRow() - 1, cols.length).getValues();
   var iDate = cols.indexOf('date');
+  /* Compared as yyyy-MM-dd strings in the script's own timezone, NOT by parsing
+     the cell back into a Date.
+
+     `new Date('2026-09-05')` is parsed as UTC midnight, while the period
+     boundary is local midnight — so in Pittsburgh every row read as five hours
+     earlier than the day it was actually filed on, and anything dated today was
+     therefore BEFORE a period that started today. In practice: every Saturday,
+     that day's calls disappeared out of "this week"; every 1st of the month, out
+     of "this month"; every 1 August, out of year-to-date. Only at the boundary,
+     only on those days, which is why it survived this long.
+
+     A row with no readable date is kept rather than dropped: it is a real
+     submission and a report that silently omits one is worse than a report with
+     an undated line in it. */
+  var tz = Session.getScriptTimeZone();
+  var sinceDay = Utilities.formatDate(new Date(since), tz, 'yyyy-MM-dd');
+  var dayOf = function (v) {
+    if (!v) return '';
+    return (v instanceof Date) ? Utilities.formatDate(v, tz, 'yyyy-MM-dd') : String(v).trim();
+  };
   return {
     cols: cols,
     rows: vals.filter(function (r) {
-      var t = new Date(r[iDate]).getTime();
-      return isNaN(t) ? true : t >= since;
+      var day = dayOf(r[iDate]);
+      return day ? day >= sinceDay : true;
     })
   };
 }

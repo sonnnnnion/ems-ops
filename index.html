@@ -1403,7 +1403,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260904233600';
+var BUILD='20260905000120';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -2923,6 +2923,60 @@ function restoreIdToken(){
   else { try{ localStorage.removeItem(LS_TOKEN); }catch(e){} }
 }
 
+/* IS THE SIGN-IN STILL GOOD, RIGHT NOW.
+   ----------------------------------------------------------------------------
+   A Google ID token lives about an hour. That was checked exactly once, when
+   the page loaded, and never again — so a tab left open longer than an hour
+   went on holding a dead token while the header went on saying "Logged in",
+   and every write was refused by the spreadsheet for a reason nothing on
+   screen could show.
+
+   That is not a corner case. It is what a manager doing the restocking does:
+   open the To Get list, walk round the room with it, come back and start
+   ticking. By then the sign-in has expired and each tick is refused — the row
+   ticks, un-ticks a second later, and the site claims to be logged in
+   throughout.
+
+   Checked at the moment of writing now, which is the only moment the answer
+   matters. A publish key counts too: it does not expire. */
+function authIsLive(){
+  if((DB.api&&DB.api.key)||'') return true;
+  if(!googleIdToken) return false;
+  return tokenExpiry(googleIdToken)*1000 > Date.now()+10000;
+}
+
+/* Called before a write that needs credentials. Returns true if it may go
+   ahead; otherwise it has already said what is wrong and put the way to fix it
+   in front of the person. */
+function requireAuth(what){
+  if(authIsLive()) return true;
+  if(googleIdToken || ROLE!=='member') signedOutNow();
+  uiConfirm('Your Google sign-in has expired, so the spreadsheet will not accept '+
+            (what||'this change')+'. Signing in again takes a moment and nothing is lost.',
+            'Signed out', {okText:'Sign in again', cancelText:'Not now'})
+    .then(function(yes){ if(yes) openRolePicker(); });
+  return false;
+}
+
+/* The header must stop claiming a sign-in the moment there is not one. Dropping
+   to member also closes the manager views, which is right: they are the views
+   whose buttons no longer work. */
+function signedOutNow(){
+  setIdToken('');
+  if(ROLE!=='member') setRole('member');
+}
+
+/* And notice it while the page is just sitting there, rather than only when
+   somebody presses something. */
+function watchAuth(){
+  setInterval(function(){
+    if(googleIdToken && !authIsLive()) signedOutNow();
+  }, 60000);
+  document.addEventListener('visibilitychange', function(){
+    if(!document.hidden && googleIdToken && !authIsLive()) signedOutNow();
+  });
+}
+
 /* ---- local manager unlock: OFF ---------------------------------------------
    Between 2026-07-30 and 2026-08-05 the Google account that owned the client
    above was disabled, so nobody could sign in at all and a manager could pick a
@@ -3949,6 +4003,13 @@ function publishContent(opts){
               'key under Site Settings — the steps are in SETUP-BACKEND.md §7.',
               'Cannot publish yet');
     return;
+  }
+  /* Held a token, but an hour ago. The auto-publish stays silent — it runs on a
+     timer and must not throw a dialog at somebody mid-sentence — but it still
+     must not send a write that will be thrown away. */
+  if(!authIsLive()){
+    if(opts.auto){ signedOutNow(); setPubMsg(''); return; }
+    if(!requireAuth('these changes being published')) return;
   }
   setPubMsg('Publishing…');
   // Snapshot what is actually being sent. The readback used to compare against a
@@ -5785,7 +5846,8 @@ function resolveConcern(what,where){
    catches up on the next tick rather than the click doing nothing. */
 function pushConcernResolved(sig, resolved){
   var url=(DB.api&&DB.api.url)||'';
-  if(!url || !googleIdToken) return;
+  if(!url) return;
+  if(!requireAuth('this being marked fixed')) return;
   try{
     fetch(url,{method:'POST',mode:'no-cors',
       headers:{'Content-Type':'text/plain;charset=utf-8'},
@@ -7337,6 +7399,10 @@ function toggleToGet(key){
    names a row, and ticking by name alone would close whichever one came first. */
 function toggleRestock(item,got,where){
   var url=(DB.api&&DB.api.url)||''; if(!url) return;
+  /* Asked BEFORE the row is ticked on screen. Firing a write nobody is going to
+     accept is what produced the whole complaint: the row ticked, the request was
+     refused unread, the list was re-read a second later and the tick vanished. */
+  if(!requireAuth('this item being ticked off')) return;
   where=where||'';
   var row=(remoteRestock||[]).filter(function(r){
     return r.item===item && String(r.where||'')===where; })[0];
@@ -8933,6 +8999,9 @@ function init(){
   // Before restoreRole, so a manager who reloads is able to publish straight
   // away rather than having every edit quietly stay on this device.
   restoreIdToken();
+  // And keep noticing: a token that dies while the page sits open must not leave
+  // the header claiming a sign-in that no longer works.
+  watchAuth();
   restoreRole();
 
   document.getElementById('nav').addEventListener('click',function(e){
