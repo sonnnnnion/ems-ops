@@ -1403,7 +1403,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260905000120';
+var BUILD='20260905130234';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -5821,13 +5821,79 @@ var USED_ON_CALL='Used on a call';
 function concernKey(what,where){
   return String(what||'').trim().toLowerCase()+'|'+String(where||'').trim().toLowerCase();
 }
-function isResolvedConcern(what,where){
-  return (DB.resolvedKeys||[]).indexOf(concernKey(what,where))>=0;
+/* MARKING SOMETHING FIXED IS ABOUT A REPORT, NOT ABOUT A SENTENCE FOREVER.
+   ----------------------------------------------------------------------------
+   A resolution used to bank the bare signature "what|where" in a permanent
+   list, and anything carrying that signature was hidden from then on. So the
+   first time the eyewash was replaced, "(1) small bottle of eyewash missing |
+   Jumpkit A" was silenced — and the NEXT time the same bottle went missing from
+   the same bag, the spreadsheet filed it, everyone else could see it, and the
+   one person who had dealt with it before could not. On a kit somebody is going
+   to grab at 2am, a live missing item hidden on the equipment manager's own
+   phone is the worst possible place for it to hide.
+
+   The prune could not save it either: it keeps a key while the sheet still has
+   an OPEN copy, which is exactly the recurrence case.
+
+   A resolution now records the day of the report it was about. Anything
+   reported AFTER that day is a new occurrence and is not covered by it. Keys
+   banked by older builds carry no day and behave as they always did, and the
+   prune retires them as the sheet confirms them. */
+var RESOLVED_SEP='\u0001';
+
+function resolvedBase(entry){
+  var s=String(entry), i=s.indexOf(RESOLVED_SEP);
+  return i<0 ? s : s.slice(0,i);
 }
+function resolvedDay(entry){
+  var s=String(entry), i=s.indexOf(RESOLVED_SEP);
+  return i<0 ? '' : s.slice(i+1);
+}
+/* The newest day banked for this signature, '' if only an undated entry exists,
+   or null if nothing has been resolved for it. Newest wins: two managers may
+   each have cleared it, and the later clear is the one that describes now. */
+function resolvedUpTo(sig){
+  var keys=DB.resolvedKeys||[], found=false, best='';
+  for(var i=0;i<keys.length;i++){
+    if(resolvedBase(keys[i])!==sig) continue;
+    found=true;
+    var d=resolvedDay(keys[i]);
+    if(d && d>best) best=d;
+  }
+  return found ? best : null;
+}
+
+function isResolvedConcern(what,where,lastDay){
+  var upTo=resolvedUpTo(concernKey(what,where));
+  if(upTo===null) return false;
+  // Undated (an older build's key), or a report with no date to compare:
+  // behave as before rather than guessing.
+  if(!upTo || !lastDay) return true;
+  // Reported again since it was cleared — a live problem, not a closed one.
+  return !(String(lastDay) > upTo);
+}
+
+/* What day the report being cleared was last made. Read off the concern itself
+   rather than off the clock, so the comparison is report-against-report and does
+   not depend on this device's date being right. */
+function concernLastDay(sig){
+  var list=Array.isArray(remoteConcerns)?remoteConcerns:[];
+  for(var i=0;i<list.length;i++){
+    var c=list[i]; if(!c||typeof c!=='object') continue;
+    if(String(c.sig||concernKey(c.what,c.where))!==sig) continue;
+    var d=String(c.last||c.first||'');
+    if(d) return d;
+  }
+  return todayISO();
+}
+
 function resolveConcern(what,where){
   DB.resolvedKeys=DB.resolvedKeys||[];
   var k=concernKey(what,where);
-  if(DB.resolvedKeys.indexOf(k)<0) DB.resolvedKeys.push(k);
+  // Every previous entry for this signature goes: they described earlier
+  // reports and this one supersedes them.
+  DB.resolvedKeys=DB.resolvedKeys.filter(function(x){ return resolvedBase(x)!==k; });
+  DB.resolvedKeys.push(k+RESOLVED_SEP+concernLastDay(k));
   (DB.issues||[]).forEach(function(i){ if(concernKey(i.what,i.where)===k) i.open=false; });
   /* A concern and the To Get line it produced are the same fact written twice.
      Resolving one and leaving the other is how the buy list filled up with
@@ -5875,7 +5941,9 @@ function toGetMarkHandled(what, where, undo){
 }
 function unresolveConcern(what,where){
   var k=concernKey(what,where);
-  DB.resolvedKeys=(DB.resolvedKeys||[]).filter(function(x){return x!==k;});
+  // Dated entries as well as the bare legacy form, or reopening would leave a
+  // clear behind that keeps hiding it.
+  DB.resolvedKeys=(DB.resolvedKeys||[]).filter(function(x){ return resolvedBase(x)!==k; });
   (DB.issues||[]).forEach(function(i){ if(concernKey(i.what,i.where)===k) i.open=true; });
   toGetMarkHandled(what, where, true);
   saveDB();
@@ -5903,19 +5971,28 @@ function pruneResolvedKeys(){
   if(!Array.isArray(remoteConcerns)) return false;
   var keys=DB.resolvedKeys||[];
   if(!keys.length) return false;
-  var srvOpen={}, srvDone={};
+  var srvOpen={}, srvDone={}, srvOpenDay={};
   remoteConcerns.forEach(function(c){
     if(!c||typeof c!=='object') return;
     var sig=String(c.sig||concernKey(c.what,c.where));
-    if(c.resolved) srvDone[sig]=1; else srvOpen[sig]=1;
+    if(c.resolved){ srvDone[sig]=1; return; }
+    srvOpen[sig]=1;
+    var d=String(c.last||c.first||'');
+    if(d && (!srvOpenDay[sig] || d>srvOpenDay[sig])) srvOpenDay[sig]=d;
   });
   var local={};
   (DB.issues||[]).forEach(function(i){
     if(i&&typeof i==='object') local[concernKey(i.what,i.where)]=1;
   });
+  /* When the sheet has an OPEN copy that was reported AFTER the day a key was
+     banked, that key describes a report which has since happened again. It must
+     go — keeping it is what hid a live missing item from the one person who had
+     fixed it before. */
   var kept=keys.filter(function(k){
-    if(srvDone[k]) return false;        // the sheet remembers; the key is spare
-    return !!(srvOpen[k] || local[k]);  // still something to suppress
+    var base=resolvedBase(k), day=resolvedDay(k);
+    if(srvDone[base]) return false;     // the sheet remembers; the key is spare
+    if(day && srvOpenDay[base] && srvOpenDay[base] > day) return false;
+    return !!(srvOpen[base] || local[base]);
   });
   /* A ceiling far above anything this list can reach in practice, kept only so
      a runaway cannot fill localStorage. It drops from the front, and only keys
@@ -5923,7 +6000,7 @@ function pruneResolvedKeys(){
   if(kept.length>2000){
     var over=kept.length-2000, out=[];
     for(var i=0;i<kept.length;i++){
-      if(over>0 && srvDone[kept[i]]){ over--; continue; }
+      if(over>0 && srvDone[resolvedBase(kept[i])]){ over--; continue; }
       out.push(kept[i]);
     }
     kept=out;
@@ -6195,7 +6272,7 @@ function allConcerns(){
     out.push({sig:sig, what:c.what||'', where:c.where||'', unit:c.unit||'',
               area:c.area||'Other', urgency:c.urgency||'Whenever',
               times:c.times||1, by:c.by||'', at:c.last||c.first||'',
-              open:!c.resolved && !isResolvedConcern(c.what,c.where),
+              open:!c.resolved && !isResolvedConcern(c.what,c.where,c.last||c.first),
               remote:true});
   });
   (DB.issues||[]).forEach(function(i){
@@ -6206,7 +6283,9 @@ function allConcerns(){
     out.push({sig:sig, what:i.what||'', where:i.where||'', unit:i.unit||'',
               area:i.area||'Other', urgency:i.urgency||'Whenever',
               times:1, by:i.by||'', at:i.at||0,
-              open:i.open!==false && !isResolvedConcern(i.what,i.where),
+              // A local issue carries a millisecond stamp rather than a day.
+              open:i.open!==false && !isResolvedConcern(i.what,i.where,
+                     i.at?isoDay(new Date(i.at)):''),
               remote:false});
   });
   return out;
@@ -8220,7 +8299,7 @@ function concernsWithState(list){
   return (list||[]).map(function(c){
     return {what:c.what, where:c.where, urgency:c.urgency||'Soon',
             by:c.by||'', times:c.times||1,
-            open: !c.resolved && !isResolvedConcern(c.what,c.where)};
+            open: !c.resolved && !isResolvedConcern(c.what,c.where,c.last||c.first)};
   });
 }
 
