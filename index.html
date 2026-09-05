@@ -1205,8 +1205,11 @@
          was to scan a QR sticker. Somebody opening the site to do their rooms
          could not find the form. -->
     <button type="button" class="sb-item" data-view="room-check"><span class="ic">✔</span>Room Check</button>
+    <!-- Ungated, and kept beside Room Check so the two items anybody can reach
+         stay together: whoever files a check is exactly who wants to know what
+         is left in the duty period. -->
+    <button type="button" class="sb-item" data-view="tracker"><span class="ic">▤</span>Duty-Period Tracker</button>
     <button type="button" class="sb-item" data-need="office" data-view="rooms"><span class="ic">▦</span>Rooms &amp; Standards</button>
-    <button type="button" class="sb-item" data-need="office" data-view="tracker"><span class="ic">▤</span>Duty-Period Tracker</button>
     <button type="button" class="sb-item" data-need="office" data-view="restock"><span class="ic">▤</span>Office Restock List</button>
 
     <div class="sb-label" data-need="mgr">Oversight</div>
@@ -1417,7 +1420,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260905135806';
+var BUILD='20260905141418';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -2925,7 +2928,12 @@ function setStaleDays(v){
    Now they can read the list. Ticking something off is still a manager's call,
    and the buttons that do it are gated inside renderLog. */
 var MANAGER_VIEWS={
-  tracker:'office', restock:'office', rooms:'office',
+  /* The tracker is a board, and a board is for the people doing the work.
+     Everybody files room checks into a duty period, so everybody has a reason
+     to see how much of it is left — it was gated to the Office Manager, who is
+     the one person who does not need to be told. Deleting a period is still a
+     manager's act; that button carries its own data-need. */
+  restock:'office', rooms:'office',
   inventory:'equipment', 'bag-check':'equipment', toget:'equipment',
   expiring:'equipment',
   reports:'mgr', activity:'mgr', roles:'mgr', qr:'mgr', settings:'mgr',
@@ -8107,8 +8115,15 @@ function dpDelete(key){
 /* Which duty period the printable grid is filled in from. Deliberately NOT in
    DB: it is which sheet this person is looking at right now, not site content,
    and it must not travel to anybody else or land in an export. */
-var trackerDP='';
+/* Empty means "not chosen yet", which is not the same as "a blank sheet" — the
+   picker offers a blank one explicitly. Until somebody chooses, the tracker
+   shows the duty period that is actually running, because that is the one
+   anybody opening this screen is asking about. */
+var trackerDP=null;
 function setTrackerDP(k){ trackerDP=k||''; renderTracker(); }
+/* Newest first is how dpKeysThisYear already sorts, so the current period is
+   the head of the list. */
+function currentDP(){ var k=dpKeysThisYear(); return k.length?k[0]:''; }
 
 function renderTracker(){
   var host=document.getElementById('trackerHost'); if(!host) return;
@@ -8125,6 +8140,10 @@ function renderTracker(){
      still the default at the start of a period, and still what you want if the
      board is being filled in by hand. */
   var keys=dpKeysThisYear();
+  // Not chosen yet: open on the one that is running. Chosen and since gone
+  // (a period deleted, or the year rolled over) falls back to a blank sheet
+  // rather than to a stale selection.
+  if(trackerDP===null) trackerDP=currentDP();
   if(trackerDP && keys.indexOf(trackerDP)<0) trackerDP='';
   h+='<div class="row noprint trackpick"><label for="trackDp">Show</label>'+
      '<select id="trackDp" onchange="setTrackerDP(this.value)">'+
@@ -8136,7 +8155,15 @@ function renderTracker(){
   h+='<div class="row noprint"><button class="btn solid" onclick="window.print()">Print tracker</button>'+
      '<button class="btn ghost" onclick="go(\'qr\')">Get the QR code</button></div>';
 
-  var fill=trackerDP?dpGet(trackerDP):null;
+  /* A duty period somebody ELSE started exists only in the sheet on this
+     device, so `dpGet` — which reads this phone's copy alone — returns nothing
+     for it. The picker lists it, because that list is built from the merged
+     keys, and the grid underneath then printed every box blank with the DP
+     number missing from the header. The card directly above it was showing
+     "Kitchen 1/3" from the same duty period at the same moment.
+
+     `dpEntries` is the merged read, and is what the card already uses. */
+  var fill=!!(trackerDP && dpKeysKnown().indexOf(trackerDP)>=0);
   h+='<div class="trackhead"><div class="th-t">CMU EMS Room Check Tracker</div>'+
      '<div class="th-dp">DP: <b>'+(fill?esc(String(dpParse(trackerDP).n)):'&nbsp;')+'</b></div></div>';
 
@@ -8156,7 +8183,7 @@ function renderTracker(){
   for(var i=1;i<=maxSlots;i++) h+='<th>Call sign '+i+'</th>';
   h+='</tr></thead><tbody>';
   DB.rooms.forEach(function(r){
-    var got=fill?((fill.rooms||{})[r.id]||[]):[];
+    var got=fill?dpEntries(trackerDP,r.id):[];
     h+='<tr class="'+(r.tier==='high'?'high':'')+'"><th scope="row">'+esc(r.name)+'</th>';
     for(var k=1;k<=maxSlots;k++){
       if(k>r.slots){ h+='<td class="slot" style="background:var(--bg-2)"></td>'; continue; }
@@ -8172,6 +8199,12 @@ function renderTracker(){
   h+='</tbody></table>';
 
   host.innerHTML=h;
+  /* This view produces [data-need] markup — the Delete button on each duty
+     period card — and only renderAll's global pass was applying the gates to
+     it. Re-rendering from the period picker alone left that button on screen
+     for anybody. It did not matter while the whole view was manager-only; it
+     matters now that a member can open it. */
+  applyGates(host);
 }
 
 /* ---- office restock ---- */
