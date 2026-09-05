@@ -692,6 +692,12 @@
 
   /* ---------- task lists (quick actions) ---------- */
   .ext-mark{margin-left:auto;color:var(--ink-faint);font-size:12px}
+  /* Waiting submissions. Amber rather than red: nothing is lost and nothing is
+     required of anybody — it goes on its own — so this is a state, not a fault. */
+  .outboxnote{background:var(--warn-wash);border:1px solid var(--warn);
+    color:var(--ink);border-radius:var(--radius);padding:10px 14px;margin:0 0 16px;
+    font-size:13.5px;line-height:1.5}
+  .outboxnote b{color:var(--warn)}
   /* The sidebar link to the bike site is an <a>, so it needs the text-decoration
      and colour resets a <button> did not. */
   .sb-item.sb-ext{text-decoration:none}
@@ -844,6 +850,11 @@
   .roomchip.stale{background:var(--warn-wash);color:var(--warn);border-color:var(--warn)}
   .roomnote{font-size:12px;color:var(--ink-faint);margin:10px 0 0}
   .lastcheck{font-size:12px;color:var(--ink-faint);margin:2px 0 0}
+  /* Amber, not red. A kit that has not been counted lately is not a kit that is
+     known to be wrong — it is one nobody can vouch for, which is a different
+     thing and must not compete with an actual fault on the same screen. */
+  .lastcheck.stale{color:var(--warn);font-weight:600}
+  .rc-stale{font-size:12px;color:var(--warn);font-weight:600;margin:8px 0 0}
   .lastcheck.none{font-style:italic}
   /* A standing instruction above a form. Not a .notice and not a banner — it is
      one line the person filling this in needs before they start, and it should
@@ -1202,6 +1213,11 @@
 
   <main>
 
+    <!-- Sits above every view rather than inside one, because the person who
+         needs to see it is whoever picks the phone back up, and that is not
+         reliably the person who filed the thing that is still waiting. -->
+    <div id="outboxNote" class="outboxnote" hidden></div>
+
     <!-- ===== WHAT'S READY ==================================================== -->
     <section class="view" data-view="readiness">
       <h2 class="view-title">What's <em>ready</em></h2>
@@ -1387,11 +1403,24 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260904230739';
+var BUILD='20260904233600';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
-  fetch(url,{cache:'no-store'})
+  /* Only the part of the file the stamp is in.
+
+     This used to download the WHOLE page again — a third of a megabyte, every
+     single time anybody opened the site — to read a fourteen-digit number out
+     of the top of it. On somebody's phone data on the way to a call that is a
+     straightforwardly bad trade.
+
+     The stamp sits inside the first 128 KB, so that is all that is asked for. A
+     server that honours Range sends a fraction of the file; one that ignores it
+     sends all of it and answers 200, which is exactly the old behaviour, so
+     there is nothing to fall back to and nothing to detect. If the slice somehow
+     arrives without the stamp in it, no match means no reload, which is the
+     same safe answer this has always given when it could not tell. */
+  fetch(url,{cache:'no-store',headers:{'Range':'bytes=0-131071'}})
     .then(function(r){ return r.text(); })
     .then(function(t){
       var m=t.match(/var BUILD='(\d+)'/);
@@ -1846,7 +1875,7 @@ var DEFAULTS={
      older seed, so a corrected bag list actually reaches people instead of
      sitting behind whatever they cached weeks ago. Their own data — submissions,
      the To Get list, the spreadsheet link, who has access — is never touched. */
-  seed:10,
+  seed:11,
 
   // ONE Apps Script Web App in front of ONE spreadsheet. Every form writes to
   // its own tab in that file, so Equipment and Office data sit side by side and
@@ -1899,6 +1928,11 @@ var DEFAULTS={
 
   // Off until there is something worth opening. Flipped in Site Settings.
   learnPublic:false,
+  /* How many days a kit may go between full contents checks before the board
+     says it is due one. A setting, not a constant, because the right number is
+     the agency's cadence — and a threshold nobody agreed to is one everybody
+     learns to ignore. */
+  staleDays:30,
 
   /* ---------- rooms ------------------------------------------------------
      `slots` is how many members may claim the room in one duty period: three
@@ -2191,7 +2225,7 @@ var DEFAULTS={
 
     /* ---- Squad car: bagcontents.pdf ---- */
     {id:'squad', name:'Squad Car', active:true, where:'Squad vehicle',
-     photos:[], note:'',
+     photos:['squad-car'], note:'',
      sections:[
        {name:'Trunk', items:[
          {id:'sq-o2bags', label:'(2) O2 bags'},
@@ -2820,6 +2854,12 @@ function applyGates(root){
   if(ln) ln.hidden = !(DB.learnPublic || can('ops'));
 }
 function canSeeLearn(){ return !!DB.learnPublic || can('ops'); }
+
+function setStaleDays(v){
+  var n=parseInt(v,10);
+  if(!(n>0 && n<400)) return;
+  DB.staleDays=n; saveDB(); renderReadiness(); renderBags();
+}
 
 /* `log` is deliberately NOT here. Reporting a problem is the one thing every
    member does and never hears about again — they type "the cot strap is torn",
@@ -3527,6 +3567,60 @@ function mergeKeySet(mineArr, theirsArr){
   return out;
 }
 
+/* Photos that ship with the site, against a published copy that has never heard
+   of them.
+
+   `bags` is manager-edited content, so the published copy is authoritative and
+   wins — correctly. But that copy was captured before a photo was ever added to
+   the repo, so its empty `photos:[]` for that bag is not somebody's decision to
+   have no picture; it is a blob that predates the file. Taken literally, adding
+   a photo to the shipped defaults does nothing at all: every device pulls the
+   published copy a moment after load and the picture disappears, with the
+   asset sitting in the repo being served to nobody.
+
+   So a shipped photo is adopted ONLY where the current entry lists none. The
+   moment a manager sets any photo on that bag, theirs is the whole answer —
+   including removals — because then there IS a decision to respect.
+
+   The one case this gets wrong: a manager who deletes the last remaining photo
+   from a bag that also ships one will see the shipped one return. That is
+   recoverable in the photo editor and is the cheaper mistake of the two. */
+/* Deliberately NOT a MERGE_KEYS hook. That hook hands back the copy that wins
+   outright, so using it here would take the server's `bags` and throw away a
+   manager's unpublished edits to a checklist or a bag name — trading a missing
+   photo for somebody's lost work. This runs afterwards instead, over whichever
+   copy won, and only ever ADDS. */
+function adoptShippedPhotos(){
+  var shipped={};
+  (DEFAULTS.bags||[]).forEach(function(b){
+    if(b && b.id && (b.photos||[]).length) shipped[b.id]=b.photos;
+  });
+  var patch=function(list){
+    var n=0;
+    (list||[]).forEach(function(b){
+      if(!b || !b.id || !shipped[b.id]) return;
+      if((b.photos||[]).length) return;          // they have an opinion; it stands
+      b.photos=shipped[b.id].slice(); n++;
+    });
+    return n;
+  };
+  var n=patch(DB.bags);
+  /* The published baseline gets the same treatment, and this is not optional.
+
+     `unpublishedKeys()` is a DIFF against that baseline, so patching only the
+     live copy makes `bags` look like an edit this device made. Two things then
+     go wrong, and the second is much worse than a missing photo: every member
+     who opens the page is told they have unpublished changes, and
+     applyContentInner starts REFUSING the server's `bags` to protect that
+     phantom edit — so a manager's real checklist update would never reach
+     anybody again. Adopting into the baseline too keeps the diff at zero, which
+     is the truth: nobody edited anything, the site simply ships a picture. */
+  if(contentBase && Array.isArray(contentBase.bags)){
+    if(patch(contentBase.bags)) setContentBase(contentBase);
+  }
+  return n;
+}
+
 /* Which keys merge, and how. Anything not named here replaces as before. */
 var MERGE_KEYS={
   dutyPeriods:  mergeDutyPeriods,
@@ -3574,6 +3668,12 @@ function applyContentInner(obj){
      changes something, so the next publish carries the fix upstream and the
      entry can eventually be retired. */
   if(applyLabelFixes()){ n++; markContentDirty(); }
+  /* Same reasoning as the label fixes above, for pictures. NOT marked dirty:
+     a photo the site ships is not an edit this device made, and flagging it as
+     unpublished work would tell every member who opens the page that they have
+     changes to publish. A manager who wants it in the shared copy has the photo
+     editor; until then it simply shows, which is the point. */
+  if(adoptShippedPhotos()) n++;
   if(n) saveDB();
   return n>0;
 }
@@ -5252,18 +5352,10 @@ function doSubmit(fid,s){
   }
 
   var url=(DB.api&&DB.api.url)||'';
+  // Queued first, sent second. If there is no signal the submission waits on the
+  // phone instead of evaporating — see the outbox below.
   var sent=false;
-  if(url){
-    try{
-      // no-cors: the response is opaque, so "sent" is never proof of "stored".
-      // The completion panel says so, and Settings ▸ Test connection is what
-      // actually verifies the endpoint.
-      fetch(url,{method:'POST',mode:'no-cors',
-        headers:{'Content-Type':'text/plain;charset=utf-8'},
-        body:JSON.stringify(payload)});
-      sent=true;
-    }catch(e){ sent=false; }
-  }
+  if(url){ outboxAdd(payload); sent=true; drainOutbox(); }
 
   // Anything unticked, plus any free-text concern, becomes a tracked problem so
   // it is not lost if the spreadsheet is not wired up yet.
@@ -5465,12 +5557,129 @@ function checkFiled(fid){
     .catch(function(){ paint('unreachable'); });
 }
 
+/* ============================================================================
+   THE OUTBOX
+   ----------------------------------------------------------------------------
+   A submission used to be a single fire-and-forget POST. On campus that is a
+   real loss and not a theoretical one: the equipment room, the lower floors of
+   several buildings and half of a squad car's parking spots have no usable
+   signal, and those are exactly the places somebody stands while counting what
+   is in a bag. The fetch failed, nothing retried it, and the only sign was a
+   line on the completion panel saying it could not be confirmed — by which
+   point the form had already been cleared.
+
+   So the payload is written to this phone BEFORE it is sent, and it is only
+   removed once a send has actually got out of the device. Anything still in the
+   queue is retried when the page opens, when the browser says it is back
+   online, and whenever another form is filed.
+
+   WHY RETRYING IS SAFE. Every payload carries a `sid` that is minted once, with
+   the submission, and stored with it — so a retry is byte-for-byte the same
+   request. The script keeps the last hundred ids per tab and drops a repeat, so
+   a submission that actually did land the first time cannot be written twice by
+   a retry that was not sure. Without that guarantee this queue would be a
+   duplicate-row machine; with it, re-sending costs nothing.
+
+   WHAT COUNTS AS SENT. `no-cors` makes the reply unreadable, so a resolved
+   fetch is not proof of storage — but a REJECTED one is proof of failure, which
+   is the half that matters here. Resolved means the request left the phone and
+   the queue can let go of it; rejected means it never left, and it stays. The
+   real confirmation is still the "On the spreadsheet" check, unchanged. */
+var LS_OUTBOX='emsops_outbox_v1', outboxBusy=false;
+
+function outboxRead(){
+  try{ var v=JSON.parse(localStorage.getItem(LS_OUTBOX)||'[]'); return Array.isArray(v)?v:[]; }
+  catch(e){ return []; }
+}
+function outboxWrite(list){
+  try{ localStorage.setItem(LS_OUTBOX,JSON.stringify(list)); return true; }catch(e){ return false; }
+}
+function outboxAdd(payload){
+  var l=outboxRead();
+  // A cap, so a phone that has been offline for a fortnight cannot fill its
+  // storage and start losing the drafts and the identity as well. The OLDEST
+  // goes, because the newest is the one somebody is standing there waiting on.
+  l.push({at:Date.now(), body:JSON.stringify(payload), sid:payload.sid||''});
+  while(l.length>60) l.shift();
+  outboxWrite(l);
+  paintOutbox();
+}
+function outboxCount(){ return outboxRead().length; }
+
+function drainOutbox(){
+  if(outboxBusy) return Promise.resolve(0);
+  var url=(DB.api&&DB.api.url)||'';
+  var l=outboxRead();
+  if(!url || !l.length){ paintOutbox(); return Promise.resolve(0); }
+  outboxBusy=true;
+  var sentCount=0;
+  /* One at a time and in order, stopping at the first failure. Firing all of
+     them at once at a phone with one bar turns a queue that would have drained
+     into a pile of rejections. */
+  var step=function(){
+    var q=outboxRead();
+    if(!q.length) return Promise.resolve();
+    var item=q[0];
+    return fetch(url,{method:'POST',mode:'no-cors',
+        headers:{'Content-Type':'text/plain;charset=utf-8'}, body:item.body})
+      .then(function(){
+        // Out of the phone. Re-read rather than reusing `q`, because another
+        // submission may have been added while this one was in flight.
+        var cur=outboxRead();
+        for(var i=0;i<cur.length;i++){
+          if(cur[i].at===item.at && cur[i].body===item.body){ cur.splice(i,1); break; }
+        }
+        outboxWrite(cur); sentCount++;
+        return step();
+      });
+  };
+  return step()
+    .catch(function(){ /* still no signal; everything left stays queued */ })
+    .then(function(){ outboxBusy=false; paintOutbox(); return sentCount; });
+}
+
+/* Says what is waiting, wherever the banner is on the page. Deliberately silent
+   when the queue is empty: a permanent "0 waiting" is furniture, and this has to
+   read as an exception. */
+function paintOutbox(){
+  var el=document.getElementById('outboxNote'); if(!el) return;
+  var n=outboxCount();
+  if(!n){ el.hidden=true; el.innerHTML=''; return; }
+  el.hidden=false;
+  el.innerHTML='<b>'+n+' '+(n===1?'submission is':'submissions are')+' waiting to send.</b> '+
+    'They are saved on this phone and will go out on their own once there is signal. '+
+    '<button type="button" class="btn xs" onclick="drainOutbox().then(paintOutbox)">Try now</button>';
+}
+
+function startOutbox(){
+  paintOutbox();
+  drainOutbox();
+  // The browser tells us when the radio comes back; that is the moment worth
+  // acting on, rather than polling a phone in somebody's pocket.
+  window.addEventListener('online', function(){ drainOutbox(); });
+  // And once more when the page is looked at again, because a phone that was
+  // asleep in a pocket may have reconnected without firing anything.
+  document.addEventListener('visibilitychange', function(){
+    if(!document.hidden) drainOutbox();
+  });
+}
+
 function filedLine(fid){
   var r=lastResult[fid]||{};
   var st=r.filed, cls='donefiled', txt;
   if(!r.url) return '<div id="'+fid+'-filed" class="donefiled bad"><b>Not sent anywhere yet.</b> '+
     'No spreadsheet is connected, so this was recorded on this device only. '+
     'A manager needs to finish the setup in Site Settings.</div>';
+  /* Still on the phone. Checked before the spreadsheet answer, because when
+     there is no signal that answer is "could not be reached to confirm it" —
+     which reads like something went wrong, when in fact nothing has: the
+     submission is safe and will send itself. Those are different situations and
+     the person walking away from the bag deserves to know which one they are
+     in. */
+  if(r.sid && outboxRead().some(function(q){ return q.sid===r.sid; }))
+    return '<div id="'+fid+'-filed" class="donefiled warn"><b>Saved on this phone, waiting for signal.</b> '+
+      'It will send itself as soon as you have a connection \u2014 you can close this. '+
+      '<button type="button" class="btn xs" onclick="drainOutbox().then(function(){ checkFiled(\''+jsq(fid)+'\'); })">Try now</button></div>';
   if(st==='yes'){ cls+=' good'; txt='\u2713 On the spreadsheet. Nothing else to do.'; }
   else if(st==='no'){ cls+=' bad'; txt='Not on the spreadsheet yet. It may still be arriving \u2014 '+
     '<button type="button" class="btn xs" onclick="checkFiled(\''+fid+'\')">check again</button>'; }
@@ -5865,6 +6074,10 @@ function canOpenDP(){
    All three now read from the sheet, with the local copy kept as an optimistic
    overlay so the device that just filed sees its own entry at once. */
 var remoteConcerns=null;     // [{sig,what,where,unit,area,urgency,times,first,last,by,resolved}]
+// Everybody's contents checks, keyed by bag id, from ?state=. Null until the
+// sheet answers, so "not asked yet" stays distinguishable from "nobody has
+// checked anything" — those render very differently and mean opposite things.
+var remoteChecked=null;      // {bagId:{on:'YYYY-MM-DD', by}}
 var remoteExpiry=null;       // {"pick|item":{date,by,at}}
 var stateFetch={loading:false, error:'', at:0, sig:''};
 
@@ -5888,6 +6101,10 @@ function fetchSharedState(){
       }
       remoteConcerns=j.concerns;
       remoteExpiry=j.expiry;
+      // Everybody's contents checks, not this phone's. Absent from an older
+      // deployment, which is why it is adopted only when it actually arrives —
+      // an empty object would read as "nobody has checked anything".
+      if(j.lastChecked && typeof j.lastChecked==='object') remoteChecked=j.lastChecked;
       stateFetch.error=''; stateFetch.at=Date.now();
       stateFetch.sig=JSON.stringify([remoteConcerns,remoteExpiry]);
       // The only moment there is a trustworthy answer to "does this key still
@@ -6276,14 +6493,55 @@ function flagLow(bagId,itemId){
   uiAlert(label+' is flagged as low and on the To Get list.','Thanks');
 }
 
+/* How long a kit may go between full contents checks before the board says so.
+
+   A setting rather than a number in the code, because the right answer is the
+   agency's cadence and not a guess — and a threshold nobody agreed to is one
+   everybody learns to ignore. */
+function staleAfterDays(){
+  var n=parseInt(DB.staleDays,10);
+  return (n>0 && n<400) ? n : 30;
+}
+
+/* One answer from two sources. `DB.lastChecked` is this device; `remoteChecked`
+   is what the spreadsheet says everybody has filed. The newer of the two wins,
+   because a check filed on this phone a minute ago has not reached the sheet
+   yet, and a check filed by somebody else last week never reaches this phone. */
+function lastCheckOf(bagId){
+  var local=(DB.lastChecked||{})[bagId], remote=(remoteChecked||{})[bagId];
+  var lDay = local&&local.at ? isoDay(new Date(local.at)) : '';
+  var rDay = remote&&remote.on ? String(remote.on) : '';
+  if(!lDay && !rDay) return null;
+  if(rDay && (!lDay || rDay>lDay)) return {day:rDay, by:remote.by||''};
+  return {day:lDay, by:(local&&local.by)||''};
+}
+
+function isoDay(d){
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+
+         '-'+String(d.getDate()).padStart(2,'0');
+}
+
+/* Days since, or null if it has never been checked. */
+function daysSinceCheck(bagId){
+  var c=lastCheckOf(bagId); if(!c) return null;
+  return Math.abs(daysUntil(c.day));
+}
+function isStale(bagId){
+  var n=daysSinceCheck(bagId);
+  // Never checked counts as stale. It is the one case where there is most to
+  // find and least reason to assume anything.
+  return n===null || n>staleAfterDays();
+}
+
 function lastCheckedLine(bagId){
-  var c=(DB.lastChecked||{})[bagId];
-  if(!c||!c.at)
+  var c=lastCheckOf(bagId);
+  if(!c)
     return '<p class="lastcheck none">Not checked on the site yet</p>';
-  var d=new Date(c.at), n=daysUntil(d.getFullYear()+'-'+
-        String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'));
-  var ago = n===0 ? 'today' : (n===-1 ? 'yesterday' : Math.abs(n)+' days ago');
-  return '<p class="lastcheck">Last checked '+esc(ago)+
+  var n=Math.abs(daysUntil(c.day));
+  var ago = n===0 ? 'today' : (n===1 ? 'yesterday' : n+' days ago');
+  var stale = n>staleAfterDays();
+  return '<p class="lastcheck'+(stale?' stale':'')+'">'+
+         (stale?'Due a check \u2014 last done ':'Last checked ')+esc(ago)+
          (c.by?' by '+esc(c.by):'')+'</p>';
 }
 
@@ -6560,6 +6818,18 @@ function renderReadiness(){
     // reason just moves the question to whoever reads the board.
     if(st.manual && st.why)
       h+='<p class="rc-why">'+esc(st.why)+'</p>';
+    /* Deliberately a line on the card and NOT a fourth status.
+
+       A kit nobody has counted lately is not a kit known to be wrong. Making it
+       amber alongside a real reported fault would say the two are the same
+       thing, and the board's whole job is telling somebody which bag to grab —
+       so the tile stays green and this says what is missing, which is
+       confidence rather than equipment. */
+    if(st.cls==='ok' && isStale(u.type)){
+      var sn=daysSinceCheck(u.type);
+      h+='<p class="rc-stale">Due a full contents check'+
+         (sn===null?' \u2014 never done on the site':' \u2014 last done '+sn+' days ago')+'</p>';
+    }
     // Taking a bag out of service, and putting it back. Equipment Manager and
     // Operations Officer only — `can()` treats ops as a superset of equipment.
     h+='<div class="row" data-need="equipment" style="margin-top:8px">'+
@@ -7083,8 +7353,34 @@ function toggleRestock(item,got,where){
   setTimeout(function(){
     fetchRestock().then(function(){
       renderToGet();
-      var m=document.getElementById('togetMsg');
-      if(m) m.textContent=restockState.error?'':'Saved to the spreadsheet.';
+      var m=document.getElementById('togetMsg'); if(!m) return;
+      if(restockState.error){ m.textContent=''; return; }
+
+      /* Did the tick actually take?
+
+         This used to print "Saved to the spreadsheet." whenever the RE-READ
+         succeeded — which says nothing about whether the WRITE did. The
+         spreadsheet can refuse a tick perfectly happily: the reply is
+         unreadable through no-cors, the read a second later comes back fine,
+         and the row returns exactly as it was. What a manager saw was an item
+         tick, sit there for about a second, quietly untick itself, and a
+         message underneath it claiming the opposite.
+
+         Comparing what came back against what was asked for is the only thing
+         that can tell those apart, and a tick that did not take has to say so
+         and say what to do about it. */
+      var after=(remoteRestock||[]).filter(function(r){
+        return r.item===item && String(r.where||'')===where; })[0];
+      if(after && !!after.got===!!got){
+        m.style.color=''; m.textContent='Saved to the spreadsheet.';
+        return;
+      }
+      m.style.color='var(--oos)';
+      m.innerHTML='<b>That did not save.</b> The spreadsheet took the tick back, '+
+        'which is nearly always one of two things: you are not signed in with '+
+        'Google on this device \u2014 the list can be read by anyone but only a '+
+        'signed-in manager can change it \u2014 or the spreadsheet is running an '+
+        'older copy of the script and cannot match this row yet.';
     });
   },1200);
 }
@@ -8450,6 +8746,16 @@ function renderSettings(){
     ((DB.api&&DB.api.key)?'Set on this device.':'Not set — publishing needs Google sign-in.')+
     '</span></div></div>';
 
+  /* The cadence is the agency's, so it is asked for rather than assumed. Sits
+     with the Equipment Manager because it is her board it changes. */
+  h+='<div class="card mt" data-need="equipment"><h3>Contents check cadence</h3>'+
+    '<div class="field"><label for="staleDays">Say a kit is due a check after</label>'+
+    '<input type="number" id="staleDays" min="1" max="399" value="'+esc(staleAfterDays())+'" '+
+    'onchange="setStaleDays(this.value)"></div>'+
+    '<p class="hint" style="margin:6px 0 0">Days since the last full contents check. '+
+    'The bag stays green on the readiness board \u2014 this only says nobody has '+
+    'counted it lately.</p></div>';
+
   h+='<div class="card mt" data-need="ops"><h3>Videos &amp; lectures</h3>'+
     '<label class="checkline"><input type="checkbox" id="learnPublic"'+
     (DB.learnPublic?' checked':'')+' onchange="setLearnPublic(this.checked)">'+
@@ -8642,8 +8948,15 @@ function init(){
     if(e.key==='Escape' && !document.getElementById('lightbox').hidden) closeLightbox();
   });
 
+  // Before the first paint, so a shipped photo shows on a device that is offline
+  // or has never pulled the shared copy.
+  adoptShippedPhotos();
   renderAll();
   go(location.hash.slice(1)||homeFor(),true);
+  // Anything this phone filed without signal, sent now. Before the content pull,
+  // because getting somebody's bag check onto the spreadsheet matters more than
+  // refreshing the text of the site.
+  startOutbox();
   // Shared content arrives after first paint: the page is usable immediately
   // and updates in place rather than blocking on the network.
   pullContent();

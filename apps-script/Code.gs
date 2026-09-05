@@ -1685,8 +1685,19 @@ function restockRows(site) {
 }
 
 function setRestockGot(p) {
-  var who = writerName(p);
-  if (!who) return json({ ok: false, error: 'not allowed' });
+  var c = writerCheck(p);
+  var who = c.name;
+  if (!who) {
+    /* Written where somebody can actually read it. The browser cannot see this
+       reply through no-cors, so a refused tick had no trace anywhere at all:
+       the item ticked, untucked itself a second later when the list was read
+       back, and there was nothing on the page or in the file saying why. The
+       reason is almost always "signed out", which is a thirty-second fix once
+       you know that is what it is. */
+    logError('Restock tick REFUSED for the ' + siteOf(p) + ' site: ' + c.why,
+             String(p.item || ''));
+    return json({ ok: false, error: 'not allowed: ' + c.why });
+  }
   /* Two lists, the same act. The bike kit is shopped for from its own tab, and
      it had no way to tick anything off at all — the list was written and never
      read back, so it only ever grew. */
@@ -1707,6 +1718,7 @@ function setRestockGot(p) {
       paintBikeRestock(sh);
       return json({ ok: true, set: true });
     }
+    logError('Restock tick found no bike row to set', String(p.item || ''));
     return json({ ok: false, error: 'not found' });
   }
   /* Matched on item AND place, which together are what addToRestock indexes on
@@ -1727,7 +1739,43 @@ function setRestockGot(p) {
     paintRestock(sh);
     return json({ ok: true, set: true });
   }
+  logError('Restock tick found no row to set for item/place',
+           String(p.item || '') + ' | ' + String(p.where === undefined ? '(no place sent)' : p.where));
   return json({ ok: false, error: 'not found' });
+}
+
+/* When was each kit last gone through, according to everybody rather than
+   according to this phone.
+
+   The site keeps `DB.lastChecked` locally and merges it on the CONTENT publish
+   path — which only a manager can write. So a member filing a full contents
+   check stamped their own device and nobody else's, and the answer to "has
+   anyone been through Jumpkit C this month" was different on every phone that
+   asked. That is the same fault the readiness board and the expiry dates were
+   both fixed for, still living in one more place.
+
+   Derived here from the rows themselves, which every member can write. Keyed by
+   Bag ID where the row has one, because that is the id the site picks by; the
+   printed Bag name is the fallback for rows filed before that column existed.
+   Newest wins. */
+function lastCheckedRows() {
+  var conf = SHEETS['Bag Checks'];
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(conf.name);
+  var out = {};
+  if (!sh || sh.getLastRow() < 2) return out;
+  var tz = Session.getScriptTimeZone();
+  var iDate = conf.keys.indexOf('date'), iName = conf.keys.indexOf('name');
+  var iSubj = conf.keys.indexOf('subject'), iBag = conf.keys.indexOf('bagId');
+  var rows = sh.getRange(2, 1, sh.getLastRow() - 1, conf.headers.length).getValues();
+  rows.forEach(function (r) {
+    var raw = r[iDate];
+    if (!raw) return;
+    var day = (raw instanceof Date) ? Utilities.formatDate(raw, tz, 'yyyy-MM-dd') : String(raw);
+    var key = String(r[iBag] || '').trim() || String(r[iSubj] || '').trim();
+    if (!key || !day) return;
+    if (!out[key] || out[key].on < day) out[key] = { on: day, by: String(r[iName] || '').trim() };
+  });
+  return out;
 }
 
 // ---- reports ----------------------------------------------------------------
@@ -2006,6 +2054,7 @@ function doGet(e) {
     var o = { ok: true, site: st, concerns: concernRows(st), expiry: expiryRows(st) };
     // Only the bike site has a fleet whose status is derived from checks.
     if (st === 'bike') o.checks = bikeCheckRows();
+    else o.lastChecked = lastCheckedRows();
     return json(o);
   }
   if (p.names) {
