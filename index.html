@@ -1427,7 +1427,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260905141950';
+var BUILD='20260905143112';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -8051,53 +8051,10 @@ function renderQR(){
    the object and every room check row in the sheet carries its duty period, so
    nothing is lost — but what the Office Manager opens in September should be
    empty rather than three terms deep. */
-function dutyPeriodsHTML(){
-  var keys=dpKeysThisYear();
-  /* Where these numbers came from. Without this the tracker silently falls back
-     to what this device filed, which under-reports without saying so — exactly
-     the failure the sheet-backed read exists to end. A view that cannot answer
-     the question must say it cannot, not answer it wrongly. */
-  var note=liveNote(dpState, !!remoteDP, 'filed', 'checks',
-                    'fetchDutyPeriods().then(renderTracker)');
-  if(!keys.length){
-    return note+'<div class="card"><p class="hint" style="margin:0">No duty period has been '+
-      'started for '+esc(acadLabel(acadYear()))+' yet. One starts when somebody files '+
-      'the first room check against its number.</p></div>';
-  }
-  return note+keys.map(function(k){
-    // A duty period somebody else started exists only in the sheet on this
-    // device, so there is no local record to read — the counts come from the
-    // merged view either way.
-    var d=dpGet(k)||{opened:0,openedBy:'',closed:false,rooms:{}};
-    var t=dpTotals(k), rem=dpRemaining(k);
-    var pct=t.need?Math.round(t.done/t.need*100):0;
-    var h='<div class="card mt dpcard"><div class="dphead">'+
-      '<h3>'+esc(dpLabel(k))+'</h3>'+
-      '<span class="dpcount'+(rem.length?'':' ok')+'">'+t.done+' / '+t.need+'</span></div>'+
-      '<div class="dpbar"><i style="width:'+pct+'%"></i></div>';
-    if(!rem.length){
-      h+='<p class="dpdone">Every room is covered.</p>';
-    }else{
-      h+='<ul class="dplist">'+rem.map(function(r){
-        return '<li>'+esc(r.name)+' <span>'+r.done+'/'+r.need+'</span></li>';
-      }).join('')+'</ul>';
-    }
-    // Who did what, so a duty period is a record and not only a score.
-    var filled=[];
-    (DB.rooms||[]).forEach(function(rm){
-      dpEntries(k,rm.id).forEach(function(e){
-        filled.push(rm.name+(e.cs?' · '+e.cs:'')+(e.remote?'':' (not sent yet)'));
-      });
-    });
-    if(filled.length)
-      h+='<details class="dpwho"><summary>'+filled.length+' filed</summary><ul>'+
-         filled.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ul></details>';
-    h+='<div class="row mt" data-need="mgr">'+
-       '<button class="btn xs" onclick="dpDelete(\''+jsq(k)+'\')">Delete</button></div>';
-    h+='</div>';
-    return h;
-  }).join('');
-}
+/* The per-duty-period cards this produced were removed: the grid below says
+   the same thing and names who did it. Kept nowhere — dead code in a file this
+   size is a cost every time somebody greps it. */
+
 
 /* Deleting is the fix for a typo — 7 for 17 — which otherwise leaves a duty
    period with fourteen empty rooms that nothing else can clear. Says how much
@@ -8137,15 +8094,22 @@ function renderTracker(){
   var maxSlots=0; DB.rooms.forEach(function(r){ if(r.slots>maxSlots) maxSlots=r.slots; });
   var h='';
 
-  // The live duty periods come first; the printable grid below them is still
-  // worth having, because a board on a wall is what people actually look at
-  // mid-shift. The paper one is now a fallback rather than the only record.
-  h+='<div class="noprint">'+dutyPeriodsHTML()+'</div>';
+  /* Just the grid.
 
-  /* The grid can now be printed against a duty period rather than blank, so the
-     sheet that goes on the wall already shows who has done what. A blank one is
-     still the default at the start of a period, and still what you want if the
-     board is being filled in by hand. */
+     There used to be a card per duty period above this — a progress bar, a chip
+     per room with its count, and an expandable list of who had filed what. Once
+     the grid started reading the merged view it said all of that better: a chip
+     reading "Kitchen 1/3" and a row reading "Kitchen | p18 | | " are the same
+     fact, and the row also names the person. Two renderings of one answer,
+     stacked, is how a screen stops being read.
+
+     What the card carried that the grid does not, and is kept: where the numbers
+     came from, and how to ask again. */
+  // liveNote returns its own <p>; wrapping it in another one nests paragraphs,
+  // which the parser silently closes early and breaks the block apart.
+  h+='<div class="noprint">'+liveNote(dpState, !!remoteDP, 'filed', 'checks',
+                                      'fetchDutyPeriods().then(renderTracker)')+'</div>';
+
   var keys=dpKeysThisYear();
   /* Not chosen yet: open on the one that is running.
 
@@ -8166,10 +8130,15 @@ function renderTracker(){
      '<option value="">A blank sheet</option>'+
      keys.map(function(k){
        return '<option value="'+esc(k)+'"'+(picked===k?' selected':'')+'>'+esc(dpLabel(k))+'</option>';
-     }).join('')+'</select></div>';
+     }).join('')+'</select>'+
+     /* Deleting a duty period lived on the cards, and removing them would have
+        taken the only way to undo a typed 7 that should have been 17 with it.
+        It acts on whichever period is being shown, and stays a manager's. */
+     (picked
+       ? '<button class="btn xs" data-need="mgr" onclick="dpDelete(\''+jsq(picked)+'\')">Delete this duty period</button>'
+       : '')+
+     '</div>';
 
-  h+='<div class="row noprint"><button class="btn solid" onclick="window.print()">Print tracker</button>'+
-     '<button class="btn ghost" onclick="go(\'qr\')">Get the QR code</button></div>';
 
   /* A duty period somebody ELSE started exists only in the sheet on this
      device, so `dpGet` — which reads this phone's copy alone — returns nothing
@@ -8195,6 +8164,10 @@ function renderTracker(){
      // The green was on the sheet with nothing saying what it meant.
      '<span class="item"><span class="keyswatch done"></span>Already covered</span>'+
      '<span class="item"><b>'+DB.rooms.length+'</b> rooms, <b>'+slots+'</b> call-sign slots</span>'+
+     /* The one thing the progress bar said that a grid of boxes does not: how
+        far through it is, without counting the boxes. */
+     (fill ? '<span class="item"><b>'+dpTotals(trackerDP).done+'</b> of <b>'+slots+
+             '</b> covered</span>' : '')+
      '</div>';
 
   h+='<table class="tracker"><thead><tr><th>Room / task</th>';
