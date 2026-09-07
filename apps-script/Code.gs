@@ -966,6 +966,13 @@ function doPost(e) {
 
     writeItems(p);
     addToRestock(p);
+    /* What a call took off the bike kit, onto the bike list. Named as coming
+       from a call so whoever works that list can see it was used rather than
+       found missing on a check — the two want different follow-ups. */
+    var bw = bikeWantsFrom(p);
+    if (bw.length)
+      addToBikeRestock(p, bw, { who: p.name || p.callsign || '',
+                                where: 'Bike Jumpkit \u2014 used on a call' });
     noteConcerns(p);
     noteUsedOnCall(p);
     saveExpiry(p);
@@ -1046,6 +1053,29 @@ function ensureRestock() {
 
 // Pulls every "we need this" out of one submission: items used on a call, items
 // found missing on a bag check, and free-text restock requests from a room check.
+/* The Operations post-call offers the bike jumpkit as a place supplies can come
+   out of, because it is the only post-call either site has and a rider using
+   gauze off that kit had nowhere to record it. Ops holds no bike bag and no bike
+   contents list — just this id, and the rule that what comes off it is shopped
+   for on the bike list. */
+var BIKE_SOURCE_ID = 'bike-jumpkit';
+
+/* Items a post-call says came out of the bike jumpkit and were NOT put back. */
+function bikeWantsFrom(p) {
+  if (!p.usageJson) return [];
+  var list;
+  try { list = JSON.parse(p.usageJson); } catch (err) { return []; }
+  if (!Array.isArray(list)) return [];
+  var names = (nameMap().items) || {}, out = [], seen = {};
+  list.forEach(function (u) {
+    if (!u || u.r || u.f !== BIKE_SOURCE_ID) return;
+    var item = names[u.i] || u.i;
+    if (!item || seen[item]) return;
+    seen[item] = 1; out.push(item);
+  });
+  return out;
+}
+
 function wantsFrom(p) {
   var out = [];
   if (p.usageJson) {
@@ -1065,6 +1095,9 @@ function wantsFrom(p) {
       // and buying another of the one item that is NOT missing is the mistake
       // the refill tick exists to prevent.
       if (u && u.r) return;
+      // Off the bike kit: belongs on the BIKE shopping list, which a different
+      // person works from. Collected separately below rather than added here.
+      if (u && u.f === BIKE_SOURCE_ID) return;
       out.push({ item: names[u.i] || u.i, qty: Number(u.q) || 1, cat: 'Equipment',
                  kind: 'buy', where: units[u.f] || u.f || '' });
     });
@@ -1318,13 +1351,18 @@ function ensureBikeRestock() {
 // One row per item, the same way the ops Restock tab works: reporting the same
 // thing again bumps its counter rather than adding a duplicate, so the length of
 // the list is the length of the actual job.
-function addToBikeRestock(p, missing) {
+/* `opts` lets a payload that is not a bike check say who filed it and where it
+   came from. The Operations post-call has neither `firstName` nor `bag`, and
+   without this it would file every bike item under a blank name. */
+function addToBikeRestock(p, missing, opts) {
   if (!missing || !missing.length) return;
+  opts = opts || {};
   var sh = ensureBikeRestock();
   var tz = Session.getScriptTimeZone();
   var when = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
-  var who = ((p.firstName || '') + ' ' + (p.lastName || '')).trim();
-  var where = p.form === 'jumpkit' ? (p.bag || 'Jumpkit') : (p.bike || 'Bike');
+  var who = opts.who || ((p.firstName || '') + ' ' + (p.lastName || '')).trim();
+  var where = opts.where ||
+              (p.form === 'jumpkit' ? (p.bag || 'Jumpkit') : (p.bike || 'Bike'));
   var n = BIKE_RESTOCK.headers.length;
 
   var last = sh.getLastRow();

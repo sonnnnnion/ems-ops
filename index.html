@@ -1427,7 +1427,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260905143112';
+var BUILD='20260907004532';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -4552,10 +4552,29 @@ function renderMeds(fid){
   }).join('');
 }
 
+/* THE BIKE JUMPKIT, AS SOMEWHERE SUPPLIES CAN COME FROM.
+   ----------------------------------------------------------------------------
+   The bike site has two forms, both of them checks, and no post-call. This is
+   the only post-call there is — so a rider who used gauze off the bike kit on a
+   call had nowhere at all to record it. The kit quietly went down and nothing
+   downstream ever heard: not the buy list, not the usage totals, not the report.
+
+   Deliberately NOT a `bagUnits` entry. Adding it there would put a bike kit on
+   the Operations readiness board and in the checkout picker, and would need a
+   matching bag TYPE with a contents list — which is the bike site's, and copying
+   it here is exactly the entanglement the two sites are kept apart to avoid.
+   Ops needs one fact about the bike kit, that supplies can come out of it, and
+   this is that fact and nothing more. */
+var BIKE_SOURCE={id:'bike-jumpkit', name:'Bike Jumpkit'};
+
+function usageSources(){
+  return (DB.bagUnits||[]).filter(function(u){return u.active;}).concat([BIKE_SOURCE]);
+}
+
 function renderUsage(fid){
   var host=document.getElementById(fid+'-usage'); if(!host) return;
   var rows=usageState(fid);
-  var items=DB.consumables||[], units=(DB.bagUnits||[]).filter(function(u){return u.active;});
+  var items=DB.consumables||[], units=usageSources();
   host.innerHTML=rows.map(function(r,i){
     var itemOpts='<option value="">— pick an item —</option>'+items.map(function(c){
       return '<option value="'+esc(c.id)+'"'+(r.item===c.id?' selected':'')+'>'+esc(c.name)+'</option>';
@@ -4846,7 +4865,10 @@ function readCheck(fid){
   var exs=paintExpiry(fid); out.expired=(exs&&exs.expired)||[]; out.soon=(exs&&exs.soon)||[];
   if(c.meds) out.meds=medsComplete(fid);
   if(c.usage) out.usage=usageComplete(fid).map(function(r){
-    var un=(DB.bagUnits||[]).filter(function(x){return x.id===r.from;})[0]||{};
+    // usageSources, not bagUnits: the bike kit is offered as a source but is
+    // deliberately not a unit, and looking it up in the wrong list would put the
+    // raw id into the readable cell on the spreadsheet.
+    var un=usageSources().filter(function(x){return x.id===r.from;})[0]||{};
     if(r.item==='__other'){
       var txt=(r.other||'').trim();
       // Keyed by the text itself, so two people typing the same thing still sum.
@@ -5432,6 +5454,12 @@ function doSubmit(fid,s){
     // back, which is the one case where ordering another would be wrong.
     s.usage.forEach(function(r){
       if(r.refilled) return;
+      /* Anything off the bike kit belongs on the BIKE shopping list, which is a
+         different tab that a different person works from. Putting it on this
+         one would file the request somewhere nobody restocking that kit ever
+         looks — a record that reads as handled and is not. The spreadsheet
+         routes it; this device simply does not claim it. */
+      if(r.from===BIKE_SOURCE.id) return;
       wantItem({item:r.item, name:r.itemName, qty:r.qty, unit:r.unit, cat:'Equipment',
         where:r.fromName, by:(s.first+' '+s.last).trim()||s.callsign||''});
     });
