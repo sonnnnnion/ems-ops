@@ -1427,7 +1427,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260907004532';
+var BUILD='20260909141412';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -4238,7 +4238,12 @@ var FORMS={
     host:'checkoutHost', tab:'Checkouts',
     who:{callsign:true,name:true,andrew:true,radio:true},
     pick:{key:'unit', label:'Which one are you taking?', from:'units'},
-    extras:[{id:'detail', label:'Anything damaged or not working?'}]
+    /* Topping a bag up from the Equipment Room is the one thing that happens
+       here and leaves no trace anywhere else: the checklist ticks complete
+       because the item IS in the bag, and the shelf it came off is never asked
+       about. Saying so in this box is the only record of it. */
+    extras:[{id:'detail', label:'Anything damaged or not working?',
+             hint:'If you took anything from the Equipment Room to top this bag up, say what.'}]
   },
   // The deeper audit: same engine, but picks a kit TYPE rather than a unit.
   'bag-check':{
@@ -4454,6 +4459,10 @@ function renderCheck(fid){
   /* --- extras --- */
   (c.extras||[]).forEach(function(x){
     h+='<div class="card mt"><h3>'+esc(x.label)+'</h3>'+
+       // One line, under the heading, only where an extra asks for it. A box
+       // whose answer needs explaining is better off saying so than being
+       // renamed into a sentence.
+       (x.hint?'<p class="hint" style="margin:-4px 0 10px">'+esc(x.hint)+'</p>':'')+
 
        (x.short
          ? '<input type="text" id="'+fid+'-x-'+x.id+'" placeholder="'+
