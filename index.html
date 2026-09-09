@@ -1427,7 +1427,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260909141843';
+var BUILD='20260909142328';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -5790,8 +5790,24 @@ function drainOutbox(){
     var q=outboxRead();
     if(!q.length) return Promise.resolve();
     var item=q[0];
+    /* A bounded attempt, not an open-ended one.
+
+       `fetch` waits as long as the network makes it, and campus wifi in a
+       stairwell can hold a request open for a very long time without ever
+       failing. While one is open `outboxBusy` is true, so a submission filed a
+       moment later is not even attempted — the queue is wedged behind a request
+       that may never answer. Fifteen seconds, then give up on this attempt and
+       let the next drain start again from the head.
+
+       Abandoning an attempt cannot double-file: the payload keeps the sid it was
+       minted with, and the script drops an id it has already written. */
+    var ctl = (typeof AbortController!=='undefined') ? new AbortController() : null;
+    var bell = ctl ? setTimeout(function(){ try{ ctl.abort(); }catch(e){} }, 15000) : 0;
     return fetch(url,{method:'POST',mode:'no-cors',
-        headers:{'Content-Type':'text/plain;charset=utf-8'}, body:item.body})
+        headers:{'Content-Type':'text/plain;charset=utf-8'}, body:item.body,
+        signal: ctl?ctl.signal:undefined})
+      .then(function(r){ if(bell) clearTimeout(bell); return r; },
+            function(e){ if(bell) clearTimeout(bell); throw e; })
       .then(function(){
         // Out of the phone. Re-read rather than reusing `q`, because another
         // submission may have been added while this one was in flight.
@@ -5827,6 +5843,14 @@ function startOutbox(){
   // The browser tells us when the radio comes back; that is the moment worth
   // acting on, rather than polling a phone in somebody's pocket.
   window.addEventListener('online', function(){ drainOutbox(); });
+  /* And while anything is still waiting, keep trying on a slow beat.
+
+     The events above are the good signals, but they all need something to
+     happen: the radio to come back, or the page to be looked at again. Somebody
+     who files a check in a dead spot and then just stands there reading it gets
+     neither. Only ever runs while the queue is non-empty, so an idle page does
+     nothing at all. */
+  setInterval(function(){ if(outboxCount()) drainOutbox(); }, 20000);
   // And once more when the page is looked at again, because a phone that was
   // asleep in a pocket may have reconnected without firing anything.
   document.addEventListener('visibilitychange', function(){

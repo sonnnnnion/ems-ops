@@ -99,6 +99,38 @@ return_ = null;
     [first.result, again.result, third.result],
     ['saved','duplicate ignored','duplicate ignored']);
 
+  /* A HUNG REQUEST MUST NOT WEDGE THE QUEUE.
+     -------------------------------------------------------------------------
+     `fetch` waits as long as the network makes it, and a stairwell can hold a
+     request open without ever failing it. While one is open the drain holds a
+     busy flag, so a submission filed a moment later is not even attempted. The
+     attempt is bounded and abandoned, and the next drain starts again from the
+     head — safe to redo, because the payload keeps its original sid. */
+  {
+    const hung=loadOutbox(path.join(REPO,'index.html'));
+    let bell=null, rejectHung=null;
+    hung.ctx.AbortController=function(){ this.signal={}; this.abort=function(){}; };
+    hung.ctx.setTimeout=(fn,ms)=>{ if(ms===15000) bell=fn; return 1; };
+    hung.ctx.clearTimeout=()=>{};
+    // A send that simply never answers.
+    hung.ctx.fetch=()=>new Promise((_res,rej)=>{ rejectHung=rej; });
+
+    hung.ctx.outboxAdd({sid:'stuck',form:'Reports'});
+    const first=hung.ctx.drainOutbox();
+    t('a bell is armed for the hung send', typeof bell, 'function');
+    bell();                       // 15s later: abort
+    rejectHung(new Error('aborted'));
+    await first;
+    t('the abandoned submission is still on the phone', hung.ctx.outboxCount(), 1);
+
+    // The queue must now accept a fresh attempt rather than staying busy.
+    let attempts=0;
+    hung.ctx.fetch=()=>{ attempts++; return Promise.resolve({}); };
+    await hung.ctx.drainOutbox();
+    t('the next drain is not blocked by the abandoned one', attempts, 1);
+    t('and it clears', hung.ctx.outboxCount(), 0);
+  }
+
   // ---- the bike site's copy -------------------------------------------------
   const BIKE=path.join(REPO,'..','bike manager','index.html');
   if(fs.existsSync(BIKE)){
