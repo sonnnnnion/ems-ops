@@ -1427,7 +1427,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260909142328';
+var BUILD='20260913180631';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -1899,7 +1899,7 @@ var DEFAULTS={
      older seed, so a corrected bag list actually reaches people instead of
      sitting behind whatever they cached weeks ago. Their own data — submissions,
      the To Get list, the spreadsheet link, who has access — is never touched. */
-  seed:12,
+  seed:13,
 
   // ONE Apps Script Web App in front of ONE spreadsheet. Every form writes to
   // its own tab in that file, so Equipment and Office data sit side by side and
@@ -2250,6 +2250,29 @@ var DEFAULTS={
          {id:'mci-writing', label:'Sharpies, pens, pencils'}]}
      ]},
 
+    /* ---- O2 bag ----
+       Transcribed from the contents layout, compartment by compartment. The
+       squad car list has carried "(2) O2 bags" since the beginning and there was
+       no bag behind that line: nothing to check out, and nowhere to say a call
+       had used one. */
+    {id:'o2', name:'O2 Bag', active:true, where:'Squad vehicle', photos:[], note:'',
+     sections:[
+       {name:'Main compartment', items:[
+         {id:'o2-tank', label:'(1) O2 tank'},
+         {id:'o2-wrench', label:'(1) non-sparking wrench'}]},
+       {name:'Left pocket', items:[
+         {id:'o2-nrb-inf', label:'(1) infant NRB'},
+         {id:'o2-cann-inf', label:'(1) infant nasal cannula'},
+         {id:'o2-cann-ped', label:'(1) pediatric nasal cannula'},
+         {id:'o2-nrb-ped', label:'(1) pediatric NRB'},
+         {id:'o2-albuterol', label:'(1) albuterol kit'}]},
+       {name:'Right pocket', items:[
+         {id:'o2-opa', label:'(1) OPA kit'},
+         {id:'o2-npa', label:'(1) NPA kit'},
+         {id:'o2-nrb-adult', label:'(1) adult NRB'},
+         {id:'o2-cann-adult', label:'(1) adult nasal cannula'}]}
+     ]},
+
     /* ---- Squad car: bagcontents.pdf ---- */
     {id:'squad', name:'Squad Car', active:true, where:'Squad vehicle',
      photos:['squad-car'], note:'',
@@ -2319,7 +2342,14 @@ var DEFAULTS={
     {id:'u-blue', ready:false, name:'Blue Bag', type:'blue', active:true},
     {id:'u-specialty', ready:false, name:'Specialty Bag', type:'specialty', active:true},
     {id:'u-mci', ready:false, name:'MCI Bag', type:'mci', active:true},
-    {id:'u-squad', ready:false, name:'Squad Car', type:'squad', active:true, need:'equipment'}
+    {id:'u-squad', ready:false, name:'Squad Car', type:'squad', active:true, need:'equipment'},
+    /* Two, because the squad car list says "(2) O2 bags". `ready:false` like the
+       other kits that live in the vehicle rather than on the rack — they are
+       checked and they are taken on calls, but the readiness board answers
+       "which bag do I grab for a shift", and two more tiles on it would bury the
+       ones that question is about. */
+    {id:'o2-1', ready:false, name:'O2 Bag 1', type:'o2', active:true},
+    {id:'o2-2', ready:false, name:'O2 Bag 2', type:'o2', active:true}
   ],
 
   /* ---------- consumables -----------------------------------------------
@@ -3716,6 +3746,87 @@ function mergeKeySet(mineArr, theirsArr){
    manager's unpublished edits to a checklist or a bag name — trading a missing
    photo for somebody's lost work. This runs afterwards instead, over whichever
    copy won, and only ever ADDS. */
+/* SOMETHING THE SITE SHIPS THAT THE PUBLISHED COPY HAS NEVER HEARD OF.
+   ----------------------------------------------------------------------------
+   `bags` and `bagUnits` are manager-edited content, so the published copy wins
+   outright — correctly. But that copy was captured before a kit existed, and its
+   silence about that kit is not a decision to leave it out; it is a blob that
+   predates it. Taken literally, adding a bag to the shipped defaults does
+   nothing at all: every device pulls the published copy a moment after load and
+   the kit disappears, including from the manager's device, so nobody can even
+   publish it. That is how the O2 bag came to be listed in the squad car's
+   contents with no bag behind it.
+
+   Adopted ONCE PER DEVICE, by id. The ids already taken are remembered here,
+   so a manager who later deletes the kit gets to keep it deleted — without that
+   record this would resurrect anything anybody ever removed, which is a far
+   worse failure than the one it fixes.
+
+   Its own key, never synced: "what has this device already merged" is device
+   state, not site content, and it must not travel to anybody else. */
+var LS_ADOPTED='emsops_adopted_v1';
+
+function adoptedIds(){
+  try{ var v=JSON.parse(localStorage.getItem(LS_ADOPTED)||'{}');
+       return (v && typeof v==='object' && !Array.isArray(v)) ? v : {}; }
+  catch(e){ return {}; }
+}
+function rememberAdopted(map){
+  try{ localStorage.setItem(LS_ADOPTED,JSON.stringify(map)); }catch(e){}
+}
+
+function adoptShippedAdditions(){
+  var done=adoptedIds(), n=0, touched=false;
+  [['bags','bag'],['bagUnits','unit']].forEach(function(pair){
+    var key=pair[0], tag=pair[1];
+    var shipped=DEFAULTS[key]||[];
+    if(!Array.isArray(DB[key])) return;
+    var have={}; DB[key].forEach(function(x){ if(x&&x.id) have[x.id]=1; });
+    /* What the SERVER's copy holds, which is a different question from what
+       this device holds. The two diverge at exactly the moment that matters:
+       on the first load the seeded defaults still contain the kit, and a
+       moment later the pull takes it away again. */
+    var shared={};
+    if(contentBase && Array.isArray(contentBase[key]))
+      contentBase[key].forEach(function(x){ if(x&&x.id) shared[x.id]=1; });
+    shipped.forEach(function(x){
+      if(!x||!x.id) return;
+      var mark=tag+':'+x.id;
+      if(done[mark]) return;              // taken once already; a later removal stands
+      if(shared[x.id]){                   // published: it is everybody's now, and
+        done[mark]=1; touched=true;       // any future removal is somebody's decision
+        return;
+      }
+      /* Present here but not on the server yet — the seeded copy, before the
+         pull has replaced it. Nothing to do, and crucially NOT marked done:
+         marking it here is what made the first version fail, because the pull
+         then removed it and the second pass skipped the id it had just ticked
+         off. */
+      if(have[x.id]) return;
+      DB[key].push(JSON.parse(JSON.stringify(x)));
+      n++; done[mark]=1; touched=true;
+    });
+  });
+  if(touched) rememberAdopted(done);
+  /* The published baseline gets the addition too, and this part is not
+     cosmetic. `unpublishedKeys()` is a DIFF against that baseline, so adding to
+     the live copy alone makes `bags` look like an edit this device made — every
+     member is told they have changes to publish, and applyContentInner then
+     starts REFUSING the server's bags to protect that phantom, so a manager's
+     real checklist update would never reach anybody again. */
+  if(n && contentBase){
+    ['bags','bagUnits'].forEach(function(key){
+      if(!Array.isArray(contentBase[key]) || !Array.isArray(DB[key])) return;
+      var have={}; contentBase[key].forEach(function(x){ if(x&&x.id) have[x.id]=1; });
+      DB[key].forEach(function(x){
+        if(x&&x.id&&!have[x.id]) contentBase[key].push(JSON.parse(JSON.stringify(x)));
+      });
+    });
+    setContentBase(contentBase);
+  }
+  return n;
+}
+
 function adoptShippedPhotos(){
   var shipped={};
   (DEFAULTS.bags||[]).forEach(function(b){
@@ -3800,6 +3911,8 @@ function applyContentInner(obj){
      changes to publish. A manager who wants it in the shared copy has the photo
      editor; until then it simply shows, which is the point. */
   if(adoptShippedPhotos()) n++;
+  // Kits the published copy predates, same reasoning and the same one-time rule.
+  if(adoptShippedAdditions()) n++;
   if(n) saveDB();
   return n>0;
 }
@@ -5037,8 +5150,7 @@ function renderDpState(fid){
   var key=dpKey(n), d=dpExists(key);
   if(!d){
     box.innerHTML='<p class="dpnew">'+esc(dpLabel(key))+' has not been used yet. '+
-      'Filing this will start it.'+
-      (canOpenDP()?'':' Only somebody with site access can start one.')+'</p>';
+      'Filing this will start it.</p>';
     return;
   }
   var rem=dpRemaining(key), t=dpTotals(key);
@@ -5327,13 +5439,19 @@ function submitCheck(fid){
 function submitWithDp(fid,s){
   var key=s.dp, d=dpExists(key);
 
-  if(!d && !canOpenDP()){
-    uiAlert(dpLabel(key)+' has not been started yet, and starting one needs site '+
-            'access. Ask a manager or a supervisor to file the first check of '+
-            'the duty period, or check the number.','Not started yet');
-    return;
-  }
+  /* Anybody can start one.
 
+     This used to refuse unless you held a role, on the reasoning that a member
+     should not be able to conjure a duty period out of a typo. But the first
+     room check of a shift is filed by whoever is on that shift, and that is
+     usually a member — so the gate was not protecting the data, it was stopping
+     the person whose job it is from doing it, and telling them to go and find a
+     manager to file a check for them.
+
+     The typo is guarded by the confirmation below, which names the duty period
+     it is about to start and gives a way back. A phantom period is recoverable
+     — a manager deletes it from the tracker — and a shift that cannot file its
+     room checks is not. */
   var go2=function(){
     if(!dpGet(key)) dpOpen(key,s.callsign||'');
     doSubmit(fid,s);
@@ -6321,13 +6439,6 @@ function dpNumber(raw){
    includes a Bike Manager — who is deliberately NOT a role here, so ROLE alone
    would read them as a member and refuse. Checked against the bike list by
    address, the same way the login dialog does it. */
-function canOpenDP(){
-  if(ROLE!=='member') return true;
-  var me=''; try{ me=localStorage.getItem(LS_EMAIL)||''; }catch(e){}
-  if(!me) return false;
-  return ((DB.access&&DB.access.bikeManagers)||[]).map(normEmail).indexOf(normEmail(me))>=0;
-}
-
 /* ---- shared state: concerns and expiry, as the SHEET has them ---------------
    Same reasoning as the duty-period tracker. Publishing needs a manager token
    and filing does not, so anything that must aggregate across people cannot
@@ -9358,6 +9469,7 @@ function init(){
   // Before the first paint, so a shipped photo shows on a device that is offline
   // or has never pulled the shared copy.
   adoptShippedPhotos();
+  adoptShippedAdditions();
   renderAll();
   go(location.hash.slice(1)||homeFor(),true);
   // Anything this phone filed without signal, sent now. Before the content pull,
