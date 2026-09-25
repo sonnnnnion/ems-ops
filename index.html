@@ -471,6 +471,7 @@
      the part that says it opened. */
   .acc .accbody{display:none;padding:0 14px 14px 48px;font-size:13.5px;color:var(--ink-soft)}
   .acc.open .accbody{display:block}
+  .acc.tight .accbody{padding-left:14px}
   .acc .accbody ul{margin:0;padding-left:18px}
   .acc .accbody li{margin-bottom:5px}
   /* Clauses: hanging section number, so the text of every clause aligns on one
@@ -1061,6 +1062,97 @@
     .qrcard .qrlink{font-size:11px;padding-top:26px}
   }
 
+  /* ---------- whose menu comes first --------------------------------------
+     A manager signing in used to find their own tools fourth, under three
+     groups that belong to other people. The signed-in role's group floats to the
+     top instead. `order`, not moving the DOM: every item keeps its place in the
+     markup, and the officer and supervisor — who hold everything — see the
+     ordinary order. Members carry no role here, so nothing moves for them. */
+  body[data-role="equipment"] .sidebar [data-grp="equipment"],
+  body[data-role="office"] .sidebar [data-grp="office"]{order:-1}
+
+  /* ---------- Jumpkits & Bags ---------------------------------------------- */
+  .kitgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-top:12px}
+  .kitcard{border:1px solid var(--rule);border-left:5px solid var(--warn);border-radius:var(--r-md);
+    background:var(--card);box-shadow:var(--shadow-sm);padding:14px 16px;min-width:0}
+  .kitcard.crit{border-left-color:var(--oos)}
+  .kc-top{display:flex;align-items:flex-start;gap:10px}
+  .kc-title{display:flex;flex-direction:column;min-width:0}
+  .kc-name{font:inherit;font-weight:700;font-size:15.5px;background:none;border:0;padding:0;
+    color:var(--ink);cursor:pointer;text-align:left}
+  .kc-name:hover{color:var(--brand)}
+  .kc-name:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:4px}
+  .kc-last{font-size:11.5px;color:var(--ink-faint)}
+  .kc-top .btn{margin-left:auto;flex:0 0 auto}
+  .kc-lines{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
+  .kc-lines li{display:flex;align-items:flex-start;gap:8px;font-size:13.5px;line-height:1.45}
+  .kc-k{flex:0 0 70px;font-family:var(--font-mono);font-size:10.5px;text-transform:uppercase;
+    letter-spacing:.05em;color:var(--ink-faint);padding-top:2px}
+  .kc-v{flex:1;min-width:0;overflow-wrap:anywhere}
+  .kc-sec,.kc-when{color:var(--ink-mute);font-size:12px}
+  .kc-when{white-space:nowrap}
+  .kc-lines .btn{flex:0 0 auto}
+  .kc-msg{font-size:12px;margin:8px 0 0}
+  .kitquiet{font-size:13px;color:var(--ink-mute);margin:14px 0 0;line-height:2}
+  .kitquiet b{font-weight:600;color:var(--ink-soft);margin-right:4px}
+  .kitquiet .kc-name{font-weight:500;font-size:13px;color:var(--ink-soft);margin-right:10px;
+    text-decoration:underline;text-decoration-color:var(--rule-strong);text-underline-offset:3px}
+  .feedhead{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap;margin:26px 0 2px}
+  .feedhead .tgsec{margin:0}
+  .feedhead .btn{margin-left:auto}
+  .fday{font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:.08em;
+    color:var(--ink-mute);margin:16px 0 6px}
+  .feed{list-style:none;margin:0;padding:0;border:1px solid var(--rule);border-radius:var(--r-md);
+    background:var(--card);overflow:hidden}
+  .fd{padding:9px 14px;border-top:1px solid var(--rule-soft);font-size:13.5px}
+  .fd:first-child{border-top:0}
+  .fd-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px}
+  .fd-time{font-family:var(--font-mono);font-size:12px;color:var(--ink-mute);min-width:64px}
+  .fd-ok{color:var(--ok);font-weight:700;width:14px}
+  .fd-dot{color:var(--warn);font-weight:700;width:14px}
+  .fd-form{font-weight:600;flex:1 1 200px;min-width:0}
+  .fd-who{color:var(--ink-mute);font-size:12px;margin-left:auto}
+  .fd.clean .fd-form{font-weight:500;color:var(--ink-soft)}
+  .fd-items{list-style:none;margin:5px 0 2px 88px;padding:0;display:flex;flex-direction:column;gap:3px}
+  .fd-items li{font-size:13px;color:var(--ink-soft)}
+  .fd-items .kc-k{display:inline-block;width:auto;margin-right:6px;padding:0}
+  .st{font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:.05em;
+    padding:1px 6px;border-radius:999px;margin-left:6px;white-space:nowrap}
+  .st.open{background:var(--warn-wash);color:var(--warn)}
+  .st.done{background:var(--ok-wash);color:var(--ok)}
+  .st.back{background:var(--bg-2);color:var(--ink-mute)}
+
+  /* ---------- Missed chores ------------------------------------------------ */
+  .chorelead{margin-top:4px}
+  .chorelead b.cs{font-family:var(--font-mono)}
+  .chorewrap{overflow-x:auto;margin-top:12px;border:1px solid var(--rule);border-radius:var(--r-md);background:var(--card)}
+  .choretab{border-collapse:collapse;width:100%}
+  .choretab th,.choretab td{padding:7px 10px;border-bottom:1px solid var(--rule-soft);font-size:13.5px;
+    text-align:left;white-space:nowrap;background:var(--card)}
+  .choretab th{background:var(--bg-2);font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-mute)}
+  .choretab th.now{color:var(--brand)}
+  /* The call sign stays put while the duty periods scroll under it — on a
+     phone the grid is wider than the screen, and a row of ticks with nobody's
+     name beside it answers nothing. */
+  .choretab td:first-child,.choretab th:first-child{position:sticky;left:0;z-index:1}
+  .choretab .cs{font-family:var(--font-mono);font-weight:700}
+  .choretab .nm{display:block;font-family:var(--font-body);font-weight:400;font-size:11.5px;color:var(--ink-mute)}
+  .choretab td.n{font-family:var(--font-mono);text-align:center}
+  .choretab td.c{text-align:center;padding:4px 5px}
+  .choretab tr.gone td{color:var(--ink-mute)}
+  .cc{display:inline-flex;align-items:center;justify-content:center;min-width:34px;height:30px;padding:0 6px;
+    border-radius:8px;font-weight:700;font-size:13px;border:0;background:none;font-family:var(--font-body);color:var(--ink-faint)}
+  .cc.done{background:var(--ok-wash);color:var(--ok)}
+  .cc.missed{background:var(--oos-wash);color:var(--oos)}
+  .cc.excused{background:var(--bg-2);color:var(--ink-mute);font-size:11px}
+  button.cc{cursor:pointer}
+  button.cc:focus-visible{outline:2px solid var(--brand);outline-offset:1px}
+  @media(max-width:560px){
+    .kc-k{flex-basis:60px}
+    .fd-items{margin-left:0}
+    .fd-who{margin-left:0;width:100%}
+  }
+
   /* Five columns is one too many at 375px, and the one that has to give is the
      name of whoever reported it — on a phone it moves under the item instead of
      taking a column of its own. Same information, one column fewer.
@@ -1198,26 +1290,34 @@
     <button type="button" class="sb-item" id="learnNav" data-view="learn"><span class="ic">▶</span>Videos &amp; Lectures</button>
     <a class="sb-item sb-ext" href="https://sonnnnnion.github.io/bike-ops/" target="_blank" rel="noopener"><span class="ic">⚙</span>Bike Ops<span class="ext-mark">↗</span></a>
 
-    <div class="sb-label" data-need="equipment">Equipment Manager</div>
-    <button type="button" class="sb-item" data-need="equipment" data-view="bag-check"><span class="ic">✚</span>Full Contents Check</button>
-    <button type="button" class="sb-item" data-need="equipment" data-view="inventory"><span class="ic">▦</span>Equipment Inventory</button>
-    <button type="button" class="sb-item" data-need="equipment" data-view="expiring"><span class="ic">⏳</span>Expiring</button>
-    <button type="button" class="sb-item" data-need="equipment" data-view="toget"><span class="ic">▤</span>To Get</button>
+    <!-- In the order the job is done: see what the bags need, buy what that
+         takes, then the two things done less often. Expiring is not listed: its
+         buy-ahead list now sits on To Get, where the buying happens, and the full
+         table of dates is one link away from there. Four places to look instead
+         of five, and the first one answers the question the role opens the site
+         to ask. `data-grp` is what floats this group to the top of the menu for
+         whoever holds the role — see the sidebar ordering rule. -->
+    <div class="sb-label" data-need="equipment" data-grp="equipment">Equipment Manager</div>
+    <button type="button" class="sb-item" data-need="equipment" data-grp="equipment" data-view="kits"><span class="ic">▣</span>Jumpkits &amp; Bags</button>
+    <button type="button" class="sb-item" data-need="equipment" data-grp="equipment" data-view="toget"><span class="ic">▤</span>To Get</button>
+    <button type="button" class="sb-item" data-need="equipment" data-grp="equipment" data-view="bag-check"><span class="ic">✚</span>Full Contents Check</button>
+    <button type="button" class="sb-item" data-need="equipment" data-grp="equipment" data-view="inventory"><span class="ic">▦</span>Equipment Inventory</button>
 
-    <div class="sb-label" data-need="office">Office Manager</div>
+    <div class="sb-label" data-need="office" data-grp="office">Office Manager</div>
     <!-- No data-need. Room checks are MEMBER work — the call sign recorded
          against a room is whoever checked it, and the whole duty-period tracker
          is built out of member filings. `MANAGER_VIEWS` has never gated this
          view, so go() has always allowed it; the nav gate meant the only way in
          was to scan a QR sticker. Somebody opening the site to do their rooms
          could not find the form. -->
-    <button type="button" class="sb-item" data-view="room-check"><span class="ic">✔</span>Room Check</button>
+    <button type="button" class="sb-item" data-grp="office" data-view="room-check"><span class="ic">✔</span>Room Check</button>
     <!-- Ungated, and kept beside Room Check so the two items anybody can reach
          stay together: whoever files a check is exactly who wants to know what
          is left in the duty period. -->
-    <button type="button" class="sb-item" data-view="tracker"><span class="ic">▤</span>Duty-Period Tracker</button>
-    <button type="button" class="sb-item" data-need="office" data-view="rooms"><span class="ic">▦</span>Rooms &amp; Standards</button>
-    <button type="button" class="sb-item" data-need="office" data-view="restock"><span class="ic">▤</span>Office Restock List</button>
+    <button type="button" class="sb-item" data-grp="office" data-view="tracker"><span class="ic">▤</span>Duty-Period Tracker</button>
+    <button type="button" class="sb-item" data-need="office" data-grp="office" data-view="chores"><span class="ic">◷</span>Missed Chores</button>
+    <button type="button" class="sb-item" data-need="office" data-grp="office" data-view="rooms"><span class="ic">▦</span>Rooms &amp; Standards</button>
+    <button type="button" class="sb-item" data-need="office" data-grp="office" data-view="restock"><span class="ic">▤</span>Office Restock List</button>
 
     <div class="sb-label" data-need="mgr">Oversight</div>
     <button type="button" class="sb-item" data-need="mgr" data-view="activity"><span class="ic">≡</span>Activity</button>
@@ -1334,10 +1434,22 @@
       <div id="trackerHost"></div>
     </section>
 
+    <!-- ===== MISSED CHORES (Office Manager) ================================== -->
+    <section class="view" data-view="chores">
+      <h2 class="view-title">Missed <em>chores</em></h2>
+      <div id="choresHost"></div>
+    </section>
+
     <!-- ===== OFFICE RESTOCK (Office Manager) ================================= -->
     <section class="view" data-view="restock">
       <h2 class="view-title">Office <em>restock</em></h2>
       <div id="restockHost"></div>
+    </section>
+
+    <!-- ===== JUMPKITS & BAGS (Equipment Manager) ============================= -->
+    <section class="view" data-view="kits">
+      <h2 class="view-title">Jumpkits &amp; <em>bags</em></h2>
+      <div id="kitsHost"></div>
     </section>
 
     <!-- ===== EXPIRING (Equipment Manager) ====================================
@@ -1427,7 +1539,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260925141852';
+var BUILD='20260925155835';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -2827,6 +2939,11 @@ function nameMapJSON(){
   var n={items:{},units:{}};
   (DB.consumables||[]).forEach(function(c){ n.items[c.id]=c.name; });
   (DB.bagUnits||[]).forEach(function(b){ n.units[b.id]=b.name; });
+  /* The post-call offers the bike jumpkit as a source, so its id reaches the
+     sheet — and without a name here the Activity screen printed it as
+     `bike-jumpkit`. Guarded: this runs from saveDB, which can fire before the
+     line declaring it has. */
+  if(typeof BIKE_SOURCE!=='undefined' && BIKE_SOURCE) n.units[BIKE_SOURCE.id]=BIKE_SOURCE.name;
   return JSON.stringify(n);
 }
 function syncNames(force){
@@ -2922,7 +3039,7 @@ function horizonDays(){
 function setHorizonDays(v){
   var n=parseInt(v,10);
   if(!(n>0 && n<400)) return;
-  DB.horizonDays=n; saveDB(); renderExpiring();
+  DB.horizonDays=n; saveDB(); renderExpiring(); renderToGet();
 }
 
 /* Plain text, because it is going into an email or a purchase form. */
@@ -2980,9 +3097,9 @@ var MANAGER_VIEWS={
      to see how much of it is left — it was gated to the Office Manager, who is
      the one person who does not need to be told. Deleting a period is still a
      manager's act; that button carries its own data-need. */
-  restock:'office', rooms:'office',
+  restock:'office', rooms:'office', chores:'office',
   inventory:'equipment', 'bag-check':'equipment', toget:'equipment',
-  expiring:'equipment',
+  expiring:'equipment', kits:'equipment',
   reports:'mgr', activity:'mgr', roles:'mgr', qr:'mgr', settings:'mgr',
   people:'ops'
 };
@@ -3166,7 +3283,10 @@ function roleForEmail(email){
 }
 
 function setRole(r,quiet){
+  var was=ROLE;
   ROLE = ROLE_LABEL[r] ? r : 'member';
+  // Read by the sidebar rule that floats the role's own group to the top.
+  document.body.setAttribute('data-role',ROLE);
   try{ localStorage.setItem(LS_ROLE,ROLE); }catch(e){}
   var pill=document.getElementById('rolePill');
   pill.textContent=ROLE_LABEL[ROLE];
@@ -3176,7 +3296,18 @@ function setRole(r,quiet){
   // A gated view reached by hash must not simply stay open when the role drops.
   var cur=document.querySelector('.view.active');
   var v=cur&&cur.getAttribute('data-view');
-  if(v && MANAGER_VIEWS[v] && !can(MANAGER_VIEWS[v])) go(homeFor());
+  /* `quiet` is the call made while the page is loading, and the redirect then
+     must not write the address: the markup opens on the checkout form, which a
+     member cannot see, so this fired on every member's first load and left
+     #room-check in the address — and an address that always has a view in it
+     cannot tell "has not gone anywhere yet" from "chose to be here". */
+  if(v && MANAGER_VIEWS[v] && !can(MANAGER_VIEWS[v])) go(homeFor(), !!quiet);
+  /* Signing in from the screen the site opened on — the address still bare, so
+     nobody has chosen anywhere yet — takes a manager to their own first screen.
+     Anybody who has gone somewhere stays there, and so does a form with work
+     typed into it: a sign-in must never pull that out from under them. */
+  else if(!quiet && was==='member' && ROLE!=='member' && !location.hash.slice(1) &&
+          !(v && FORMS[v] && readDrafts()[v])) go(homeFor());
   if(!quiet) renderAll();
 }
 
@@ -4271,6 +4402,10 @@ function publishContent(opts){
 // "What's in each bag", so the walk always ends somewhere.
 var HOME_ORDER=['checkout','readiness','room-check','report','bags'];
 function homeFor(){
+  /* The Equipment Manager opens this site to answer one question — which bags
+     need something — so that is where they land. Everybody else's first screen
+     is still the form they came to fill in. */
+  if(ROLE==='equipment') return 'kits';
   for(var i=0;i<HOME_ORDER.length;i++){
     var v=HOME_ORDER[i];
     if(!MANAGER_VIEWS[v] || can(MANAGER_VIEWS[v])) return v;
@@ -4327,7 +4462,9 @@ function go(v,fromHash){
   if(v==='readiness'){ renderReadiness(); fetchSharedState().then(function(){ renderReadiness(); }); }
   // Paint what we have immediately, then replace it with the sheet's copy when
   // it lands — the list is the same shape either way, so nothing jumps about.
-  if(v==='toget'){ renderToGet(); fetchRestock().then(function(){ renderToGet(); }); }
+  // The buy-ahead card reads expiry dates, which come with the shared state.
+  if(v==='toget'){ renderToGet();
+    Promise.all([fetchRestock(), fetchSharedState()]).then(function(){ renderToGet(); }); }
   // Derived from DB.expiry, which any contents check can have just written.
   if(v==='expiring'){ renderExpiring(); fetchSharedState().then(function(){ renderExpiring(); }); }
   /* Read from the SHEET, then repainted — the same shape either way, so nothing
@@ -4335,6 +4472,8 @@ function go(v,fromHash){
      the whole bug: publishing needs a manager token and filing does not. */
   if(v==='tracker'){ renderTracker(); fetchDutyPeriods().then(function(){ renderTracker(); }); }
   if(v==='room-check'){ fetchDutyPeriods().then(function(){ renderDpState('room-check'); }); }
+  if(v==='chores'){ renderChores(); fetchDutyPeriods().then(function(){ renderChores(); }); }
+  if(v==='kits'){ renderKits(); kitsFetch().then(function(){ renderKits(); }); }
   /* Sheet-backed views keep asking while they are on screen; everything else
      stops the timer, so a form is never repainted under somebody's hands. */
   liveStart(v);
@@ -6165,6 +6304,13 @@ function concernLastDay(sig){
 }
 
 function resolveConcern(what,where){
+  var k=resolveConcernLocal(what,where);
+  pushConcernResolved(k, true);
+}
+/* Everything resolving does on this device, without telling the sheet. Marking
+   a bag restocked closes several at once and tells the sheet in ONE request
+   that names them all, rather than one request per line. */
+function resolveConcernLocal(what,where){
   DB.resolvedKeys=DB.resolvedKeys||[];
   var k=concernKey(what,where);
   // Every previous entry for this signature goes: they described earlier
@@ -6180,7 +6326,7 @@ function resolveConcern(what,where){
      where it can still be undone. */
   toGetMarkHandled(what, where);
   saveDB();
-  pushConcernResolved(k, true);
+  return k;
 }
 
 /* Ticking a concern is a manager action, so unlike a submission this one is
@@ -6217,6 +6363,9 @@ function toGetMarkHandled(what, where, undo){
   });
 }
 function unresolveConcern(what,where){
+  pushConcernResolved(unresolveConcernLocal(what,where), false);
+}
+function unresolveConcernLocal(what,where){
   var k=concernKey(what,where);
   // Dated entries as well as the bare legacy form, or reopening would leave a
   // clear behind that keeps hiding it.
@@ -6224,7 +6373,7 @@ function unresolveConcern(what,where){
   (DB.issues||[]).forEach(function(i){ if(concernKey(i.what,i.where)===k) i.open=true; });
   toGetMarkHandled(what, where, true);
   saveDB();
-  pushConcernResolved(k, false);
+  return k;
 }
 
 /* Ticked-off signatures are a permanent list, and the old one dropped the
@@ -6297,10 +6446,10 @@ function addIssue(o){
   saveDB();
 }
 function resolveConcernUI(what,where){
-  resolveConcern(what,where); renderLog(); renderReports(); renderReadiness(); renderToGet();
+  resolveConcern(what,where); renderLog(); renderReports(); renderReadiness(); renderToGet(); renderKits();
 }
 function reopenConcernUI(what,where){
-  unresolveConcern(what,where); renderLog(); renderReports(); renderReadiness(); renderToGet();
+  unresolveConcern(what,where); renderLog(); renderReports(); renderReadiness(); renderToGet(); renderKits();
 }
 
 
@@ -6598,6 +6747,8 @@ var LIVE={
   expiring:   {get:fetchSharedState,  st:function(){return stateFetch;},   draw:function(){ renderExpiring(); }},
   toget:      {get:fetchRestock,      st:function(){return restockState;}, draw:function(){ renderToGet(); }},
   tracker:    {get:fetchDutyPeriods,  st:function(){return dpState;},      draw:function(){ renderTracker(); }},
+  chores:     {get:fetchDutyPeriods,  st:function(){return dpState;},      draw:function(){ renderChores(); }},
+  kits:       {get:function(){ return kitsFetch(); }, st:kitsLiveState,    draw:function(){ renderKits(); }},
   'room-check':{get:fetchDutyPeriods, st:function(){return dpState;},      draw:function(){ renderDpState('room-check'); }}
 };
 
@@ -6681,7 +6832,12 @@ function liveNote(st, have, mine, ours, retry){
    matter who filed it. `DB.dutyPeriods` stays as an OPTIMISTIC overlay: the
    device that just filed shows its own check immediately rather than waiting on
    a round trip, and drops the overlay once the same sid comes back. */
-var remoteDP=null;                 // {dpKey:{roomId:[{cs,sid,date}]}}
+var remoteDP=null;                 // {dpKey:{roomId:[{cs,sid,date,name}]}}
+/* The Office Manager's decisions about who owes a chore, in the order they were
+   made. Null until the sheet answers WITH them — an older deployment answers
+   the duty periods and nothing else, and an empty list would read as "nobody
+   has ever been removed", which is a claim, not an absence. */
+var remoteChores=null;
 var dpState={loading:false, error:'', at:0, sig:''};
 
 function fetchDutyPeriods(){
@@ -6693,7 +6849,8 @@ function fetchDutyPeriods(){
       dpState.loading=false;
       if(!j||!j.ok||!j.dp||typeof j.dp!=='object'){ dpState.error='the sheet did not answer with duty periods'; return false; }
       remoteDP=j.dp; dpState.error=''; dpState.at=Date.now();
-      dpState.sig=JSON.stringify(remoteDP);
+      remoteChores=Array.isArray(j.chores)?j.chores:null;
+      dpState.sig=JSON.stringify([remoteDP,remoteChores]);
       return true;
     })
     .catch(function(e){
@@ -7282,16 +7439,22 @@ function backInService(id){
     });
 }
 
+/* Closes what the CARD showed — every open concern against the bag, from the
+   sheet as well as from this device. It used to close this device's own issues
+   only, so on any bag somebody else had reported, the button said "Close all 2"
+   in a dialog listing none of them, closed nothing, and the bag stayed amber. */
 function clearUnit(id){
   var u=(DB.bagUnits||[]).filter(function(x){return x.id===id;})[0];
-  var open=(DB.issues||[]).filter(function(i){ return i.open && i.unit===id; });
+  var open=unitStatus(id).issues||[];
+  if(!open.length) return;
+  if(!requireAuth('these being marked fixed')) return;
   uiConfirm('Close all '+open.length+' open problems on '+(u?u.name:'this bag')+'?\n\n'+
             open.map(function(i){return '• '+i.what;}).join('\n'),'Mark all fixed',
             {okText:'Close all '+open.length,cancelText:'Cancel'})
     .then(function(y){
       if(!y) return;
-      (DB.issues||[]).forEach(function(i){ if(i.unit===id) i.open=false; });
-      saveDB(); renderReadiness(); renderLog();
+      open.forEach(function(i){ resolveConcern(i.what,i.where); });
+      renderReadiness(); renderLog(); renderKits();
     });
 }
 
@@ -7534,27 +7697,10 @@ function onToGet(key){
   return (DB.toGet||[]).some(function(t){ return t.key===key && !t.done; });
 }
 
-function renderExpiring(){
-  var host=document.getElementById('expiringHost'); if(!host) return;
-  var rows=expiringRows();
-  var note=liveNote(stateFetch, !!remoteExpiry, 'recorded', 'dates',
-                    'fetchSharedState().then(renderExpiring)');
-  if(!rows.length){
-    host.innerHTML=note+'<div class="card"><p class="hint" style="margin:0">No expiry dates '+
-      'recorded yet. They are entered on a Full Contents Check, beside any item '+
-      'marked with an expiry, and appear here once saved.</p></div>';
-    return;
-  }
-  var expired=rows.filter(function(r){return r.days<0;});
-  var m30=rows.filter(function(r){return r.days>=0&&r.days<=30;});
-  var m90=rows.filter(function(r){return r.days>30&&r.days<=90;});
-
-  var h=note+'<div class="repgrid">'+
-    '<div class="repstat"><div class="rs-n">'+expired.length+'</div><div class="rs-l">expired</div></div>'+
-    '<div class="repstat"><div class="rs-n">'+m30.length+'</div><div class="rs-l">within 30 days</div></div>'+
-    '<div class="repstat"><div class="rs-n">'+m90.length+'</div><div class="rs-l">31 to 90 days</div></div>'+
-    '</div>';
-
+/* Moved here from Expiring. Buying is done from To Get, so the list of what
+   has to be bought before it lapses belongs beside the list of what to buy —
+   one screen to shop from, not two. */
+function horizonCardHtml(rows){
   /* ONE ORDER, NOT A ROLLING SERIES OF SURPRISES.
      ------------------------------------------------------------------------
      The table below answers "what lapses when", item by item, which is the
@@ -7568,7 +7714,7 @@ function renderExpiring(){
      they need two; a parser pulling the 2 out of the prose would be wrong the
      first time somebody writes a label in a slightly different shape, and would
      be wrong silently, on a purchase order. */
-  var hz=horizonDays();
+  var hz=horizonDays(), h='';
   var due=rows.filter(function(r){ return r.days<=hz; });
   h+='<div class="card mt"><div class="dphead"><h3>To have bought</h3>'+
      '<span class="dpcount">next '+hz+' days</span></div>';
@@ -7605,7 +7751,34 @@ function renderExpiring(){
     '<span class="hint">'+groups.length+' item'+(groups.length===1?'':'s')+' to order'+
     (due.length!==groups.length ? ', covering '+due.length+' dates' : '')+'</span></div>';
   }
+  // Every date, not only the ones due. Off the menu since this card moved here,
+  // so this is how it is reached.
+  h+='<p style="margin:12px 0 0"><button type="button" class="btn xs ghost" '+
+     'onclick="go(\'expiring\')">Every expiry date \u2192</button></p>';
   h+='</div>';
+  return h;
+}
+
+function renderExpiring(){
+  var host=document.getElementById('expiringHost'); if(!host) return;
+  var rows=expiringRows();
+  var note=liveNote(stateFetch, !!remoteExpiry, 'recorded', 'dates',
+                    'fetchSharedState().then(renderExpiring)');
+  if(!rows.length){
+    host.innerHTML=note+'<div class="card"><p class="hint" style="margin:0">No expiry dates '+
+      'recorded yet. They are entered on a Full Contents Check, beside any item '+
+      'marked with an expiry, and appear here once saved.</p></div>';
+    return;
+  }
+  var expired=rows.filter(function(r){return r.days<0;});
+  var m30=rows.filter(function(r){return r.days>=0&&r.days<=30;});
+  var m90=rows.filter(function(r){return r.days>30&&r.days<=90;});
+
+  var h=note+'<div class="repgrid">'+
+    '<div class="repstat"><div class="rs-n">'+expired.length+'</div><div class="rs-l">expired</div></div>'+
+    '<div class="repstat"><div class="rs-n">'+m30.length+'</div><div class="rs-l">within 30 days</div></div>'+
+    '<div class="repstat"><div class="rs-n">'+m90.length+'</div><div class="rs-l">31 to 90 days</div></div>'+
+    '</div>';
 
   h+='<p class="explegend"><span class="expbadge bad">Expired</span> past its date'+
      '<span class="expbadge soon">60d</span> 60 days or fewer'+
@@ -7679,9 +7852,11 @@ function renderToGet(){
          : 'From the spreadsheet — everyone’s checks, not just this device.')+
        '</p>';
   }
+  var hzCard=horizonCardHtml(expiringRows());
   if(!list.length){
     h='<div class="card"><p class="hint" style="margin:0">Nothing outstanding. '+
       'Items land here when a post-call logs usage or a check finds something missing.</p></div>';
+    h+=hzCard;
     h+='<div class="row mt"><button class="btn ghost sm" onclick="addToGet()">Add an item</button></div>';
     host.innerHTML=h; return;
   }
@@ -7744,10 +7919,18 @@ function renderToGet(){
      : '<p class="hint tgempty">Nothing to buy. Items land here when a post-call '+
        'logs what was used, or a shelf count drops below its par.</p>';
 
-  h+='<h3 class="tgsec">Reported on a check</h3>';
-  h+= reps.length ? rowsTable(reps,false)
-     : '<p class="hint tgempty">Nothing outstanding. Anything a member could not '+
-       'find, or typed into a check, appears here until somebody ticks it off.</p>';
+  h+=hzCard;
+
+  /* Folded away, not removed. Every one of these is also a line on the card of
+     the bag it came from, on Jumpkits & Bags — which is where it gets dealt
+     with now, and where ticking it off here also ticks it off. Open, this list
+     was the same work shown twice on two screens, and the bigger of the two
+     sections on the one screen meant for shopping. */
+  h+='<div class="acc tight mt"><button type="button" class="acchead" onclick="toggleAcc(this)">'+
+     '<span class="num">'+reps.length+'</span><span>Reported on a check</span>'+
+     '<span class="chev">▾</span></button><div class="accbody">'+
+     (reps.length ? rowsTable(reps,false)
+       : '<p class="hint tgempty">Nothing outstanding.</p>')+'</div></div>';
 
   h+='<div class="row mt"><button class="btn ghost sm" onclick="addToGet()">Add an item</button>'+
      '<button class="btn ghost sm" onclick="copyToGet()">Copy list</button>'+
@@ -8400,6 +8583,293 @@ function renderTracker(){
   applyGates(host);
 }
 
+/* ============================================================================
+   MISSED CHORES — who is not doing their room check each duty period
+   ============================================================================
+   Everybody owes one room check per duty period, and nobody keeps a roster, so
+   the roster is whoever has filed one this year: a call sign that has checked a
+   room is a call sign expected to keep doing it, from the first duty period it
+   appears in.
+
+   Counting starts at DP 4. Michaela's call — the periods before it are not
+   held against anybody.
+
+   The newest duty period is still running, so nobody has missed it yet. It
+   shows who has done theirs and a dot for everyone still to go, and becomes a
+   real column the moment somebody files into the next one.
+
+   What the Office Manager decides — this person left, this person moved up and
+   files under a new call sign now, this person was excused this week — is
+   written to the Chore Log tab and replayed here in the order it was made. A
+   removal clears that call sign up to the current duty period. If it files
+   again afterwards it comes back, counted from then: somebody filing under it
+   is somebody doing chores. */
+var CHORE_FIRST_DP=4;
+var CHORE_WHY_OPTS=[{v:'left',t:'Left'},{v:'upgraded',t:'Moved up from probationary'},{v:'other',t:'Other'}];
+var choreLocal=[];     // decisions made here that the sheet has not echoed yet
+var choreMsg='';
+
+function csKey(raw){ return String(raw==null?'':raw).toLowerCase().replace(/[^a-z0-9]/g,''); }
+function csSort(a,b){ return String(a).localeCompare(String(b),undefined,{numeric:true}); }
+
+/* Every filing in one duty period, across every room, with the name it was
+   filed under. `dpEntries` answers one room at a time and drops the name; this
+   needs neither restriction. Deduped on sid, exactly as that is. */
+function dpAllEntries(key){
+  var out=[], seen={};
+  var rem=(remoteDP||{})[key];
+  if(rem && typeof rem==='object') Object.keys(rem).forEach(function(room){
+    (Array.isArray(rem[room])?rem[room]:[]).forEach(function(e){
+      if(!e||typeof e!=='object') return;
+      if(e.sid){ if(seen[e.sid]) return; seen[e.sid]=1; }
+      out.push({cs:e.cs||'', name:e.name||''});
+    });
+  });
+  var loc=((dpGet(key)||{}).rooms)||{};
+  Object.keys(loc).forEach(function(room){
+    (Array.isArray(loc[room])?loc[room]:[]).forEach(function(e){
+      if(!e||typeof e!=='object') return;
+      if(e.sid && seen[e.sid]) return;
+      if(e.sid) seen[e.sid]=1;
+      out.push({cs:e.cs||'', name:''});
+    });
+  });
+  return out;
+}
+
+function choreSame(a,b){ return a.cs===b.cs && a.did===b.did && a.dp===b.dp; }
+
+/* The sheet's decisions, then this device's newer ones on top. A local one is
+   dropped once the sheet holds more rows like it than it did when the decision
+   was made — counted rather than matched, because removing, restoring and
+   removing the same person again is three rows and two of them look alike. */
+function choreLedger(){
+  var remote=Array.isArray(remoteChores)?remoteChores:[];
+  choreLocal=choreLocal.filter(function(l){
+    return remote.filter(function(r){ return choreSame(r,l); }).length<=l.base;
+  });
+  return remote.concat(choreLocal);
+}
+
+function choreTable(){
+  var y=acadYear();
+  var keys=dpKeysKnown().filter(function(k){ return dpParse(k).year===y; })
+    .sort(function(a,b){ return dpParse(a).n-dpParse(b).n; });
+  var curN=keys.length?dpParse(keys[keys.length-1]).n:0;
+  var people={};
+  keys.forEach(function(k){
+    var n=dpParse(k).n;
+    dpAllEntries(k).forEach(function(e){
+      var cs=csKey(e.cs); if(!cs) return;
+      var m=people[cs]||(people[cs]={cs:cs, shown:'', name:'', dps:{}});
+      m.dps[n]=(m.dps[n]||0)+1;
+      // Oldest to newest, so whatever is seen last is how they file now.
+      m.shown=String(e.cs).trim();
+      if(e.name) m.name=e.name;
+    });
+  });
+  var cut={}, cutBy={}, excused={};
+  choreLedger().forEach(function(d){
+    if(!d||!d.cs) return;
+    var p=dpParse(d.dp); if(p.year!==y) return;
+    if(d.did==='Removed'){ cut[d.cs]=p.n; cutBy[d.cs]=d; }
+    else if(d.did==='Restored'){ delete cut[d.cs]; delete cutBy[d.cs]; }
+    else if(d.did==='Excused') excused[d.cs+'@'+p.n]=d;
+    else if(d.did==='Unexcused') delete excused[d.cs+'@'+p.n];
+  });
+  // Newest first, so the duty period anybody is asking about is the one on
+  // screen without scrolling sideways on a phone.
+  var cols=keys.map(function(k){ return dpParse(k).n; })
+    .filter(function(n){ return n>=CHORE_FIRST_DP; }).reverse();
+  var rows=[], removed=[];
+  Object.keys(people).forEach(function(cs){
+    var m=people[cs], c=cut[cs]||0;
+    var filed=Object.keys(m.dps).map(Number).filter(function(n){ return n>c; });
+    if(c && !filed.length){ removed.push({cs:cs, shown:m.shown, name:m.name, d:cutBy[cs]}); return; }
+    var from=Math.max(CHORE_FIRST_DP, Math.min.apply(null,filed));
+    var cells=cols.map(function(n){
+      if(n<from) return {n:n, st:'none'};
+      if(m.dps[n]) return {n:n, st:'done'};
+      if(n===curN) return {n:n, st:'pending'};
+      if(excused[cs+'@'+n]) return {n:n, st:'excused'};
+      return {n:n, st:'missed'};
+    });
+    rows.push({cs:cs, shown:m.shown, name:m.name, cells:cells,
+               misses:cells.filter(function(x){ return x.st==='missed'; }).length});
+  });
+  // Removed before they ever showed up this year — still a decision on record.
+  Object.keys(cut).forEach(function(cs){
+    if(!people[cs]) removed.push({cs:cs, shown:cs, name:'', d:cutBy[cs]});
+  });
+  rows.sort(function(a,b){ return b.misses-a.misses || csSort(a.shown,b.shown); });
+  removed.sort(function(a,b){ return csSort(a.shown,b.shown); });
+  var lastDone=cols.filter(function(n){ return n<curN; })[0]||0;
+  return {year:y, cols:cols, curN:curN, lastDone:lastDone, rows:rows, removed:removed,
+          known:Object.keys(people).length};
+}
+
+/* Who did it, as a role rather than an address. The sheet records the Google
+   account that signed the change, which is right for the file and wrong for a
+   screen: the Office Manager knows "Office Manager", not somebody's Gmail. */
+function choreBy(d){
+  if(!d || !d.who) return '';
+  var r=roleForEmail(d.who);
+  return r && ROLE_LABEL[r] ? ROLE_LABEL[r] : d.who;
+}
+
+function renderChores(){
+  var host=document.getElementById('choresHost'); if(!host) return;
+  var h=liveNote(dpState, !!remoteDP, 'filed', 'checks', 'fetchDutyPeriods().then(renderChores)');
+  /* The grid is a query and works against any copy of the script that serves
+     the tracker. Removing and excusing need the Chore Log, which only the
+     current copy has — so those buttons appear only once the sheet has answered
+     with it, rather than being pressable into a script that would drop them. */
+  var decide=can('office') && Array.isArray(remoteChores);
+  if(remoteDP && !Array.isArray(remoteChores) && !dpState.error)
+    h+='<p class="dpsrc bad">Removing and excusing need the current copy of the '+
+       'spreadsheet script. Paste it and redeploy.</p>';
+  if(choreMsg) h+='<p class="dpsrc bad">'+choreMsg+'</p>';
+  var t=choreTable();
+
+  if(!t.cols.length){
+    h+='<div class="card"><p class="hint" style="margin:0">Counting starts at DP '+CHORE_FIRST_DP+'.'+
+       (t.known?' '+t.known+' call sign'+(t.known===1?'':'s')+' so far.':'')+'</p></div>';
+    host.innerHTML=h+choreRemovedHtml(t,decide);
+    return;
+  }
+
+  // The answer to the question this screen is opened for, before the grid.
+  if(t.lastDone){
+    var missed=t.rows.filter(function(r){
+      return r.cells.some(function(c){ return c.n===t.lastDone && c.st==='missed'; });
+    });
+    h+='<p class="chorelead"><b>DP '+t.lastDone+':</b> '+
+       (missed.length
+         ? missed.length+' missed — '+missed.map(function(r){
+             return '<b class="cs">'+esc(r.shown)+'</b>'+(r.name?' '+esc(r.name):'');
+           }).join(', ')
+         : 'everybody did theirs.')+'</p>';
+  }
+
+  h+='<div class="legend">'+
+     '<span class="item"><span class="cc done">✓</span> Did one</span>'+
+     '<span class="item"><span class="cc missed">✗</span> Missed</span>'+
+     '<span class="item"><span class="cc excused">Excused</span></span>'+
+     '<span class="item"><span class="cc">·</span> DP '+t.curN+', still running</span>'+
+     '</div>';
+
+  h+='<div class="chorewrap"><table class="choretab"><thead><tr><th>Call sign</th><th>Missed</th>'+
+     t.cols.map(function(n){
+       return '<th'+(n===t.curN?' class="now"':'')+'>DP '+n+'</th>';
+     }).join('')+(decide?'<th></th>':'')+'</tr></thead><tbody>';
+  t.rows.forEach(function(r){
+    var cs=jsq(r.cs);
+    h+='<tr><td><span class="cs">'+esc(r.shown)+'</span>'+
+       (r.name?'<span class="nm">'+esc(r.name)+'</span>':'')+'</td>'+
+       '<td class="n">'+(r.misses||'')+'</td>';
+    r.cells.forEach(function(c){
+      var lab=esc(r.shown)+', DP '+c.n;
+      if(c.st==='none') h+='<td class="c"></td>';
+      else if(c.st==='done') h+='<td class="c"><span class="cc done" title="'+lab+': did one">✓</span></td>';
+      else if(c.st==='pending') h+='<td class="c"><span class="cc" title="'+lab+': not yet">·</span></td>';
+      else if(c.st==='missed') h+='<td class="c">'+(decide
+          ? '<button type="button" class="cc missed" aria-label="'+lab+': missed. Excuse it" '+
+            'onclick="choreExcuse(\''+cs+'\','+c.n+')">✗</button>'
+          : '<span class="cc missed" title="'+lab+': missed">✗</span>')+'</td>';
+      else h+='<td class="c">'+(decide
+          ? '<button type="button" class="cc excused" aria-label="'+lab+': excused. Count it again" '+
+            'onclick="choreUnexcuse(\''+cs+'\','+c.n+')">Excused</button>'
+          : '<span class="cc excused">Excused</span>')+'</td>';
+    });
+    if(decide) h+='<td><button type="button" class="btn xs" onclick="choreRemove(\''+cs+'\')">Remove</button></td>';
+    h+='</tr>';
+  });
+  h+='</tbody></table></div>';
+  host.innerHTML=h+choreRemovedHtml(t,decide);
+}
+
+/* Everybody taken off the list, why, and by whom — and the way back. */
+function choreRemovedHtml(t,decide){
+  if(!t.removed.length) return '';
+  return '<div class="acc mt"><button type="button" class="acchead" onclick="toggleAcc(this)">'+
+    '<span class="num">'+t.removed.length+'</span><span>Removed</span><span class="chev">▾</span></button>'+
+    '<div class="accbody"><ul class="isslist">'+t.removed.map(function(r){
+      var d=r.d||{};
+      return '<li><b><span class="mono">'+esc(r.shown)+'</span>'+(r.name?' '+esc(r.name):'')+'</b>'+
+        '<div style="font-size:11.5px;color:var(--ink-faint);margin-top:2px">'+
+        esc(d.why||'Removed')+' · DP '+esc(String(dpParse(d.dp||'').n||''))+
+        (d.date?' · '+esc(kitWhen(d.date)):'')+
+        (choreBy(d)?' · '+esc(choreBy(d)):'')+'</div>'+
+        (decide?'<button class="issx" onclick="choreRestore(\''+jsq(r.cs)+'\')">Restore</button>':'')+
+        '</li>';
+    }).join('')+'</ul></div></div>';
+}
+
+function choreRemove(cs){
+  var t=choreTable(); if(!t.curN) return;
+  var r=t.rows.filter(function(x){ return x.cs===cs; })[0];
+  var shown=r?r.shown:cs;
+  uiForm('Take '+shown+' off the chore list?',
+         'If '+shown+' files a room check again, they come back.',
+         [{key:'why',label:'Why',type:'select',required:true,value:'left',options:CHORE_WHY_OPTS}],
+         {okText:'Remove'})
+    .then(function(v){ if(v) choreSend(cs,'Removed',dpKey(t.curN,t.year),v.why); });
+}
+function choreRestore(cs){
+  var t=choreTable();
+  var r=t.removed.filter(function(x){ return x.cs===cs; })[0];
+  if(!r||!r.d) return;
+  choreSend(cs,'Restored',r.d.dp,'');
+}
+function choreExcuse(cs,n){
+  var t=choreTable();
+  var r=t.rows.filter(function(x){ return x.cs===cs; })[0];
+  uiConfirm('', 'Excuse '+(r?r.shown:cs)+' for DP '+n+'?', {okText:'Excuse',cancelText:'Cancel'})
+    .then(function(ok){ if(ok) choreSend(cs,'Excused',dpKey(n,t.year),''); });
+}
+function choreUnexcuse(cs,n){
+  var t=choreTable();
+  var r=t.rows.filter(function(x){ return x.cs===cs; })[0];
+  uiConfirm('', 'Count DP '+n+' as missed for '+(r?r.shown:cs)+' again?',
+            {okText:'Count it',cancelText:'Cancel'})
+    .then(function(ok){ if(ok) choreSend(cs,'Unexcused',dpKey(n,t.year),''); });
+}
+
+/* Shown at once, then checked. The reply to a POST cannot be read, so the only
+   honest confirmation is reading the Chore Log back and finding the row — and a
+   change that is not there after three reads did not happen, and says so
+   rather than sitting on screen as though it had. */
+function choreSend(cs,did,dp,why){
+  var url=(DB.api&&DB.api.url)||'';
+  if(!url){ uiAlert('No spreadsheet is connected.','Not saved'); return; }
+  if(!requireAuth('this change')) return;
+  var base=(Array.isArray(remoteChores)?remoteChores:[]).filter(function(r){
+    return choreSame(r,{cs:cs,did:did,dp:dp}); }).length;
+  var why2=(CHORE_WHY_OPTS.filter(function(o){ return o.v===why; })[0]||{}).t||'';
+  choreLocal.push({cs:cs, did:did, dp:dp, why:why2, who:'', date:todayISO(), base:base});
+  choreMsg='';
+  renderChores();
+  try{
+    fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({form:'__chore', cs:cs, did:did, dp:dp, why:why||'',
+                           idToken:googleIdToken, key:(DB.api&&DB.api.key)||''})});
+  }catch(e){}
+  choreVerify({cs:cs,did:did,dp:dp},base,0);
+}
+function choreVerify(d,base,tries){
+  setTimeout(function(){
+    fetchDutyPeriods().then(function(){
+      var n=(Array.isArray(remoteChores)?remoteChores:[]).filter(function(r){ return choreSame(r,d); }).length;
+      if(n>base){ renderChores(); return; }
+      if(tries<2){ choreVerify(d,base,tries+1); return; }
+      choreLocal=choreLocal.filter(function(l){ return !(choreSame(l,d) && l.base===base); });
+      choreMsg='<b>That did not save.</b> Sign in again and retry — or the spreadsheet '+
+               'is running an older copy of the script.';
+      renderChores();
+    });
+  }, tries?3000:2000);
+}
+
 /* ---- office restock ---- */
 function renderRestock(){
   var host=document.getElementById('restockHost'); if(!host) return;
@@ -8887,7 +9357,7 @@ function renderReports(){
        'who did it and when.</p>';
   }else{
     h+='<ul class="isslist">'+acts.slice(0,60).map(function(a){
-      var tone = a.did==='Restocked' ? 'ok' : a.did==='Resolved' ? 'ok' : 'brand';
+      var tone = (a.did==='Restocked'||a.did==='Restocked bag'||a.did==='Resolved') ? 'ok' : 'brand';
       return '<li><span class="tag '+tone+'">'+esc(a.did)+'</span>'+
         '<b>'+esc(a.what)+'</b>'+
         (a.where?' <span style="color:var(--ink-faint)">— '+esc(a.where)+'</span>':'')+
@@ -8961,6 +9431,445 @@ function fallbackCopy(t,done){
     uiAlert('Could not copy automatically. Print instead, or select the text by hand.','Copy failed');
   }
   document.body.removeChild(ta);
+}
+
+/* ============================================================================
+   JUMPKITS & BAGS — the Equipment Manager's screen
+   ============================================================================
+   One question, answered first: which bags need something, and what. Before
+   this it was spread over five screens that each held a piece of it — flags on
+   What's Ready, purchases on To Get, typed notes on Reported Problems, dates on
+   Expiring, and the forms themselves on Activity as one line each reading
+   "2 missing" without ever saying which two. Somebody with ten minutes between
+   classes could not get from "what needs doing" to doing it.
+
+   So the top of the screen is only bags that need something, one card each,
+   every line saying what it is, where in the bag it goes, and when it was
+   reported. Bags that need nothing are one line of names. Under that, every
+   form that touched a bag, newest first, grouped by day — the record the cards
+   are built from, there to be checked rather than to be read through.
+
+   One tap marks a bag restocked: it closes everything a restock fixes, on every
+   screen at once. A report of damage is not closed by it — a zipper is not
+   fixed by putting gauze back — and keeps its own tick. */
+var kitForms=[], kitOwed=null;
+var kitState={loading:false, error:'', at:0, total:0, more:false, sig:''};
+var kitUnit='';          // the bag the list of forms is narrowed to; '' for all
+var kitMarks={};         // unitId -> {at} marked restocked here, until the sheet agrees
+var kitNote={};          // unitId -> a message for that bag's card
+var LS_KITFOUND='emsops_kitfound_v1';
+var kitOnlyFound=false;
+try{ kitOnlyFound=localStorage.getItem(LS_KITFOUND)==='1'; }catch(e){}
+
+function kitUnitsAll(){
+  return (DB.bagUnits||[]).filter(function(u){ return u && u.active && (!u.need || can(u.need)); });
+}
+function kitUnitById(id){ return (DB.bagUnits||[]).filter(function(u){ return u.id===id; })[0]||null; }
+function kitUnitName(id){
+  if(id===BIKE_SOURCE.id) return BIKE_SOURCE.name;
+  var u=kitUnitById(id); return u?u.name:String(id||'');
+}
+function kitTypeOf(id){ var u=kitUnitById(id); return u?u.type:''; }
+
+/* Where in the bag a checklist line lives. Matched on the exact wording, which
+   is what the form sent; a line reworded since then gets no section rather than
+   a guessed one. */
+function kitSection(typeId,label){
+  var t=(DB.bags||[]).filter(function(b){ return b.id===typeId; })[0]; if(!t) return '';
+  var want=String(label||'').trim().toLowerCase(), hit='';
+  (t.sections||[]).forEach(function(sec){
+    (sec.items||[]).forEach(function(it){
+      if(!hit && String(it.label||'').trim().toLowerCase()===want) hit=sec.name;
+    });
+  });
+  return hit;
+}
+
+function kitParseDay(iso){
+  var p=String(iso||'').split('-'); if(p.length!==3) return null;
+  var d=new Date(+p[0],+p[1]-1,+p[2]); return isNaN(d)?null:d;
+}
+function kitDay(iso){
+  var d=kitParseDay(iso);
+  return d ? d.toLocaleDateString([],{month:'short',day:'numeric'}) : String(iso||'');
+}
+function kitDayLong(iso){
+  var d=kitParseDay(iso); if(!d) return String(iso||'');
+  if(iso===todayISO()) return 'Today';
+  var y=new Date(); y.setDate(y.getDate()-1);
+  if(iso===isoDay(y)) return 'Yesterday';
+  return d.toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'});
+}
+/* A concern's date comes as yyyy-MM-dd from the sheet and as a timestamp from
+   this device; either way it prints the way the rest of this screen does. */
+function kitWhen(v){
+  if(typeof v==='number'){ var d=new Date(v); return isNaN(d)?'':kitDay(isoDay(d)); }
+  return v?kitDay(v):'';
+}
+function kitTime(hhmm){
+  var m=/^(\d{1,2}):(\d{2})/.exec(String(hhmm||'')); if(!m) return String(hhmm||'');
+  return new Date(2000,0,1,+m[1],+m[2]).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+}
+function kitStamp(ms){
+  var d=new Date(ms);
+  return isoDay(d)+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+}
+
+function kitsFetch(){ return Promise.all([fetchSharedState(), fetchBagForms(false)]); }
+function kitsLiveState(){
+  return {loading:stateFetch.loading||kitState.loading, sig:stateFetch.sig+'\u0001'+kitState.sig};
+}
+
+function fetchBagForms(more){
+  var url=(DB.api&&DB.api.url)||'';
+  if(!url){ kitState.error='no spreadsheet is connected'; return Promise.resolve(false); }
+  // One request at a time: a second "Load more" would ask for the same page.
+  if(kitState.loading) return Promise.resolve(false);
+  var unit=kitUnit;
+  var offset=more?kitForms.length:0;
+  // A refresh asks for as much as is already showing, so a live update never
+  // quietly shrinks a list somebody has paged down through.
+  var limit=more?40:Math.min(200,Math.max(40,kitForms.length));
+  kitState.loading=true;
+  var q=url+(url.indexOf('?')<0?'?':'&')+'bagforms=1&limit='+limit+'&offset='+offset+
+        (unit?'&unit='+encodeURIComponent(unit)+'&type='+encodeURIComponent(kitTypeOf(unit)):'');
+  return fetchJSONTries(q,3,15000).then(function(j){
+    kitState.loading=false;
+    /* The shape, not only the status: an older deployment answers anything it
+       does not recognise with its connection report, which is ok:true with no
+       rows — and an empty list would read as "nothing has been filed". */
+    if(!j||!j.ok||!Array.isArray(j.rows)){
+      kitState.error='the spreadsheet is running an older copy of the script '+
+                     '(paste the current one and redeploy)';
+      return false;
+    }
+    /* Narrowed to another bag while this was in the air. Its answer is for the
+       wrong bag, and the request for the right one was turned away because this
+       one was still loading — so ask for it now, or the list sits on "Reading…"
+       until the next refresh comes round. */
+    if(unit!==kitUnit) return fetchBagForms(false);
+    kitForms=more?kitForms.concat(j.rows):j.rows;
+    if(j.bags && typeof j.bags==='object'){ kitOwed=j.bags; kitSettleMarks(); }
+    kitState.total=j.total||kitForms.length; kitState.more=!!j.more;
+    kitState.error=''; kitState.at=Date.now();
+    kitState.sig=JSON.stringify([kitForms.length?kitForms[0].sid:'', kitState.total, kitOwed]);
+    return true;
+  }).catch(function(e){
+    kitState.loading=false;
+    kitState.error='could not reach the spreadsheet ('+
+      (e&&e.message==='timeout'?'timed out':'connection failed')+')';
+    return false;
+  });
+}
+
+/* A bag marked restocked here stays that way on screen until the sheet records
+   it too, then the sheet's answer takes over. A minute of slack either side:
+   the phone's clock and the script's are not the same clock. */
+function kitSettleMarks(){
+  Object.keys(kitMarks).forEach(function(id){
+    var s=((kitOwed||{})[id]||{}).since;
+    if(s && s.date && (s.date+' '+(s.time||'')) >= kitStamp(kitMarks[id].at-60000)) delete kitMarks[id];
+  });
+}
+
+/* Everything one bag needs, from what the sheet holds. */
+function kitNeeds(u,exp){
+  var nm=String(u.name||'').trim().toLowerCase();
+  var open=openConcerns().filter(function(c){
+    return c.unit===u.id || (!c.unit && String(c.where||'').trim().toLowerCase()===nm);
+  });
+  var lines=[], flag=null, blocking=false;
+  open.forEach(function(c){
+    var w=String(c.what||''), m;
+    if(c.urgency==='Blocking') blocking=true;
+    if(w.indexOf(USED_ON_CALL)===0){ if(!flag) flag=c; return; }
+    if((m=/^(.*) missing$/.exec(w))) lines.push({k:'missing', label:m[1], sec:kitSection(u.type,m[1]), c:c});
+    else if((m=/^(.*) is expired$/.exec(w))) lines.push({k:'expired', label:m[1], sec:kitSection(u.type,m[1]), c:c});
+    else lines.push({k:'note', label:w, c:c});
+  });
+  var owed=(kitOwed||{})[u.id]||null;
+  var used=(owed&&owed.used)||[], calls=(owed&&owed.calls)||0;
+  if(kitMarks[u.id]){ used=[]; calls=0; }
+  // Dates on file that have lapsed or are about to — except where a form has
+  // already said so, which is a line of its own above.
+  var said={};
+  lines.forEach(function(l){ if(l.k==='expired') said[l.label.toLowerCase()]=1; });
+  var dates=(exp||[]).filter(function(r){
+    return r.key.indexOf(u.id+'|')===0 && r.days<=30 && !said[String(r.item).toLowerCase()];
+  });
+  return {u:u, lines:lines, used:used, calls:calls, flag:flag, dates:dates, blocking:blocking,
+          last:owed&&owed.last,
+          any:!!(lines.length||used.length||flag||dates.length),
+          restock:!!(used.length||flag||lines.some(function(l){ return l.k!=='note'; }))};
+}
+
+function renderKits(){
+  var host=document.getElementById('kitsHost'); if(!host) return;
+  var exp=expiringRows();
+  var needs=kitUnitsAll().map(function(u){ return kitNeeds(u,exp); });
+  var busy=needs.filter(function(n){ return n.any; });
+  var quiet=needs.filter(function(n){ return !n.any; });
+
+  var h=liveNote(stateFetch, !!remoteConcerns, 'reported', 'reports', 'kitsFetch().then(renderKits)');
+  if(kitState.error && ROLE!=='member')
+    h+='<p class="dpsrc bad">Forms: '+esc(kitState.error)+'. '+
+       '<button type="button" class="btn xs" onclick="kitsFetch().then(renderKits)">Try again</button></p>';
+
+  h+='<h3 class="tgsec">Needs something'+(busy.length?' — '+busy.length:'')+'</h3>';
+  h+= busy.length ? '<div class="kitgrid">'+busy.map(kitCardHtml).join('')+'</div>'
+                  : '<p class="hint">Every bag is complete.</p>';
+  if(quiet.length)
+    h+='<p class="kitquiet"><b>Nothing to replace</b> '+quiet.map(function(n){
+      return '<button type="button" class="kc-name" onclick="kitShow(\''+jsq(n.u.id)+'\')">'+
+             esc(n.u.name)+'</button>';
+    }).join('')+'</p>';
+
+  h+='<div class="feedhead" id="kitFeedTop"><h3 class="tgsec">'+
+     (kitUnit?esc(kitUnitName(kitUnit)):'Every form')+'</h3>'+
+     (kitUnit?'<button type="button" class="btn xs" onclick="kitShow(\'\')">All bags</button>':'')+
+     '<button type="button" class="btn xs'+(kitOnlyFound?' on':'')+'" aria-pressed="'+kitOnlyFound+'" '+
+     'onclick="kitToggleFound()">Only forms that found something</button></div>';
+  h+='<div id="kitFeedHost">'+kitFeedHtml()+'</div>';
+  host.innerHTML=h;
+  applyGates(host);
+}
+
+function kitCardHtml(n){
+  var u=n.u, id=jsq(u.id);
+  var h='<div class="kitcard'+(n.blocking?' crit':'')+'"><div class="kc-top"><div class="kc-title">'+
+    '<button type="button" class="kc-name" onclick="kitShow(\''+id+'\')">'+esc(u.name)+'</button>'+
+    (n.last?'<span class="kc-last">last out '+esc(kitDay(n.last.date))+'</span>':'')+'</div>'+
+    (n.restock?'<button type="button" class="btn xs" data-need="equipment" '+
+      'onclick="kitRestocked(\''+id+'\')">Restocked</button>':'')+
+    '</div><ul class="kc-lines">';
+  if(n.used.length || n.flag){
+    var latest='';
+    n.used.forEach(function(x){ if(x.last>latest) latest=x.last; });
+    var when = n.used.length
+      ? (n.calls>1?n.calls+' calls · ':'')+kitDay(latest)
+      : 'used on a call '+kitWhen(n.flag.at);
+    h+='<li><span class="kc-k">Used</span><span class="kc-v">'+
+       (n.used.length
+         ? n.used.map(function(x){ return esc(x.n)+(x.q>1?' ×'+x.q:''); }).join(' · ')
+         : 'Check it over')+
+       ' <span class="kc-when">'+esc(when)+'</span></span></li>';
+  }
+  n.lines.forEach(function(l){
+    var k={missing:'Missing', expired:'Expired', note:'Reported'}[l.k];
+    h+='<li><span class="kc-k">'+k+'</span><span class="kc-v">'+
+       (l.k==='note'?'“'+esc(l.label)+'”':esc(l.label))+
+       (l.sec?' <span class="kc-sec">· '+esc(l.sec)+'</span>':'')+
+       ' <span class="kc-when">'+esc(kitWhen(l.c.at))+'</span></span>'+
+       '<button type="button" class="btn xs" data-need="equipment" '+
+       'aria-label="'+esc(l.k==='note'?'Dealt with: ':'Replaced: ')+esc(l.label)+'" '+
+       'onclick="kitLineDone(\''+jsq(l.c.what)+'\',\''+jsq(l.c.where)+'\')">✓</button></li>';
+  });
+  if(n.dates.length)
+    h+='<li><span class="kc-k">Dates</span><span class="kc-v">'+n.dates.map(function(d){
+      var w = d.days<0 ? 'expired' : d.days===0 ? 'today' : 'in '+d.days+'d';
+      return esc(d.item)+' <span class="kc-when">'+w+'</span>';
+    }).join(' · ')+'</span></li>';
+  h+='</ul>'+(kitNote[u.id]?'<p class="kc-msg dpsrc bad">'+kitNote[u.id]+'</p>':'')+'</div>';
+  return h;
+}
+
+/* ---- the forms ---- */
+function kitFormFound(r){
+  if(!r) return false;
+  if(r.kind==='postcall')
+    return (r.used||[]).some(function(u){ return !u.r; }) || (r.meds||[]).length>0;
+  return (r.missing||[]).length>0 || r.missingCount>0 || (r.expired||[]).length>0 ||
+         (r.soon||[]).length>0 || !!r.note;
+}
+
+function kitFeedHtml(){
+  var rows=kitForms.filter(function(r){ return r && typeof r==='object'; });
+  var all=rows.length;
+  if(kitOnlyFound) rows=rows.filter(kitFormFound);
+  var h='';
+  if(!rows.length){
+    var msg = kitState.loading || (!kitState.at && !kitState.error) ? 'Reading the spreadsheet…'
+            : kitState.error ? 'The forms could not be read.'
+            : (kitOnlyFound && all) ? 'Nothing in what has loaded found anything.'
+            : 'Nothing filed yet.';
+    h+='<div class="card"><p class="hint" style="margin:0">'+msg+'</p></div>';
+  }else{
+    var day='';
+    rows.forEach(function(r){
+      if(r.date!==day){
+        if(day) h+='</ul>';
+        day=r.date;
+        h+='<div class="fday">'+esc(kitDayLong(day))+'</div><ul class="feed">';
+      }
+      h+=kitFormHtml(r);
+    });
+    h+='</ul>';
+  }
+  if(kitState.more)
+    h+='<div class="row mt"><button type="button" class="btn" onclick="kitMore()"'+
+       (kitState.loading?' disabled':'')+'>'+(kitState.loading?'Loading…':'Load more')+'</button>'+
+       '<span class="hint">'+kitForms.length+' of '+kitState.total+'</span></div>';
+  return h;
+}
+
+function kitFormHtml(r){
+  var found=kitFormFound(r);
+  var form = r.kind==='postcall' ? 'After a call'+(r.call?' #'+r.call:'')
+           : r.kind==='bagcheck' ? 'Full contents check' : 'Checkout';
+  var bag;
+  if(r.kind==='postcall'){
+    var seen={}, names=[];
+    (r.used||[]).forEach(function(u){
+      if(u.f && !seen[u.f]){ seen[u.f]=1; names.push(u.fn||kitUnitName(u.f)); }
+    });
+    bag=names.join(', ');
+  }else bag=r.bag||kitUnitName(r.unit);
+  var h='<li class="fd'+(found?'':' clean')+'"><div class="fd-head">'+
+    '<span class="fd-time">'+esc(kitTime(r.time))+'</span>'+
+    (found?'<span class="fd-dot" aria-hidden="true">●</span>'
+          :'<span class="fd-ok" title="Nothing to replace">✓</span>')+
+    '<span class="fd-form">'+esc(form)+(bag?' · '+esc(bag):'')+'</span>'+
+    '<span class="fd-who">'+esc(r.who||'')+'</span></div>';
+  if(found) h+='<ul class="fd-items">'+kitFormItems(r)+'</ul>';
+  return h+'</li>';
+}
+
+/* Whether each thing a form named is still owed. A checklist line is owed
+   while its report is open; something used on a call is owed until the bag it
+   came out of was restocked after the call. */
+function kitStatus(open,note){
+  return open===true ? '<span class="st open">'+(note?'open':'still needed')+'</span>'
+       : open===false ? '<span class="st done">'+(note?'dealt with':'done')+'</span>' : '';
+}
+function kitConcernOpen(what,where){
+  var sig=concernKey(what,where), hit=null;
+  var all=allConcerns();
+  for(var i=0;i<all.length;i++) if(all[i].sig===sig){ hit=all[i]; break; }
+  return hit ? hit.open : null;
+}
+function kitUsedOpen(r,f){
+  if(kitMarks[f]) return false;
+  var s=((kitOwed||{})[f]||{}).since;
+  if(!s || !s.date) return true;
+  return (r.date+' '+r.time) > (s.date+' '+(s.time||''));
+}
+
+function kitFormItems(r){
+  var h='';
+  if(r.kind==='postcall'){
+    var by={}, order=[];
+    (r.used||[]).forEach(function(u){
+      if(kitUnit && u.f!==kitUnit) return;
+      if(!by[u.f]){ by[u.f]=[]; order.push(u.f); }
+      by[u.f].push(u);
+    });
+    order.forEach(function(f){
+      var bike=(f===BIKE_SOURCE.id);
+      h+='<li><span class="kc-k">'+esc(by[f][0].fn||kitUnitName(f))+'</span>'+by[f].map(function(u){
+        var tag = u.r ? '<span class="st back">put back</span>'
+                : bike ? '<span class="st back">bike list</span>'
+                : kitStatus(kitUsedOpen(r,f));
+        return esc(u.n)+(u.q>1?' ×'+u.q:'')+tag;
+      }).join(' · ')+'</li>';
+    });
+    if((r.meds||[]).length)
+      h+='<li><span class="kc-k">Meds given</span>'+esc(r.meds.join(', '))+'</li>';
+    return h;
+  }
+  var where=r.bag||kitUnitName(r.unit);
+  var type=r.kind==='bagcheck' ? r.type : kitTypeOf(r.unit);
+  (r.missing||[]).forEach(function(m){
+    var sec=kitSection(type,m);
+    h+='<li><span class="kc-k">Missing</span>'+esc(m)+
+       (sec?' <span class="kc-sec">· '+esc(sec)+'</span>':'')+
+       kitStatus(kitConcernOpen(m+' missing',where))+'</li>';
+  });
+  // Rows from before the form recorded WHICH items: say how many, and no more.
+  if(!(r.missing||[]).length && r.missingCount>0)
+    h+='<li><span class="kc-k">Missing</span>'+r.missingCount+' item'+(r.missingCount===1?'':'s')+
+       ' <span class="kc-sec">· not named on this form</span></li>';
+  (r.expired||[]).forEach(function(m){
+    h+='<li><span class="kc-k">Expired</span>'+esc(m)+kitStatus(kitConcernOpen(m+' is expired',where))+'</li>';
+  });
+  (r.soon||[]).forEach(function(m){
+    h+='<li><span class="kc-k">Expiring</span>'+esc(m)+'</li>';
+  });
+  if(r.note)
+    h+='<li><span class="kc-k">Note</span>“'+esc(r.note)+'”'+kitStatus(kitConcernOpen(r.note,where),true)+'</li>';
+  return h;
+}
+
+/* ---- acting on it ---- */
+function kitShow(id){
+  kitUnit=id||'';
+  kitForms=[]; kitState.total=0; kitState.more=false; kitState.at=0;
+  renderKits();
+  var top=document.getElementById('kitFeedTop');
+  if(top && id && top.scrollIntoView) top.scrollIntoView({block:'start',behavior:'smooth'});
+  fetchBagForms(false).then(function(){ renderKits(); });
+}
+function kitMore(){ fetchBagForms(true).then(function(){ renderKits(); }); }
+function kitToggleFound(){
+  kitOnlyFound=!kitOnlyFound;
+  try{ localStorage.setItem(LS_KITFOUND,kitOnlyFound?'1':'0'); }catch(e){}
+  renderKits();
+}
+
+function kitLineDone(what,where){
+  if(!requireAuth('this being marked done')) return;
+  resolveConcern(what,where);
+  renderKits(); renderReadiness(); renderLog(); renderToGet();
+}
+
+/* One tap for the bag. Says what it is about to close first, because it closes
+   several things at once and the person pressing it is looking at the bag, not
+   the list. */
+function kitRestocked(id){
+  if(!can('equipment')) return;
+  var u=kitUnitById(id); if(!u) return;
+  if(!requireAuth('this bag being marked restocked')) return;
+  var n=kitNeeds(u,expiringRows());
+  var closing=n.lines.filter(function(l){ return l.k!=='note'; });
+  var list=[];
+  n.used.forEach(function(x){ list.push(x.n+(x.q>1?' ×'+x.q:'')); });
+  closing.forEach(function(l){ list.push(l.label+(l.k==='expired'?' (expired)':'')); });
+  if(!list.length && n.flag) list.push('Checked over after the call');
+  var notes=n.lines.length-closing.length;
+  uiConfirm(list.map(function(x){ return '• '+x; }).join('\n')+
+            (notes?'\n\n'+(notes===1?'The report below stays open.':'The '+notes+' reports below stay open.'):''),
+            u.name+' restocked?', {okText:'Restocked', cancelText:'Not yet'})
+    .then(function(ok){
+      if(!ok) return;
+      var shut=closing.map(function(l){ return l.c; }).concat(n.flag?[n.flag]:[]);
+      var sigs=shut.map(function(c){ resolveConcernLocal(c.what,c.where); return c.sig; });
+      kitMarks[id]={at:Date.now(), shut:shut}; kitNote[id]='';
+      renderKits(); renderReadiness(); renderLog(); renderToGet();
+      var url=(DB.api&&DB.api.url)||''; if(!url) return;
+      try{
+        fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},
+          body:JSON.stringify({form:'__bagdone', site:'ops', unit:id, name:u.name, sigs:sigs,
+                               idToken:googleIdToken, key:(DB.api&&DB.api.key)||''})});
+      }catch(e){}
+      kitVerify(id,0);
+    });
+}
+
+/* Read back until the sheet has it. Not there after three reads means it did
+   not happen — the card goes back to how it was, says so, and the lines it
+   closed on this phone are opened again rather than left looking dealt with. */
+function kitVerify(id,tries){
+  setTimeout(function(){
+    kitsFetch().then(function(){
+      var mark=kitMarks[id];
+      if(!mark){ renderKits(); return; }
+      if(tries<2){ kitVerify(id,tries+1); return; }
+      (mark.shut||[]).forEach(function(c){ unresolveConcernLocal(c.what,c.where); });
+      delete kitMarks[id];
+      kitNote[id]='<b>That did not save.</b> Sign in again and retry — or the '+
+                  'spreadsheet is running an older copy of the script.';
+      renderKits(); renderReadiness(); renderLog(); renderToGet();
+    });
+  }, tries?3000:2000);
 }
 
 /* ============================================================================
@@ -9436,8 +10345,10 @@ function renderAll(){
   renderRoles();
   renderQR();
   renderTracker();
+  renderChores();
   renderRestock();
   renderInventory();
+  renderKits();
   renderReadiness();
   renderToGet();
   renderExpiring();

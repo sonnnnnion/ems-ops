@@ -93,8 +93,8 @@ people, clutter to everyone else.
 
 | Role | Also gets |
 |---|---|
-| Office Manager | duty-period tracker, room standards, office restock list, reports, problem log |
-| Equipment Manager | full contents check, equipment inventory, bags-in-service list, reports, problem log |
+| Office Manager | missed chores (who has not filed a room check each duty period, from DP 4), room standards, office restock list, reports, problem log |
+| Equipment Manager | jumpkits & bags (what each bag needs, and every bag form), to get (with the expiring buy-ahead list), full contents check, equipment inventory, reports, problem log |
 | Operations Officer | all of the above |
 
 The one thing members lose by moving the room gallery behind a role is the "what

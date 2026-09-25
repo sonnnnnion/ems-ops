@@ -190,10 +190,14 @@ var BIKE_RESTOCK = {
 
    One row per action, appended, never edited. It is a ledger: ticking something
    and un-ticking it are both events and both stay. */
+/* `Ref` is appended LAST, for the same reason every other new column in this
+   file is. It holds a machine id where a row needs one to be found again — a
+   bag marked restocked is looked up by its unit id, because a bag's name is
+   the one thing about it a rename changes. Blank on every older row. */
 var ACTIONS = {
   name: 'Actions',
-  headers: ['Date','Time','Who','Site','Did','What','Where'],
-  widths:  [95, 70, 150, 70, 120, 340, 170]
+  headers: ['Date','Time','Who','Site','Did','What','Where','Ref'],
+  widths:  [95, 70, 150, 70, 120, 340, 170, 90]
 };
 
 function ensureActions() {
@@ -208,14 +212,15 @@ function ensureActions() {
 
 /* Never throws. A ledger entry is worth having and never worth losing the thing
    it describes over — if this fails the tick still happened. */
-function logAction(site, who, did, what, where) {
+function logAction(site, who, did, what, where, ref) {
   try {
     var sh = ensureActions();
     var tz = Session.getScriptTimeZone(), now = new Date();
     sh.appendRow([Utilities.formatDate(now, tz, 'yyyy-MM-dd'),
                   Utilities.formatDate(now, tz, 'HH:mm'),
                   String(who || ''), site === 'bike' ? 'bike' : 'ops',
-                  String(did || ''), String(what || ''), String(where || '')]);
+                  String(did || ''), String(what || ''), String(where || ''),
+                  String(ref || '')]);
   } catch (err) {
     logError('could not record an action: ' + err, [site, who, did, what, where].join(' | '));
   }
@@ -787,22 +792,68 @@ function concernRows(site) {
 function setConcernResolved(p) {
   var c = writerCheck(p);
   if (!c.name) return json({ ok: false, error: 'not allowed: ' + c.why });
+  var found = markConcerns(siteOf(p), [String(p.sig)], p.resolved === true, c.name);
+  if (found < 0) return json({ ok: false, error: 'nothing to tick' });
+  return json(found ? { ok: true, set: true } : { ok: false, error: 'not found' });
+}
+
+/* Ticks (or unticks) concerns by signature, and returns how many it found, or
+   -1 when there is no tab to look in. One read of the tab for the whole list:
+   marking a bag restocked closes several at once, and a read per signature is
+   a read per line on a phone that is waiting for the answer. */
+function markConcerns(site, sigs, resolved, who) {
   var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONCERNS.name);
-  if (!sh || sh.getLastRow() < 2) return json({ ok: false, error: 'nothing to tick' });
-  var site = siteOf(p);
+  if (!sh || sh.getLastRow() < 2) return -1;
+  var want = {};
+  (sigs || []).forEach(function (g) { if (g) want[String(g)] = 1; });
   var rows = sh.getRange(2, 1, sh.getLastRow() - 1, CONCERNS.headers.length).getValues();
+  var found = 0;
   for (var i = 0; i < rows.length; i++) {
     // Site as well as signature: the same words reported on both sites are two
     // different problems, and ticking one must not tick the other.
-    if (String(rows[i][1]) === String(p.sig) && rowSite(rows[i][12]) === site) {
-      sh.getRange(i + 2, 1).setValue(p.resolved === true);
-      sh.getRange(i + 2, 12).setValue(p.resolved === true ? c.name : '');
-      logAction(site, c.name, p.resolved === true ? 'Resolved' : 'Reopened',
-                String(rows[i][2] || ''), String(rows[i][3] || ''));
-      return json({ ok: true, set: true });
-    }
+    if (!want[String(rows[i][1])] || rowSite(rows[i][12]) !== site) continue;
+    found++;
+    // Already in the state asked for: nothing happened, so nothing is logged. A
+    // bag marked restocked twice must not count as two restocks.
+    if ((rows[i][0] === true) === resolved) continue;
+    sh.getRange(i + 2, 1).setValue(resolved);
+    sh.getRange(i + 2, 12).setValue(resolved ? who : '');
+    logAction(site, who, resolved ? 'Resolved' : 'Reopened',
+              String(rows[i][2] || ''), String(rows[i][3] || ''));
+    if (site === 'ops') tickReportFor(String(rows[i][2] || ''), String(rows[i][3] || ''), resolved, who);
   }
-  return json({ ok: false, error: 'not found' });
+  return found;
+}
+
+/* A concern and the Restock line it produced are one fact written twice: "the
+   eyewash is missing from Jumpkit A" is both a problem on the board and a line
+   on the list of things to go and look at. Ticking one used to leave the other
+   open on the sheet, so the buy list filled up with things somebody had already
+   put back, and nobody trusted it.
+
+   Only the two wordings that map to a Restock line exactly — the ones this file
+   writes itself in noteConcerns and wantsFrom. Free text maps to nothing, and a
+   guess would tick the wrong row. */
+function tickReportFor(what, where, got, who) {
+  var item = '', m;
+  if ((m = /^(.*) missing$/.exec(what))) item = m[1];
+  else if ((m = /^(.*) is expired$/.exec(what))) item = m[1] + ' \u2014 expired';
+  if (!item) return;
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(RESTOCK.name);
+  if (!sh || sh.getLastRow() < 2) return;
+  var rows = sh.getRange(2, 1, sh.getLastRow() - 1, RESTOCK.headers.length).getValues();
+  var changed = false;
+  for (var i = 0; i < rows.length; i++) {
+    if (String(rows[i][9] || 'buy') !== 'report') continue;
+    if (String(rows[i][1]) !== item || String(rows[i][7] || '') !== where) continue;
+    if ((rows[i][0] === true) === got) continue;
+    sh.getRange(i + 2, 1).setValue(got);
+    // Logged as the restock it is, so the count of how often this keeps going
+    // missing from this bag includes the times it was dealt with from the board.
+    logAction('ops', who, got ? 'Restocked' : 'Put back on the list', item, where);
+    changed = true;
+  }
+  if (changed) paintRestock(sh);
 }
 
 function json(o) {
@@ -920,6 +971,8 @@ function doPost(e) {
     if (p.form === '__content' || p.type === 'content') return saveContent(p);
     if (p.form === '__restock') return setRestockGot(p);
     if (p.form === '__resolve') return setConcernResolved(p);
+    if (p.form === '__bagdone') return setBagDone(p);
+    if (p.form === '__chore') return setChore(p);
 
     // The bike site's forms, which post a different payload shape.
     if (BIKE_SHEETS[p.form]) return writeBikeRow(p);
@@ -1723,7 +1776,7 @@ function dutyPeriodRows() {
   var head = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
   var cDp = head.indexOf('DP Key'), cRoom = head.indexOf('Room ID');
   var cCs = head.indexOf('Call Sign'), cSid = head.indexOf('Submission ID');
-  var cDate = head.indexOf('Date');
+  var cDate = head.indexOf('Date'), cName = head.indexOf('Name');
   if (cDp < 0 || cRoom < 0) return {};          // sheet predates these columns
   var rows = sh.getRange(2, 1, sh.getLastRow() - 1, sh.getLastColumn()).getValues();
   var out = {};
@@ -1736,10 +1789,99 @@ function dutyPeriodRows() {
     out[dp][room].push({
       cs:   cCs  >= 0 ? String(r[cCs]  || '').trim() : '',
       sid:  cSid >= 0 ? String(r[cSid] || '').trim() : '',
-      date: cDate >= 0 ? String(r[cDate] || '').trim() : ''
+      date: cDate >= 0 ? String(r[cDate] || '').trim() : '',
+      // For the Office Manager's chore list, which is read by people who know
+      // members by name at least as well as by call sign.
+      name: cName >= 0 ? String(r[cName] || '').trim() : ''
     });
   });
   return out;
+}
+
+/* WHO IS NOT DOING THEIR CHORE — the decisions half.
+
+   Who owes a chore is DERIVED, from the room checks above: anybody who has
+   filed one this year is expected to file one every duty period. That part is
+   a query and needs nothing stored.
+
+   What cannot be derived is the Office Manager's judgement about it. A member
+   who left, or who moved up from probationary to a new call sign, still has an
+   old call sign that files nothing, and without somewhere to say so it reads as
+   missing every duty period forever. A member excused from one duty period is
+   the same thing for one column. Those are decisions, so they are written down,
+   one row each, and never edited — undoing one is another row, which is what
+   lets the list say who changed what and when.
+
+   Kept out of Actions on purpose. That tab is the equipment and restock ledger
+   the weekly report reads, and a list of people's chores does not belong in a
+   report about what the agency bought. */
+var CHORES = {
+  name: 'Chore Log',
+  headers: ['Date','Time','Who','Call Sign','Did','Duty Period','Reason'],
+  widths:  [95, 70, 180, 90, 110, 110, 200]
+};
+var CHORE_DID = { Removed: 1, Restored: 1, Excused: 1, Unexcused: 1 };
+// Fixed reasons, not free text. This list is read back by an endpoint anybody
+// can call, and a box inviting somebody to write why a member left is a box
+// that will one day hold something that should not be public.
+var CHORE_WHY = { left: 'Left', upgraded: 'Moved up from probationary', other: 'Other' };
+
+function ensureChores() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(CHORES.name);
+  if (!sh) {
+    sh = ss.insertSheet(CHORES.name);
+    sh.appendRow(CHORES.headers);
+    sh.getRange(1, 1, 1, CHORES.headers.length)
+      .setFontWeight('bold').setBackground(BRAND).setFontColor('#ffffff');
+    sh.setFrozenRows(1);
+    CHORES.widths.forEach(function (w, i) { sh.setColumnWidth(i + 1, w); });
+  }
+  var have = sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), 1)).getValues()[0];
+  if (have.join('|') !== CHORES.headers.join('|'))
+    sh.getRange(1, 1, 1, CHORES.headers.length).setValues([CHORES.headers]);
+  return sh;
+}
+
+/* In the order they happened, which is the order they have to be replayed in:
+   removed-then-restored and restored-then-removed are opposite answers. */
+function choreRows() {
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CHORES.name);
+  if (!sh || sh.getLastRow() < 2) return [];
+  var tz = Session.getScriptTimeZone();
+  var asDate = function (v) {
+    if (!v) return '';
+    return (v instanceof Date) ? Utilities.formatDate(v, tz, 'yyyy-MM-dd') : String(v);
+  };
+  var asTime = function (v) {
+    if (!v) return '';
+    return (v instanceof Date) ? Utilities.formatDate(v, tz, 'HH:mm') : String(v);
+  };
+  return sh.getRange(2, 1, sh.getLastRow() - 1, CHORES.headers.length).getValues()
+    .filter(function (r) { return String(r[3] || '').trim() && CHORE_DID[String(r[4] || '')]; })
+    .map(function (r) {
+      return { date: asDate(r[0]), time: asTime(r[1]), who: String(r[2] || ''),
+               cs: String(r[3] || '').trim(), did: String(r[4]), dp: String(r[5] || '').trim(),
+               why: String(r[6] || '') };
+    });
+}
+
+/* An Office Manager's decision, so it is checked like one. */
+function setChore(p) {
+  var c = writerCheck(p);
+  if (!c.name) {
+    logError('Chore change REFUSED: ' + c.why, String(p.cs || '') + ' ' + String(p.did || ''));
+    return json({ ok: false, error: 'not allowed: ' + c.why });
+  }
+  var did = CHORE_DID[String(p.did || '')] ? String(p.did) : '';
+  var cs = String(p.cs || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+  var dp = /^\d{4}:\d{1,3}$/.test(String(p.dp || '')) ? String(p.dp) : '';
+  if (!did || !cs || !dp) return json({ ok: false, error: 'bad request' });
+  var tz = Session.getScriptTimeZone(), now = new Date();
+  ensureChores().appendRow([Utilities.formatDate(now, tz, 'yyyy-MM-dd'),
+                            Utilities.formatDate(now, tz, 'HH:mm'),
+                            c.name, cs, did, dp, CHORE_WHY[String(p.why || '')] || '']);
+  return json({ ok: true });
 }
 
 function restockRows(site) {
@@ -2058,6 +2200,205 @@ function activityRows(site, sinceDay, offset, limit) {
            offset: start, more: start + take < out.length };
 }
 
+/* ============================================================================
+   BAG FORMS — every form that touched a bag, and what each bag is still owed
+   ============================================================================
+   The Equipment Manager's question is "which bags need something, and what",
+   and before this the answer was spread across five screens that each held one
+   part of it: the readiness board had the flags, To Get had the purchases,
+   Reported Problems had the notes, Expiring had the dates, Activity had the
+   forms — as one-line summaries that said "2 missing" and never which two.
+
+   This reads the three bag forms in full, newest first, with every item named.
+   A query, like Activity: nothing here is stored.
+
+   `unit` narrows it to one physical bag. A full contents check picks a kit
+   TYPE, not a unit, so it is included for every unit of that type — `type`
+   says which. */
+function bagFormRows(unit, type, offset, limit) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var tz = Session.getScriptTimeZone();
+  var map = nameMap(), units = map.units || {}, items = map.items || {};
+  // Rows filed before `Bag ID` existed name the bag only by its printed name.
+  var idByName = {};
+  Object.keys(units).forEach(function (id) { idByName[String(units[id]).toLowerCase()] = id; });
+  var asDate = function (v) {
+    if (!v) return '';
+    return (v instanceof Date) ? Utilities.formatDate(v, tz, 'yyyy-MM-dd') : String(v).trim();
+  };
+  var asTime = function (v) {
+    if (!v) return '';
+    return (v instanceof Date) ? Utilities.formatDate(v, tz, 'HH:mm') : String(v).trim();
+  };
+  var list = function (v) {
+    return String(v || '').split(' | ').map(function (x) { return x.trim(); })
+      .filter(function (x) { return x; });
+  };
+  var unitName = function (id) {
+    if (id === BIKE_SOURCE_ID) return 'Bike Jumpkit';
+    return units[id] || id;
+  };
+  var itemName = function (id) {
+    var s = String(id || '');
+    if (items[s]) return items[s];
+    return s.indexOf('free:') === 0 ? s.slice(5) : s;
+  };
+  var read = function (conf) {
+    var sh = ss.getSheetByName(conf.name);
+    if (!sh || sh.getLastRow() < 2) return [];
+    var at = {};
+    conf.keys.forEach(function (k, i) { at[k] = i; });
+    return sh.getRange(2, 1, sh.getLastRow() - 1, conf.headers.length).getValues()
+      .map(function (r, n) {
+        var get = function (k) { return at[k] === undefined ? '' : r[at[k]]; };
+        return { get: get, n: n };
+      });
+  };
+
+  var out = [];
+  read(SHEETS['Checkouts']).forEach(function (x) {
+    var date = asDate(x.get('date')); if (!date) return;
+    var bag = String(x.get('subject') || '').trim();
+    out.push({ kind: 'checkout', date: date, time: asTime(x.get('time')),
+      who: String(x.get('name') || '').trim(), sid: String(x.get('sid') || ''),
+      unit: String(x.get('unitId') || '').trim() || idByName[bag.toLowerCase()] || '',
+      bag: bag, result: String(x.get('result') || ''),
+      missing: list(x.get('missing')), missingCount: Number(x.get('missingCount')) || 0,
+      expired: list(x.get('expired')), soon: list(x.get('expiringSoon')),
+      note: String(x.get('detail') || '').trim(), n: x.n, t: 0 });
+  });
+  read(SHEETS['Bag Checks']).forEach(function (x) {
+    var date = asDate(x.get('date')); if (!date) return;
+    out.push({ kind: 'bagcheck', date: date, time: asTime(x.get('time')),
+      who: String(x.get('name') || '').trim(), sid: String(x.get('sid') || ''),
+      type: String(x.get('bagId') || '').trim(), bag: String(x.get('subject') || '').trim(),
+      result: String(x.get('result') || ''),
+      missing: list(x.get('missing')), missingCount: Number(x.get('missingCount')) || 0,
+      expired: list(x.get('expired')), soon: list(x.get('expiringSoon')),
+      note: '', n: x.n, t: 1 });
+  });
+  read(SHEETS['Post-Call']).forEach(function (x) {
+    var date = asDate(x.get('date')); if (!date) return;
+    var used = [], raw = x.get('usageJson');
+    if (raw) {
+      var parsed;
+      try { parsed = JSON.parse(raw); } catch (err) { parsed = []; }
+      if (Array.isArray(parsed)) parsed.forEach(function (u) {
+        if (!u || !u.i) return;
+        used.push({ n: itemName(u.i), q: Number(u.q) || 1, f: String(u.f || ''),
+                    fn: unitName(String(u.f || '')), r: !!u.r });
+      });
+    }
+    out.push({ kind: 'postcall', date: date, time: asTime(x.get('time')),
+      who: String(x.get('name') || '').trim(), sid: String(x.get('sid') || ''),
+      call: String(x.get('callnum') || '').trim(), result: String(x.get('result') || ''),
+      used: used, meds: list(x.get('meds')), n: x.n, t: 2 });
+  });
+
+  /* Newest first. The row's own position breaks a tie within a tab, because
+     rows are only ever appended — so position is the order they were filed. */
+  out.sort(function (a, b) {
+    return (b.date + ' ' + b.time).localeCompare(a.date + ' ' + a.time) ||
+           (a.t - b.t) || (b.n - a.n);
+  });
+
+  var start = Math.max(0, Number(offset) || 0);
+  var reply = { ok: true };
+  // Only on the first page: it is computed across everything, and page two of a
+  // feed does not need it sent again.
+  if (!start) reply.bags = bagOwed(out, units);
+
+  var rows = out.filter(function (r) {
+    if (!unit) return true;
+    if (r.kind === 'checkout') return r.unit === unit;
+    if (r.kind === 'bagcheck') return !!type && r.type === type;
+    return r.used.some(function (u) { return u.f === unit; });
+  });
+  var take = Math.min(Math.max(Number(limit) || 40, 1), 200);
+  reply.rows = rows.slice(start, start + take).map(function (r) {
+    delete r.n; delete r.t; return r;
+  });
+  reply.total = rows.length; reply.offset = start; reply.more = start + take < rows.length;
+  return reply;
+}
+
+/* What each bag has had taken out of it on calls since it was last restocked,
+   and when anybody last had it out.
+
+   "Last restocked" is the newest of two things in the Actions ledger: the bag
+   marked restocked outright, or its "Used on a call" flag ticked off — which
+   is the same statement made from the readiness board, and must not leave the
+   bag looking owed things somebody already put back.
+
+   What a member put back themselves is not owed and is left out. So is the
+   bike kit, which is shopped for from the bike list by somebody else. */
+function bagOwed(rows, units) {
+  var since = {}, nameToId = {};
+  Object.keys(units).forEach(function (id) { nameToId[String(units[id]).toLowerCase()] = id; });
+  var tz = Session.getScriptTimeZone();
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(ACTIONS.name);
+  if (sh && sh.getLastRow() >= 2) {
+    sh.getRange(2, 1, sh.getLastRow() - 1, ACTIONS.headers.length).getValues().forEach(function (r) {
+      if (rowSite(r[3]) !== 'ops') return;
+      var did = String(r[4] || ''), id = '';
+      if (did === 'Restocked bag') id = String(r[7] || '').trim();
+      else if (did === 'Resolved' && String(r[5] || '').indexOf(USED_ON_CALL) === 0)
+        id = nameToId[String(r[6] || '').trim().toLowerCase()] || '';
+      if (!id) return;
+      var day = (r[0] instanceof Date) ? Utilities.formatDate(r[0], tz, 'yyyy-MM-dd') : String(r[0] || '');
+      var time = (r[1] instanceof Date) ? Utilities.formatDate(r[1], tz, 'HH:mm') : String(r[1] || '');
+      var at = day + ' ' + time;
+      if (!since[id] || since[id].at < at) since[id] = { at: at, date: day, time: time, who: String(r[2] || '') };
+    });
+  }
+  var out = {};
+  var slot = function (id) {
+    return out[id] || (out[id] = { since: since[id] || null, used: [], calls: 0, last: null });
+  };
+  Object.keys(since).forEach(slot);
+  // Rows arrive newest first, so the first sighting of a bag is its latest.
+  rows.forEach(function (r) {
+    var at = r.date + ' ' + r.time;
+    if (r.kind === 'checkout' && r.unit) {
+      var s = slot(r.unit);
+      if (!s.last) s.last = { kind: 'checkout', date: r.date, time: r.time, who: r.who };
+    }
+    if (r.kind !== 'postcall') return;
+    var seen = {};
+    r.used.forEach(function (u) {
+      if (!u.f || u.f === BIKE_SOURCE_ID) return;
+      var s = slot(u.f);
+      if (!s.last) s.last = { kind: 'postcall', date: r.date, time: r.time, who: r.who };
+      if (u.r) return;
+      if (s.since && at <= s.since.at) return;
+      if (!seen[u.f]) { seen[u.f] = 1; s.calls++; }
+      var hit = null;
+      for (var i = 0; i < s.used.length; i++) if (s.used[i].n === u.n) { hit = s.used[i]; break; }
+      if (hit) hit.q += u.q;
+      else s.used.push({ n: u.n, q: u.q, last: r.date });
+    });
+  });
+  return out;
+}
+
+/* Marking a bag restocked: one tap for what used to be a tick per line on two
+   different screens. Closes the concerns the site names — the things that are
+   a restock, never the free-text reports of damage, which restocking does not
+   fix — and records the moment, which is what `bagOwed` measures from. */
+function setBagDone(p) {
+  var c = writerCheck(p);
+  if (!c.name) {
+    logError('Bag restock REFUSED: ' + c.why, String(p.unit || ''));
+    return json({ ok: false, error: 'not allowed: ' + c.why });
+  }
+  var unit = String(p.unit || '').trim();
+  if (!unit) return json({ ok: false, error: 'bad request' });
+  var sigs = Array.isArray(p.sigs) ? p.sigs.map(String) : [];
+  if (sigs.length) markConcerns('ops', sigs, true, c.name);
+  logAction('ops', c.name, 'Restocked bag', String(p.name || unit), '', unit);
+  return json({ ok: true });
+}
+
 function collectReport(period) {
   var since = periodStartMs(period);
   var used = {}, calls = {}, concerns = [];
@@ -2146,7 +2487,10 @@ function doGet(e) {
                   recur: recurrenceRows(siteOf(p)) });
   }
   if (p.dp) {
-    return json({ ok: true, dp: dutyPeriodRows() });
+    return json({ ok: true, dp: dutyPeriodRows(), chores: choreRows() });
+  }
+  if (p.bagforms) {
+    return json(bagFormRows(String(p.unit || ''), String(p.type || ''), p.offset, p.limit));
   }
   /* Everything a view needs that has to aggregate across people, in one call.
      Three round trips from a phone on campus wifi is three chances to time out
@@ -2239,7 +2583,7 @@ function checkTabShapes() {
 var TAB_ORDER = ['Checkouts', 'Restock', 'Room Checks', 'Bag Checks', 'Post-Call',
                  'Reports', 'Concerns', 'Expiry',
                  'Bike Jumpkit Checks', 'Bike Safety Checks',
-                 'Bike Restock', 'Actions', 'Items'];
+                 'Bike Restock', 'Actions', 'Chore Log', 'Items'];
 
 /* Run by hand (Run ▸ tidyUp) after pasting an updated script.
 
@@ -2283,7 +2627,7 @@ function tidyUp() {
   paintRestock(ensureRestock());
   paintBikeRestock(ensureBikeRestock());
   [ [ensureExpiry(), EXPIRY], [ensureConcerns(), CONCERNS],
-    [ensureActions(), ACTIONS] ].forEach(function (pair) {
+    [ensureActions(), ACTIONS], [ensureChores(), CHORES] ].forEach(function (pair) {
     var sh = pair[0], conf = pair[1];
     sh.setFrozenRows(1);
     sh.getRange(1, 1, 1, conf.headers.length)
