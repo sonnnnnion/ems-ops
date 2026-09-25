@@ -1253,6 +1253,28 @@
     width:24px;height:24px;border-radius:50%}
   .fchip button:hover{background:rgba(140,28,43,.12)}
 
+  /* Lists of problems and of work done: one row each, the thing in bold, where
+     it is underneath, and the one button at the end. */
+  .isslist{gap:0}
+  .isslist li{padding:11px 0;border-bottom:1px solid var(--rule-soft);align-items:center;gap:10px;font-size:14px}
+  .isslist li:last-child{border-bottom:0}
+  .isslist li>b{font-weight:600;line-height:1.4}
+  .iss-where{display:block;font-weight:400;font-size:12.5px;color:var(--ink-mute);margin-top:1px}
+  .iss-when{font-size:12.5px;color:var(--ink-mute);white-space:nowrap}
+  .isslist .issx{font-size:12.5px;font-weight:600;color:var(--ink-mute);border:1px solid var(--rule-strong);
+    border-radius:999px;padding:5px 11px;white-space:nowrap}
+  .isslist .issx:hover{background:var(--ok-wash);color:var(--ok);border-color:var(--ok)}
+
+  .exprows{list-style:none;margin:0;padding:0}
+  .exprows li{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--rule-soft)}
+  .exprows li:last-child{border-bottom:0}
+  .daysleft{background:var(--ok-wash);color:var(--ok)}
+  .gcell{white-space:nowrap}
+  .gauge{display:inline-block;vertical-align:middle;width:70px;height:10px;border-radius:999px;background:var(--bg-2);
+    overflow:hidden;margin-right:8px}
+  .gauge i{display:block;height:100%;border-radius:999px}
+  .stockin{max-width:96px}
+
   /* ---------- Jumpkits & Bags ---------------------------------------------- */
   .board{display:flex;flex-direction:column;gap:12px}
   .board-g{display:grid;grid-template-columns:104px 1fr;gap:10px;align-items:start}
@@ -1757,7 +1779,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260925155835';
+var BUILD='20260925165000';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -6452,6 +6474,14 @@ function startAgain(fid){ formDone[fid]=false; renderCheck(fid); }
    by prefix rather than equality, because the date is appended — see doSubmit. */
 var USED_ON_CALL='Used on a call';
 
+/* "Used on a call 2026-09-01" is how the flag is stored, because the date keeps
+   one call's flag apart from the next. Read aloud it is a string of digits, so
+   screens say "Used on a call · Sep 1" instead. Display only: the stored text,
+   and every signature built from it, is untouched. */
+function prettyWhat(w){
+  var m=/^Used on a call (\d{4}-\d{2}-\d{2})$/.exec(String(w||''));
+  return m ? USED_ON_CALL+' · '+kitDay(m[1]) : String(w||'');
+}
 function concernKey(what,where){
   return String(what||'').trim().toLowerCase()+'|'+String(where||'').trim().toLowerCase();
 }
@@ -7574,9 +7604,18 @@ function renderReadiness(){
      matters more here than anywhere. */
   var h=liveNote(stateFetch, !!remoteConcerns, 'reported', 'reports',
                  'fetchSharedState().then(renderReadiness)');
-  h+='<div class="legend"><span class="item"><span class="tag ok">Ready</span></span>'+
-        '<span class="item"><span class="tag warn">Check first</span></span>'+
-        '<span class="item"><span class="tag crit">Do not take</span></span></div>';
+  var tally={ok:0,warn:0,oos:0};
+  units.forEach(function(u){ tally[unitStatus(u.id).cls]=(tally[unitStatus(u.id).cls]||0)+1; });
+  h+='<div class="glance">'+
+     '<div class="gl gl-hero">'+ringSVG([{v:tally.ok,cls:'r-ok'},{v:tally.warn,cls:'r-warn'},{v:tally.oos,cls:'r-crit'}],
+                                        Math.round(tally.ok/units.length*100)+'%')+
+       '<div><div class="gl-n">'+tally.ok+'<small>of '+units.length+'</small></div><div class="gl-l">ready to take</div>'+
+       '<ul class="key"><li><i class="p-ok"></i>Ready</li><li><i class="p-warn"></i>Check first</li>'+
+       '<li><i class="p-crit"></i>Do not take</li></ul></div></div>'+
+     glTile(tally.warn,'check first','',tally.warn?'warn':'ok')+
+     glTile(tally.oos,'do not take','',tally.oos?'crit':'ok')+
+     glTile(units.filter(function(u){ return isStale(u.type); }).length,'due a full check','','')+
+     '</div>';
   h+='<div class="readygrid">';
   units.forEach(function(u){
     var st=unitStatus(u.id);
@@ -7589,7 +7628,7 @@ function renderReadiness(){
       // the gauze saw three lines, pressed one button, and silently signed off a
       // broken zipper they had never been shown.
       h+='<ul class="rc-iss">'+st.issues.map(function(i){
-        return '<li><span>'+esc(i.what)+'</span>'+
+        return '<li><span>'+esc(prettyWhat(i.what))+'</span>'+
           '<button class="btn xs rc-fix" data-need="equipment" title="Mark this one fixed" '+
           'onclick="resolveConcernUI(\''+jsq(i.what)+'\',\''+jsq(i.where)+'\')">✓</button></li>';
       }).join('')+'</ul>';
@@ -7756,7 +7795,7 @@ function toGetName(t){
    it as UTC, which prints yesterday for anyone west of Greenwich. */
 function toGetDate(t){
   if(!t.last) return '—';
-  if(t.remote) return String(t.last);
+  if(t.remote) return kitDay(String(t.last));
   var d=new Date(t.last);
   return isNaN(d.getTime())?'—':d.toLocaleDateString();
 }
@@ -7957,7 +7996,7 @@ function horizonCardHtml(rows){
                : g.soonest===0 ? 'expires today'
                : 'in '+g.soonest+' day'+(g.soonest===1?'':'s');
       return '<li><b>'+esc(g.item)+'</b>'+
-             '<span class="hz-when'+(g.soonest<=30?' near':'')+'">'+esc(when)+'</span>'+
+             '<span class="daysleft '+(g.soonest<0?'bad':g.soonest<=30?'soon':'')+'">'+esc(when)+'</span>'+
              '<span class="hz-where">'+esc(g.places.filter(Boolean).join(', '))+'</span></li>';
     }).join('')+'</ul>'+
     /* Both numbers, said together. The card header used to carry the count of
@@ -7991,35 +8030,58 @@ function renderExpiring(){
   var expired=rows.filter(function(r){return r.days<0;});
   var m30=rows.filter(function(r){return r.days>=0&&r.days<=30;});
   var m90=rows.filter(function(r){return r.days>30&&r.days<=90;});
+  var later=rows.filter(function(r){return r.days>90;});
 
-  var h=note+'<div class="repgrid">'+
-    '<div class="repstat"><div class="rs-n">'+expired.length+'</div><div class="rs-l">expired</div></div>'+
-    '<div class="repstat"><div class="rs-n">'+m30.length+'</div><div class="rs-l">within 30 days</div></div>'+
-    '<div class="repstat"><div class="rs-n">'+m90.length+'</div><div class="rs-l">31 to 90 days</div></div>'+
+  var h=note+'<div class="glance">'+
+    '<div class="gl gl-hero">'+ringSVG([{v:expired.length,cls:'r-crit'},{v:m30.length,cls:'r-warn'},
+                                       {v:m90.length+later.length,cls:'r-ok'}],
+                                       Math.round((m90.length+later.length)/rows.length*100)+'%')+
+      '<div><div class="gl-n">'+(m90.length+later.length)+'<small>of '+rows.length+'</small></div>'+
+      '<div class="gl-l">dates more than a month away</div>'+
+      '<ul class="key"><li><i class="p-crit"></i>Expired</li><li><i class="p-warn"></i>Within 30 days</li>'+
+      '<li><i class="p-ok"></i>Later</li></ul></div></div>'+
+    glTile(expired.length,'expired','',expired.length?'crit':'ok')+
+    glTile(m30.length,'within 30 days','',m30.length?'warn':'ok')+
+    glTile(m90.length,'in 31 to 90 days',later.length+' later','')+
     '</div>';
 
-  h+='<p class="explegend"><span class="expbadge bad">Expired</span> past its date'+
-     '<span class="expbadge soon">60d</span> 60 days or fewer'+
-     '<span class="expbadge good">OK</span> more than 60 days</p>';
+  /* When the buying lands. Expired first, then month by month for six months:
+     the months with tall bars are the orders to plan for. */
+  var now=new Date(), months=[];
+  for(var i=0;i<6;i++){ var md=new Date(now.getFullYear(),now.getMonth()+i,1); months.push(md); }
+  var colFor=function(r){
+    if(r.days<0) return 'x';
+    var d=kitParseDay(r.iso); if(!d) return '';
+    for(var i=0;i<months.length;i++)
+      if(d.getFullYear()===months[i].getFullYear() && d.getMonth()===months[i].getMonth()) return String(i);
+    return '';
+  };
+  var cols=[{key:'x', label:'Expired', parts:[{v:expired.length,cls:'p-crit'}], title:expired.length+' expired'}]
+    .concat(months.map(function(m,i){
+      var list=rows.filter(function(r){ return colFor(r)===String(i); });
+      var soon=list.filter(function(r){ return r.days<=30; }).length;
+      var lab=m.toLocaleDateString([],{month:'short'});
+      return {key:String(i), label:lab, parts:[{v:soon,cls:'p-warn'},{v:list.length-soon,cls:'p-ok'}],
+              title:lab+': '+list.length+' lapse'+(list.length===1?'s':'')};
+    }));
+  h+='<div class="sec"><h3>When things lapse</h3></div><div class="panel">'+colChart(cols,{h:140,gap:10,bw:52})+'</div>';
 
-  h+='<div class="invwrap"><table class="invtable exptable"><thead><tr>'+
-     '<th>Item</th><th>Bag</th><th>Expires</th><th></th><th></th>'+
-     '</tr></thead><tbody>';
-  rows.forEach(function(r){
-    var cls = r.days<0 ? 'bad' : (r.days<=60 ? 'soon' : 'good');
-    var txt = r.days<0 ? 'Expired' : (r.days<=60 ? r.days+'d' : 'OK');
-    h+='<tr><td>'+esc(r.item)+
-       (r.known?'':'<br><span style="font-size:11px;color:var(--ink-faint)">no longer in this bag’s list</span>')+
-       '</td>'+
-       '<td style="font-size:12px">'+esc(r.place)+'</td>'+
-       '<td style="font-size:12px" class="mono">'+esc(r.iso)+'</td>'+
-       '<td><span class="expbadge '+cls+'">'+esc(txt)+'</span></td>'+
-       '<td>'+(r.onList
-         ? '<button class="btn xs on" onclick="wantExpiring(\''+jsq(r.key)+'\')">✓ On list</button>'
-         : '<button class="btn xs" onclick="wantExpiring(\''+jsq(r.key)+'\')">To Get</button>')+
-       '</td></tr>';
-  });
-  h+='</tbody></table></div>';
+  var group=function(title,list,tone){
+    if(!list.length) return '';
+    return '<div class="sec"><h3>'+title+'</h3><span class="sec-n">'+list.length+'</span></div>'+
+      '<div class="panel"><ul class="exprows">'+list.map(function(r){
+        var w = r.days<0 ? 'expired '+(-r.days)+'d ago' : r.days===0 ? 'today' : r.days+' days left';
+        return '<li><div class="kc-item"><b>'+esc(r.item)+'</b><span>'+esc(r.place)+
+          (r.known?'':' · no longer in this bag’s list')+' · '+esc(kitDay(r.iso))+'</span></div>'+
+          '<span class="daysleft '+tone+'">'+w+'</span>'+
+          (r.onList
+            ? '<button class="btn xs on" onclick="wantExpiring(\''+jsq(r.key)+'\')">✓ On list</button>'
+            : '<button class="btn xs" onclick="wantExpiring(\''+jsq(r.key)+'\')">To Get</button>')+
+          '</li>';
+      }).join('')+'</ul></div>';
+  };
+  h+=group('Expired',expired,'bad')+group('Within 30 days',m30,'soon')+
+     group('In 31 to 90 days',m90,'')+group('Later',later,'');
   host.innerHTML=h;
 }
 
@@ -8929,7 +8991,7 @@ function choreTable(){
 /* Who did it, as a role rather than an address. The sheet records the Google
    account that signed the change, which is right for the file and wrong for a
    screen: the Office Manager knows "Office Manager", not somebody's Gmail. */
-function choreBy(d){
+function whoLabel(d){
   if(!d || !d.who) return '';
   var r=roleForEmail(d.who);
   return r && ROLE_LABEL[r] ? ROLE_LABEL[r] : d.who;
@@ -9092,7 +9154,7 @@ function choreRemovedHtml(t,decide){
       var d=r.d||{};
       return '<li><div><span class="who-cs">'+esc(r.shown)+'</span><span class="who-nm">'+esc(r.name||'')+'</span>'+
         '<div class="g-why">'+esc(d.why||'Removed')+' · after DP '+esc(String(dpParse(d.dp||'').n||''))+
-        (d.date?' · '+esc(kitWhen(d.date)):'')+(choreBy(d)?' · '+esc(choreBy(d)):'')+'</div></div>'+
+        (d.date?' · '+esc(kitWhen(d.date)):'')+(whoLabel(d)?' · '+esc(whoLabel(d)):'')+'</div></div>'+
         (decide?'<button type="button" class="btn xs" onclick="choreRestore(\''+jsq(r.cs)+'\')">Restore</button>':'')+
         '</li>';
     }).join('')+'</ul>';
@@ -9244,13 +9306,17 @@ function renderInventory(){
 
   var short=(DB.inventory||[]).filter(belowPar).length;
   var counted=(DB.inventory||[]).filter(function(r){return stockOf(r.id)!=null;}).length;
-  h+='<div class="repgrid">'+
-     '<div class="repstat"><div class="rs-n">'+short+'</div><div class="rs-l">below par</div></div>'+
-     '<div class="repstat"><div class="rs-n">'+counted+' / '+(DB.inventory||[]).length+
-     '</div><div class="rs-l">counted</div></div></div>';
-  h+='<p class="explegend"><span class="expbadge bad">Short</span> under par'+
-     '<span class="expbadge good">OK</span> at or over par'+
-     '<span class="expbadge">—</span> never counted</p>';
+  var total=(DB.inventory||[]).length;
+  h+='<div class="glance">'+
+     '<div class="gl gl-hero">'+ringSVG([{v:counted-short,cls:'r-ok'},{v:short,cls:'r-crit'},{v:total-counted,cls:'r-mute'}],
+                                        total?Math.round(counted/total*100)+'%':'—')+
+       '<div><div class="gl-n">'+counted+'<small>of '+total+'</small></div><div class="gl-l">shelves counted</div>'+
+       '<ul class="key"><li><i class="p-ok"></i>At par</li><li><i class="p-crit"></i>Short</li>'+
+       '<li><i class="p-mute"></i>Not counted</li></ul></div></div>'+
+     glTile(short,'below par','',short?'crit':'ok')+
+     glTile(total-counted,'never counted','','')+
+     glTile((DB.bagUnits||[]).filter(function(u){return u.active;}).length,'bags in service','','')+
+     '</div>';
 
   // "Uses" said nothing on its own, and "— not linked —" read like an error
   // rather than a job. Both now say what the column is for and what pressing it
@@ -9267,8 +9333,13 @@ function renderInventory(){
     h+='<tr class="grp"><td colspan="6">'+esc(loc)+'</td></tr>';
     groups[loc].forEach(function(i){
       var cur=stockOf(i.id), low=belowPar(i);
-      var cls = cur==null ? '' : (low?'bad':'good');
-      var txt = cur==null ? '—' : (low?'Short':'OK');
+      var par=(typeof i.par==='number' && i.par>0) ? i.par : 0;
+      // Have against par as a bar: a count means little until it is set beside
+      // what should be there.
+      var pct = cur==null||!par ? 0 : Math.min(100, cur/par*100);
+      var gauge = '<span class="gauge" title="'+(cur==null?'Not counted':cur+' of '+par)+'">'+
+        (cur==null?'':'<i class="'+(low?'p-crit':'p-ok')+'" style="width:'+Math.max(4,pct)+'%"></i>')+'</span>'+
+        (cur==null?'<span class="tag mute">Not counted</span>':low?'<span class="tag crit">Short</span>':'<span class="tag ok">OK</span>');
       // The count is typed straight into the row. A dialog per item is four taps
       // for a number somebody is reading off a shelf with the box still in hand.
       h+='<tr><td>'+esc(i.item)+consumableSelect(i.id)+'</td><td>'+esc(i.cat)+'</td>'+
@@ -9276,7 +9347,7 @@ function renderInventory(){
            'value="'+(cur==null?'':esc(String(cur)))+'" placeholder="—" aria-label="How many of '+
            esc(i.item)+'" onchange="setStock(\''+jsq(i.id)+'\',this.value)"></td>'+
          '<td class="num">'+esc(String(i.par))+'</td>'+
-         '<td><span class="expbadge '+cls+'">'+esc(txt)+'</span></td>'+
+         '<td class="gcell">'+gauge+'</td>'+
          '<td><button class="btn xs'+(low?' on':'')+'" onclick="restocked(\''+jsq(i.id)+'\')">Restocked</button></td>'+
          '</tr>';
     });
@@ -9554,122 +9625,95 @@ function renderReports(){
   var live=!!(DB.api&&DB.api.url);
   if(live && !remoteReport[p]) fetchReport(p).then(function(r){ if(r) renderReports(); });
 
-  var h='<div class="periodbar">'+
+  var h='<div class="toolbar"><div class="seg" role="group" aria-label="Period">'+
     [['week','This week'],['month','This month'],['ytd','Year to date']].map(function(o){
-      return '<button type="button" class="'+(p===o[0]?'on':'')+'" onclick="setPeriod(\''+o[0]+'\')">'+
-             o[1]+'</button>';
-    }).join('')+'</div>'+
-    '<p class="hint" style="margin-top:8px">'+esc(periodLabel(p))+'</p>';
+      return '<button type="button" class="'+(p===o[0]?'on':'')+'" aria-pressed="'+(p===o[0])+'" '+
+             'onclick="setPeriod(\''+o[0]+'\')">'+o[1]+'</button>';
+    }).join('')+'</div><span class="hint" style="margin:0">'+esc(periodLabel(p))+'</span></div>';
 
   // One quiet line, not a banner: a manager reading a buy-list still needs to
   // know whether it covers the whole team or only this phone.
-  h+='<p class="hint" style="margin-top:2px">'+
+  h+='<p class="dpsrc">'+
      (d.remote ? 'From the spreadsheet.'
       : reportStale ? '<span class="bad">The spreadsheet is running an older copy of the '+
         'script, so this covers this device only (paste the current one and redeploy).</span>'
       : live ? 'Reading the spreadsheet…'
       : 'From this device.')+'</p>';
 
-  /* Two questions, in this order: what came up, and what we did about it.
-
-     The report used to answer only the first, so a month of solid work showed a
-     wall of problems and no evidence anybody had touched them. The counts are
-     paired deliberately — reported against handled, so the gap between them is
-     the thing worth reading. */
+  /* Two questions, in this order: what came up, and what we did about it — the
+     counts side by side, so the gap between them is the thing that reads. */
   var acts=d.actions||[];
-  var didRestock=acts.filter(function(a){ return a.did==='Restocked'; });
+  var didRestock=acts.filter(function(a){ return a.did==='Restocked'||a.did==='Restocked bag'; });
   var didResolve=acts.filter(function(a){ return a.did==='Resolved'; });
-  h+='<h3 class="tgsec">What came up</h3>';
-  h+='<div class="repgrid">'+
-     '<div class="repstat"><div class="rs-n">'+d.calls+'</div><div class="rs-l">calls</div></div>'+
-     '<div class="repstat"><div class="rs-n">'+d.usage.reduce(function(a,u){return a+u.qty;},0)+
-       '</div><div class="rs-l">units used</div></div>'+
-     '<div class="repstat"><div class="rs-n">'+d.issuesAll.length+'</div><div class="rs-l">problems raised</div></div>'+
-     '</div>';
-  h+='<h3 class="tgsec">What we did</h3>';
-  h+='<div class="repgrid">'+
-     '<div class="repstat"><div class="rs-n">'+didRestock.length+'</div><div class="rs-l">items restocked</div></div>'+
-     '<div class="repstat"><div class="rs-n">'+didResolve.length+'</div><div class="rs-l">problems closed</div></div>'+
-     '<div class="repstat'+(d.issuesOpen.length?' open':'')+'"><div class="rs-n">'+d.issuesOpen.length+
-       '</div><div class="rs-l">still open</div></div>'+
+  var units=d.usage.reduce(function(a,u){return a+u.qty;},0);
+  var raised=d.issuesAll.length, open=d.issuesOpen.length;
+  h+='<div class="glance">'+
+     '<div class="gl gl-hero">'+ringSVG([{v:raised-open,cls:'r-ok'},{v:open,cls:'r-warn'}],
+                                        raised?Math.round((raised-open)/raised*100)+'%':'—')+
+       '<div><div class="gl-n">'+(raised-open)+'<small>of '+raised+'</small></div>'+
+       '<div class="gl-l">problems dealt with</div>'+
+       '<ul class="key"><li><i class="p-ok"></i>Dealt with</li><li><i class="p-warn"></i>Still open</li></ul></div></div>'+
+     glTile(d.calls,'call'+(d.calls===1?'':'s'),units+' thing'+(units===1?'':'s')+' used','')+
+     glTile(didRestock.length,'restocked',didResolve.length+' problem'+(didResolve.length===1?'':'s')+' closed',didRestock.length?'ok':'')+
+     glTile(open,'still open','',open?'warn':'ok')+
      '</div>';
 
-  /* ---- equipment to buy ---- */
-  h+='<div class="card"><h3>Equipment to buy</h3>';
-  if(!d.buy.length){
-    h+='<p class="hint" style="margin:0">Nothing has been logged as used in this period. '+
-       'If that looks wrong, it means post-call forms are not being filled in.</p>';
-  }else{
-    d.buy.forEach(function(b){
-      var froms=Object.keys(b.from).sort(function(x,y){return b.from[y]-b.from[x];});
-      var u=unitLabel(b.unit,b.qty);
-      h+='<div class="buyrow"><span class="bq">'+b.qty+
-         (u?'<span style="font-weight:400"> '+esc(u)+'</span>':'')+'</span>'+
-         '<span class="bn">'+esc(b.name)+'</span>'+
-         '<span class="bf">'+esc(froms.slice(0,3).join(', '))+
-         (froms.length>3?' +'+(froms.length-3):'')+'</span></div>';
-    });
-  }
-  h+='</div>';
+  // ---- what to buy, and where it went
+  var buyRows=d.buy.slice(0,12).map(function(b){
+    var froms=Object.keys(b.from).sort(function(x,y){return b.from[y]-b.from[x];});
+    var u=unitLabel(b.unit,b.qty);
+    return {label:b.name+(u?' ('+u+')':''), sub:froms.slice(0,3).join(', ')+(froms.length>3?' +'+(froms.length-3):''),
+            v:b.qty, cls:'p-brand'};
+  });
+  var bags=Object.keys(d.byUnit).sort(function(a,b){return d.byUnit[b]-d.byUnit[a];})
+    .slice(0,10).map(function(u){ return {label:u, v:d.byUnit[u], cls:'p-warn'}; });
+  h+='<div class="twoup" style="margin-top:22px">'+
+     '<div class="panel"><h4>Equipment to buy</h4><p class="ph-s">Used on calls, most first</p>'+
+     (buyRows.length ? hBars(buyRows)+(d.buy.length>12?'<p class="hint">and '+(d.buy.length-12)+' more in the copy for email</p>':'')
+                     : '<p class="hint" style="margin:0">Nothing logged as used.</p>')+'</div>'+
+     '<div class="panel"><h4>Where it went</h4><p class="ph-s">Things used, by bag</p>'+
+     (bags.length ? hBars(bags) : '<p class="hint" style="margin:0">Nothing logged as used.</p>')+'</div>'+
+     '</div>';
 
-  /* ---- concerns ---- */
-  h+='<div class="card mt"><h3>Concerns reported</h3>';
-  if(!d.issuesAll.length){
-    h+='<p class="hint" style="margin:0">Nothing reported in this period.</p>';
-  }else{
-    var badge={Blocking:'crit',Soon:'warn',Whenever:'brand'};
-    // Same row shape as the log, open or resolved, because the only difference
-    // that matters is which way the button goes. Mark resolved used to be a
-    // one-way door here — the resolved ones collapsed into a count with nothing
-    // to press, so a mis-tap could only be undone from a different view.
-    var crow=function(i,isOpen){
-      return '<li><span class="tag '+(badge[i.urgency]||'brand')+'">'+esc(i.urgency)+'</span>'+
-        '<b>'+esc(i.what)+'</b>'+(i.where?' <span style="color:var(--ink-faint)">— '+esc(i.where)+'</span>':'')+
-        '<button class="issx" onclick="'+(isOpen?'clearReportConcern':'reopenReportConcern')+
-        '(\''+jsq(i.what)+'\',\''+jsq(i.where||'')+'\')">'+
-        (isOpen?'Mark resolved':'Reopen')+'</button></li>';
-    };
-    h+= d.issuesOpen.length
-      ? '<ul class="isslist">'+d.issuesOpen.map(function(i){return crow(i,true);}).join('')+'</ul>'
-      : '<p class="noissues">Nothing open.</p>';
+  // ---- concerns
+  var badge={Blocking:'crit',Soon:'warn',Whenever:'brand'};
+  /* Same row shape as the log, open or resolved, because the only difference
+     that matters is which way the button goes. */
+  var crow=function(i,isOpen){
+    return '<li><span class="tag '+(isOpen?(badge[i.urgency]||'brand'):'ok')+'">'+esc(isOpen?i.urgency:'Dealt with')+'</span>'+
+      '<b>'+esc(prettyWhat(i.what))+(i.where?'<span class="iss-where">'+esc(i.where)+'</span>':'')+'</b>'+
+      '<button class="issx" onclick="'+(isOpen?'clearReportConcern':'reopenReportConcern')+
+      '(\''+jsq(i.what)+'\',\''+jsq(i.where||'')+'\')">'+(isOpen?'Mark resolved':'Reopen')+'</button></li>';
+  };
+  h+='<div class="sec"><h3>What came up</h3><span class="sec-n">'+raised+'</span></div><div class="panel">';
+  if(!raised) h+='<p class="hint" style="margin:0">Nothing reported in this period.</p>';
+  else{
+    h+= open ? '<ul class="isslist">'+d.issuesOpen.map(function(i){return crow(i,true);}).join('')+'</ul>'
+             : '<p class="noissues">Nothing open.</p>';
     var closedList=d.issuesAll.filter(function(i){ return !i.open; });
     if(closedList.length)
-      h+='<div class="acc mt"><button type="button" class="acchead" onclick="toggleAcc(this)">'+
-         '<span class="num">'+closedList.length+'</span><span>Resolved in this period</span>'+
+      h+='<div class="acc tight mt"><button type="button" class="acchead" onclick="toggleAcc(this)">'+
+         '<span class="num">'+closedList.length+'</span><span>Dealt with in this period</span>'+
          '<span class="chev">▾</span></button>'+
          '<div class="accbody"><ul class="isslist">'+
          closedList.slice(0,50).map(function(i){return crow(i,false);}).join('')+'</ul></div></div>';
   }
   h+='</div>';
 
-  /* ---- the running total: everything done in this period ---- */
-  h+='<div class="card mt"><h3>What we got through</h3>';
+  // ---- the running total: everything done in this period
+  h+='<div class="sec"><h3>What we got through</h3><span class="sec-n">'+acts.length+'</span></div><div class="panel">';
   if(!acts.length){
-    h+='<p class="hint" style="margin:0">Nothing has been ticked off in this period. '+
-       'Restocking something or marking a problem resolved records it here, with '+
-       'who did it and when.</p>';
+    h+='<p class="hint" style="margin:0">Nothing ticked off in this period.</p>';
   }else{
     h+='<ul class="isslist">'+acts.slice(0,60).map(function(a){
-      var tone = (a.did==='Restocked'||a.did==='Restocked bag'||a.did==='Resolved') ? 'ok' : 'brand';
+      var tone = (a.did==='Restocked'||a.did==='Restocked bag'||a.did==='Resolved') ? 'ok' : 'mute';
       return '<li><span class="tag '+tone+'">'+esc(a.did)+'</span>'+
-        '<b>'+esc(a.what)+'</b>'+
-        (a.where?' <span style="color:var(--ink-faint)">— '+esc(a.where)+'</span>':'')+
-        '<div style="font-size:11.5px;color:var(--ink-faint);margin-top:2px">'+
-        esc(a.who||'somebody')+' · '+esc(concernWhen(a.date))+'</div></li>';
+        '<b>'+esc(prettyWhat(a.what))+(a.where?'<span class="iss-where">'+esc(a.where)+'</span>':'')+'</b>'+
+        '<span class="iss-when">'+esc(whoLabel(a)||'somebody')+' · '+esc(kitWhen(a.date))+'</span></li>';
     }).join('')+'</ul>';
     if(acts.length>60) h+='<p class="hint">Showing the most recent 60 of '+acts.length+'.</p>';
   }
   h+='</div>';
-
-  /* ---- which units are consuming most ---- */
-  var units=Object.keys(d.byUnit).sort(function(a,b){return d.byUnit[b]-d.byUnit[a];});
-  if(units.length){
-    h+='<div class="card mt"><h3>Where it is going</h3>';
-    units.forEach(function(u){
-      h+='<div class="buyrow"><span class="bq">'+d.byUnit[u]+'</span><span class="bn">'+esc(u)+'</span></div>';
-    });
-    h+='</div>';
-  }
 
   h+='<div class="row mt noprint">'+
      '<button class="btn solid" onclick="copyReport()">Copy for email</button>'+
@@ -10506,12 +10550,12 @@ function renderActivity(){
   var host=document.getElementById('activityHost'); if(!host) return;
   var kindLabel={check:'Check', usage:'Used on a call', report:'Reported'};
 
-  var h='<div class="periodbar">'+
+  var h='<div class="toolbar"><div class="seg" role="group" aria-label="Period">'+
     [['week','This week'],['month','This month'],['ytd','Year to date'],['all','Everything']]
       .map(function(o){
-        return '<button type="button" class="'+(actFilter.period===o[0]?'on':'')+
-               '" onclick="setActPeriod(\''+o[0]+'\')">'+o[1]+'</button>';
-      }).join('')+'</div>';
+        return '<button type="button" class="'+(actFilter.period===o[0]?'on':'')+'" '+
+               'aria-pressed="'+(actFilter.period===o[0])+'" onclick="setActPeriod(\''+o[0]+'\')">'+o[1]+'</button>';
+      }).join('')+'</div></div>';
 
   h+='<p class="dpsrc">'+
      (actState.error
@@ -10564,26 +10608,27 @@ function renderActRows(){
             : 'Reading the spreadsheet…';
     h+='<div class="card"><p class="hint" style="margin:0">'+msg+'</p></div>';
   }else{
-    h+='<div class="invwrap"><table class="invtable"><thead><tr>'+
-       '<th>When</th><th>Who</th><th>What</th>'+
-       '<th class="mob-hide">Kit or room</th><th class="mob-hide">Details</th>'+
-       '</tr></thead><tbody>';
-    rows.forEach(function(a){
-      var tone = a.kind==='usage' ? 'brand' : a.kind==='report' ? 'warn' : (a.missing>0?'warn':'ok');
-      var subj = actSubjects(a).join(', ');
-      h+='<tr>'+
-         '<td style="font-size:12px;white-space:nowrap">'+esc(a.date)+
-           '<br><span style="color:var(--ink-faint)">'+esc(a.time)+'</span></td>'+
-         '<td>'+esc(a.who||'—')+
-           (a.andrew?'<br><span style="font-size:11px;color:var(--ink-faint)">'+esc(a.andrew)+'</span>':'')+'</td>'+
-         '<td><span class="tag '+tone+'">'+esc(a.form)+'</span>'+
-           '<span class="mob-only" style="font-size:11.5px;color:var(--ink-faint)">'+
-           (subj?esc(subj)+' · ':'')+esc(a.summary)+'</span></td>'+
-         '<td class="mob-hide" style="font-size:12.5px">'+(subj?esc(subj):'<span class="dim">—</span>')+'</td>'+
-         '<td class="mob-hide" style="font-size:12.5px">'+esc(a.summary)+'</td>'+
-         '</tr>';
+    /* A day at a time, like the bag forms: the date once as a heading instead
+       of on every row, and each row reading as a sentence — what kind of form,
+       about what, what it said, who and when. */
+    var byDay={}, order=[];
+    rows.forEach(function(a){ if(!byDay[a.date]){ byDay[a.date]=[]; order.push(a.date); } byDay[a.date].push(a); });
+    var kindName={check:'Check', usage:'After a call', report:'Report'};
+    order.forEach(function(day){
+      var list=byDay[day];
+      h+='<div class="tl-day"><b>'+esc(kitDayLong(day))+'</b><span>'+list.length+' filed</span></div><ol class="tl">'+
+        list.map(function(a){
+          var flag = a.kind==='report' || a.missing>0;
+          var subj = actSubjects(a).join(', ');
+          var k = a.kind==='usage' ? 'postcall' : a.kind==='report' ? 'bagcheck' : 'checkout';
+          return '<li class="tl-row '+(flag?'found':'clean')+'"><span class="tl-dot" aria-hidden="true"></span><div>'+
+            '<div class="tl-top"><span class="tl-kind k-'+k+'">'+esc(a.form||kindName[a.kind]||'Form')+'</span>'+
+            '<b>'+esc(subj||'\u2014')+'</b><span class="tl-meta">'+esc(kitTime(a.time))+(a.who?' · '+esc(a.who):'')+'</span></div>'+
+            (a.summary && a.summary!=='Complete'
+              ? '<ul class="tl-items"><li>'+esc(a.summary)+'</li></ul>' : '')+
+            '</div></li>';
+        }).join('')+'</ol>';
     });
-    h+='</tbody></table></div>';
   }
 
   /* Outside the empty branch on purpose. It used to sit after an early return,
@@ -10603,6 +10648,7 @@ function renderActRows(){
 }
 
 /* ---- problem log ---- */
+var logView={show:'open', q:''};
 function renderLog(){
   var host=document.getElementById('logHost'); if(!host) return;
   /* Everybody's, not this laptop's. A member reporting a problem cannot publish
@@ -10615,39 +10661,66 @@ function renderLog(){
   var h=liveNote(stateFetch, !!remoteConcerns, 'reported', 'reports',
                  'fetchSharedState().then(renderLog)');
   if(!all.length){
-    h+='<div class="card"><p class="hint" style="margin:0">Nothing has been reported yet. '+
-      'Anything left unticked on a check, and anything filed through Report a Problem, lands here.</p></div>';
+    h+='<div class="panel"><p class="hint" style="margin:0">Nothing has been reported.</p></div>';
     host.innerHTML=h; return;
   }
+  var blocking=open.filter(function(i){ return i.urgency==='Blocking'; }).length;
+  h+='<div class="glance">'+
+     '<div class="gl gl-hero">'+ringSVG([{v:closed.length,cls:'r-ok'},{v:open.length-blocking,cls:'r-warn'},{v:blocking,cls:'r-crit'}],
+                                        Math.round(closed.length/all.length*100)+'%')+
+       '<div><div class="gl-n">'+closed.length+'<small>of '+all.length+'</small></div><div class="gl-l">dealt with</div>'+
+       '<ul class="key"><li><i class="p-ok"></i>Dealt with</li><li><i class="p-warn"></i>Open</li>'+
+       '<li><i class="p-crit"></i>Blocking</li></ul></div></div>'+
+     glTile(open.length,'open','',open.length?'warn':'ok')+
+     glTile(blocking,'blocking a bag','',blocking?'crit':'ok')+
+     glTile(open.filter(function(i){ return i.area==='Office'; }).length,'for the office','','')+
+     '</div>';
+  h+='<div class="toolbar" style="margin-top:18px"><div class="seg" role="group" aria-label="Which problems">'+
+     [['open','Open',open.length],['closed','Dealt with',closed.length],['all','Everything',all.length]].map(function(o){
+       return '<button type="button" class="'+(logView.show===o[0]?'on':'')+'" aria-pressed="'+(logView.show===o[0])+'" '+
+              'onclick="logShow(\''+o[0]+'\')">'+o[1]+'<span class="n">'+o[2]+'</span></button>';
+     }).join('')+'</div>'+
+     '<div class="search"><input type="search" placeholder="Search" aria-label="Search problems" '+
+       'value="'+esc(logView.q)+'" oninput="logSearch(this.value)"></div></div>'+
+     '<div id="logListHost">'+logListHtml()+'</div>';
+  host.innerHTML=h;
+}
+
+function logListHtml(){
+  var all=allConcerns();
+  var q=logView.q.trim().toLowerCase();
+  var rows=all.filter(function(i){
+    if(logView.show==='open' && !i.open) return false;
+    if(logView.show==='closed' && i.open) return false;
+    if(q && (i.what+' '+i.where+' '+i.area+' '+(i.by||'')).toLowerCase().indexOf(q)<0) return false;
+    return true;
+  });
+  // Blocking first, then the oldest open thing — the one that has waited longest.
+  var rank={Blocking:0,Soon:1,Whenever:2};
+  rows.sort(function(a,b){
+    return (b.open-a.open) || ((rank[a.urgency]||3)-(rank[b.urgency]||3)) ||
+           String(a.at).localeCompare(String(b.at));
+  });
+  if(!rows.length) return '<div class="panel"><p class="hint" style="margin:0">'+
+    (logView.show==='open'&&!q?'Nothing open.':'Nothing matches.')+'</p></div>';
   var badge={Blocking:'crit',Soon:'warn',Whenever:'brand'};
   // Deciding something is dealt with is a manager's call. A member reads the
   // same list and sees the same answer; they just have no button.
   var canTick=can('mgr');
-  var row=function(i,isOpen){
-    return '<li><span class="tag '+(badge[i.urgency]||'brand')+'">'+esc(i.urgency)+'</span> '+
-      '<b>'+esc(i.what)+'</b>'+
-      (i.where?' <span style="color:var(--ink-faint)">— '+esc(i.where)+'</span>':'')+
-      '<div style="font-size:11.5px;color:var(--ink-faint);margin-top:2px">'+
-      // Remote rows carry a yyyy-MM-dd string, local ones a timestamp. Neither
-      // must render as "Invalid Date".
-      esc(i.area)+' · '+esc(i.by||'anonymous')+' · '+esc(concernWhen(i.at))+'</div>'+
+  return '<div class="panel"><ul class="isslist">'+rows.map(function(i){
+    return '<li><span class="tag '+(i.open?(badge[i.urgency]||'brand'):'ok')+'">'+esc(i.open?i.urgency:'Dealt with')+'</span>'+
+      '<b>'+esc(prettyWhat(i.what))+'<span class="iss-where">'+
+      [i.where, i.area, i.by||'anonymous', kitWhen(i.at)].filter(Boolean).map(esc).join(' · ')+'</span></b>'+
       (canTick
-        ? '<button class="issx" onclick="'+(isOpen?'resolveConcernUI':'reopenConcernUI')+
-          '(\''+jsq(i.what)+'\',\''+jsq(i.where||'')+'\')">'+
-          (isOpen?'Mark resolved':'Reopen')+'</button>'
+        ? '<button class="issx" onclick="'+(i.open?'resolveConcernUI':'reopenConcernUI')+
+          '(\''+jsq(i.what)+'\',\''+jsq(i.where||'')+'\')">'+(i.open?'Mark resolved':'Reopen')+'</button>'
         : '')+'</li>';
-  };
-  h+='<div class="card"><h3>Open — '+open.length+'</h3>';
-  h+= open.length ? '<ul class="isslist">'+open.map(function(i){return row(i,true);}).join('')+'</ul>'
-                  : '<p class="noissues">Nothing open.</p>';
-  h+='</div>';
-  if(closed.length){
-    h+='<div class="acc mt"><button type="button" class="acchead" onclick="toggleAcc(this)">'+
-       '<span class="num">'+closed.length+'</span><span>Resolved</span><span class="chev">▾</span></button>'+
-       '<div class="accbody"><ul class="isslist">'+
-       closed.slice(0,50).map(function(i){return row(i,false);}).join('')+'</ul></div></div>';
-  }
-  host.innerHTML=h;
+  }).join('')+'</ul></div>';
+}
+function logShow(v){ logView.show=v; renderLog(); }
+function logSearch(v){
+  logView.q=String(v||'');
+  var host=document.getElementById('logListHost'); if(host) host.innerHTML=logListHtml();
 }
 
 /* ---- settings ---- */
