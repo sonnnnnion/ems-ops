@@ -1071,88 +1071,6 @@
   body[data-role="equipment"] .sidebar [data-grp="equipment"],
   body[data-role="office"] .sidebar [data-grp="office"]{order:-1}
 
-  /* ---------- Jumpkits & Bags ---------------------------------------------- */
-  .kitgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-top:12px}
-  .kitcard{border:1px solid var(--rule);border-left:5px solid var(--warn);border-radius:var(--r-md);
-    background:var(--card);box-shadow:var(--shadow-sm);padding:14px 16px;min-width:0}
-  .kitcard.crit{border-left-color:var(--oos)}
-  .kc-top{display:flex;align-items:flex-start;gap:10px}
-  .kc-title{display:flex;flex-direction:column;min-width:0}
-  .kc-name{font:inherit;font-weight:700;font-size:15.5px;background:none;border:0;padding:0;
-    color:var(--ink);cursor:pointer;text-align:left}
-  .kc-name:hover{color:var(--brand)}
-  .kc-name:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:4px}
-  .kc-last{font-size:11.5px;color:var(--ink-faint)}
-  .kc-top .btn{margin-left:auto;flex:0 0 auto}
-  .kc-lines{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
-  .kc-lines li{display:flex;align-items:flex-start;gap:8px;font-size:13.5px;line-height:1.45}
-  .kc-k{flex:0 0 70px;font-family:var(--font-mono);font-size:10.5px;text-transform:uppercase;
-    letter-spacing:.05em;color:var(--ink-faint);padding-top:2px}
-  .kc-v{flex:1;min-width:0;overflow-wrap:anywhere}
-  .kc-sec,.kc-when{color:var(--ink-mute);font-size:12px}
-  .kc-when{white-space:nowrap}
-  .kc-lines .btn{flex:0 0 auto}
-  .kc-msg{font-size:12px;margin:8px 0 0}
-  .kitquiet{font-size:13px;color:var(--ink-mute);margin:14px 0 0;line-height:2}
-  .kitquiet b{font-weight:600;color:var(--ink-soft);margin-right:4px}
-  .kitquiet .kc-name{font-weight:500;font-size:13px;color:var(--ink-soft);margin-right:10px;
-    text-decoration:underline;text-decoration-color:var(--rule-strong);text-underline-offset:3px}
-  .feedhead{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap;margin:26px 0 2px}
-  .feedhead .tgsec{margin:0}
-  .feedhead .btn{margin-left:auto}
-  .fday{font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:.08em;
-    color:var(--ink-mute);margin:16px 0 6px}
-  .feed{list-style:none;margin:0;padding:0;border:1px solid var(--rule);border-radius:var(--r-md);
-    background:var(--card);overflow:hidden}
-  .fd{padding:9px 14px;border-top:1px solid var(--rule-soft);font-size:13.5px}
-  .fd:first-child{border-top:0}
-  .fd-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px}
-  .fd-time{font-family:var(--font-mono);font-size:12px;color:var(--ink-mute);min-width:64px}
-  .fd-ok{color:var(--ok);font-weight:700;width:14px}
-  .fd-dot{color:var(--warn);font-weight:700;width:14px}
-  .fd-form{font-weight:600;flex:1 1 200px;min-width:0}
-  .fd-who{color:var(--ink-mute);font-size:12px;margin-left:auto}
-  .fd.clean .fd-form{font-weight:500;color:var(--ink-soft)}
-  .fd-items{list-style:none;margin:5px 0 2px 88px;padding:0;display:flex;flex-direction:column;gap:3px}
-  .fd-items li{font-size:13px;color:var(--ink-soft)}
-  .fd-items .kc-k{display:inline-block;width:auto;margin-right:6px;padding:0}
-  .st{font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:.05em;
-    padding:1px 6px;border-radius:999px;margin-left:6px;white-space:nowrap}
-  .st.open{background:var(--warn-wash);color:var(--warn)}
-  .st.done{background:var(--ok-wash);color:var(--ok)}
-  .st.back{background:var(--bg-2);color:var(--ink-mute)}
-
-  /* ---------- Missed chores ------------------------------------------------ */
-  .chorelead{margin-top:4px}
-  .chorelead b.cs{font-family:var(--font-mono)}
-  .chorewrap{overflow-x:auto;margin-top:12px;border:1px solid var(--rule);border-radius:var(--r-md);background:var(--card)}
-  .choretab{border-collapse:collapse;width:100%}
-  .choretab th,.choretab td{padding:7px 10px;border-bottom:1px solid var(--rule-soft);font-size:13.5px;
-    text-align:left;white-space:nowrap;background:var(--card)}
-  .choretab th{background:var(--bg-2);font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-mute)}
-  .choretab th.now{color:var(--brand)}
-  /* The call sign stays put while the duty periods scroll under it — on a
-     phone the grid is wider than the screen, and a row of ticks with nobody's
-     name beside it answers nothing. */
-  .choretab td:first-child,.choretab th:first-child{position:sticky;left:0;z-index:1}
-  .choretab .cs{font-family:var(--font-mono);font-weight:700}
-  .choretab .nm{display:block;font-family:var(--font-body);font-weight:400;font-size:11.5px;color:var(--ink-mute)}
-  .choretab td.n{font-family:var(--font-mono);text-align:center}
-  .choretab td.c{text-align:center;padding:4px 5px}
-  .choretab tr.gone td{color:var(--ink-mute)}
-  .cc{display:inline-flex;align-items:center;justify-content:center;min-width:34px;height:30px;padding:0 6px;
-    border-radius:8px;font-weight:700;font-size:13px;border:0;background:none;font-family:var(--font-body);color:var(--ink-faint)}
-  .cc.done{background:var(--ok-wash);color:var(--ok)}
-  .cc.missed{background:var(--oos-wash);color:var(--oos)}
-  .cc.excused{background:var(--bg-2);color:var(--ink-mute);font-size:11px}
-  button.cc{cursor:pointer}
-  button.cc:focus-visible{outline:2px solid var(--brand);outline-offset:1px}
-  @media(max-width:560px){
-    .kc-k{flex-basis:60px}
-    .fd-items{margin-left:0}
-    .fd-who{margin-left:0;width:100%}
-  }
-
   /* Five columns is one too many at 375px, and the one that has to give is the
      name of whoever reported it — on a phone it moves under the item instead of
      taking a column of its own. Same information, one column fewer.
@@ -1192,6 +1110,306 @@
        "Adhesiv / e / bandage / s". */
     .invtable td:nth-child(2){overflow-wrap:break-word}
   }
+
+  /* ======================================================================
+     THE DATA KIT — one visual language for every manager screen
+     ======================================================================
+     The screens managers read were built out of the same few pieces — a
+     count in a box, a coloured badge, a table — and every one of those pieces
+     was hard work to read: labels in small capitals in a typewriter face,
+     white text on saturated badges, numbers with nothing beside them to say
+     whether they were good or bad. A friend of the role, handed the phone,
+     could not tell at a glance what any of it meant.
+
+     So the shared pieces change here, once, and every screen that uses them
+     changes with them: sentence-case labels in the body face, status as a
+     soft pill with a dot, counts that say what they are counting, and charts
+     drawn in plain HTML so their text never shrinks with the screen. Placed
+     after the phone rules above so it wins on equal specificity, and before
+     the touch sizing block, which must stay last. */
+
+  /* Status pills. */
+  .tag{font-family:var(--font-body);font-size:12px;font-weight:700;text-transform:none;letter-spacing:0;
+    border:0;padding:3px 10px 3px 8px;border-radius:999px;background:var(--bg-2);color:var(--ink-soft);
+    display:inline-flex;align-items:center;gap:6px;white-space:nowrap;line-height:1.4;vertical-align:middle}
+  .tag::before{content:'';width:7px;height:7px;border-radius:50%;background:currentColor;flex:0 0 auto}
+  .tag.crit{background:var(--oos-wash);color:var(--oos)}
+  .tag.warn{background:var(--warn-wash);color:var(--warn)}
+  .tag.ok{background:var(--ok-wash);color:var(--ok)}
+  .tag.brand{background:var(--brand-wash);color:var(--brand)}
+  .tag.mute{background:var(--bg-2);color:var(--ink-mute)}
+
+  /* Counts. */
+  .repgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:16px 0}
+  .repstat{padding:16px 18px 15px;border-radius:var(--r-md)}
+  .repstat .rs-n{font-size:30px;color:var(--ink)}
+  .repstat .rs-l{font-size:13px;font-weight:600;text-transform:none;letter-spacing:0;color:var(--ink-mute);margin-top:7px}
+  .repstat.open{border-color:#EBD7B0;background:var(--warn-wash)}
+  .repstat.open .rs-n{color:var(--warn)}
+
+  /* Table headings that read as words, not as a typewriter. */
+  .invtable th{font-family:var(--font-body);font-size:12px;font-weight:700;text-transform:none;letter-spacing:0;color:var(--ink-mute)}
+
+  /* Section headings with their count beside them. */
+  .sec{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:30px 0 12px}
+  .sec h3{font-family:var(--font-display);font-size:21px;margin:0;color:var(--ink);line-height:1.2}
+  .sec .sec-n{font-size:13px;font-weight:700;color:var(--ink-mute);background:var(--bg-2);border-radius:999px;padding:2px 10px}
+  .sec .sec-r{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .sec + .card, .sec + .panel{margin-top:0}
+  .panel{border:1px solid var(--rule);border-radius:var(--r-md);background:var(--card);box-shadow:var(--shadow-sm);padding:18px 20px}
+  .panel h4{font-family:var(--font-body);font-size:14px;font-weight:700;margin:0 0 2px;color:var(--ink)}
+  .panel .ph-s{font-size:12.5px;color:var(--ink-mute);margin:0 0 14px}
+  .twoup{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}
+
+  /* The band across the top of a screen: the answer, before the detail. */
+  .glance{display:grid;grid-template-columns:minmax(250px,1.25fr) repeat(3,minmax(0,1fr));gap:12px;margin:16px 0 4px}
+  .gl{border:1px solid var(--rule);border-radius:var(--r-md);background:var(--card);box-shadow:var(--shadow-sm);
+    padding:15px 17px;min-width:0}
+  .gl-hero{display:flex;align-items:center;gap:16px}
+  .gl-n{font-family:var(--font-display);font-size:30px;font-weight:700;line-height:1;color:var(--ink)}
+  .gl-n small{font-family:var(--font-body);font-size:15px;font-weight:600;color:var(--ink-mute);margin-left:3px}
+  .gl-l{font-size:13px;font-weight:600;color:var(--ink-mute);margin-top:7px;line-height:1.35}
+  .gl-s{font-size:12px;color:var(--ink-faint);margin-top:3px}
+  .gl.t-ok .gl-n{color:var(--ok)} .gl.t-warn .gl-n{color:var(--warn)} .gl.t-crit .gl-n{color:var(--oos)}
+  .gl.t-warn{background:linear-gradient(0deg,var(--warn-wash),var(--card) 70%)}
+  .gl.t-crit{background:linear-gradient(0deg,var(--oos-wash),var(--card) 70%)}
+  .gl-hero .gl-n{font-size:34px}
+  .gl-hero .gl-l{margin-top:4px}
+
+  /* A ring: how much of a whole. */
+  .ring{position:relative;width:86px;height:86px;flex:0 0 86px}
+  .ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+  .ring circle{fill:none;stroke-width:10}
+  .ring .r-bg{stroke:var(--bg-2)}
+  .ring .r-ok{stroke:var(--ok)} .ring .r-warn{stroke:var(--warn)} .ring .r-crit{stroke:var(--oos)} .ring .r-mute{stroke:#CFC6BA}
+  .ring b{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    font-family:var(--font-display);font-size:19px;color:var(--ink)}
+
+  /* A bar split into parts, with its key. */
+  .segbar{display:flex;height:10px;border-radius:999px;overflow:hidden;background:var(--bg-2);margin-top:10px}
+  .segbar i{display:block;height:100%}
+  .p-ok{background:var(--ok)} .p-warn{background:var(--warn)} .p-crit{background:var(--oos)}
+  .p-mute{background:#CFC6BA} .p-brand{background:var(--brand)}
+  .p-todo{background:repeating-linear-gradient(135deg,#E6DED2 0 4px,#F1ECE4 4px 8px)}
+  .key{display:flex;flex-wrap:wrap;gap:6px 16px;margin:10px 0 0;padding:0;list-style:none;font-size:12.5px;color:var(--ink-mute)}
+  .key li{display:inline-flex;align-items:center;gap:7px}
+  .key i{width:11px;height:11px;border-radius:3px;display:inline-block}
+
+  /* Column chart, in HTML so its labels stay readable at any width. */
+  .colchart{position:relative;padding:18px 0 0 30px}
+  .cc-plot{position:relative;height:var(--h,170px)}
+  .cc-grid{position:absolute;inset:0;pointer-events:none}
+  .cc-grid span{position:absolute;left:-30px;right:0;border-top:1px dashed var(--rule);font-size:10.5px;
+    color:var(--ink-faint);line-height:0}
+  .cc-grid span em{font-style:normal;display:inline-block;width:24px;text-align:right;transform:translateY(-1px)}
+  .cc-cols{position:absolute;inset:0;display:flex;align-items:flex-end;gap:var(--gap,4px)}
+  .cc-col{flex:1 1 0;min-width:0;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;
+    background:none;border:0;padding:0;cursor:pointer;border-radius:6px 6px 0 0;position:relative;font:inherit}
+  .cc-col:hover{background:var(--bg-2)}
+  .cc-col:focus-visible{outline:2px solid var(--brand);outline-offset:1px}
+  .cc-col.sel{background:var(--brand-tint);box-shadow:inset 0 0 0 1.5px var(--brand-wash)}
+  .cc-col.dim .cc-stack{opacity:.35}
+  .cc-stack{width:min(100%,var(--bw,34px));display:flex;flex-direction:column-reverse;border-radius:5px 5px 2px 2px;
+    overflow:hidden;animation:ccgrow .5s var(--ease-out) both;transform-origin:bottom}
+  .cc-stack i{display:block;width:100%}
+  .cc-v{font-size:11.5px;font-weight:700;color:var(--ink-soft);margin-bottom:3px;white-space:nowrap}
+  .cc-xs{display:flex;gap:var(--gap,4px);margin-top:6px}
+  .cc-xs span{flex:1 1 0;min-width:0;text-align:center;font-size:11.5px;color:var(--ink-mute);white-space:nowrap;overflow:visible}
+  .cc-xs span.sel{color:var(--brand);font-weight:700}
+  @keyframes ccgrow{from{transform:scaleY(.02)}to{transform:scaleY(1)}}
+
+  /* Horizontal bars: a ranked list you can read in a second. */
+  .hbars{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:9px}
+  .hbars li{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(90px,1.4fr) auto;align-items:center;gap:10px}
+  .hb-l{font-size:13.5px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .hb-l small{display:block;font-size:11.5px;color:var(--ink-faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .hb-t{height:12px;background:var(--bg-2);border-radius:999px;overflow:hidden;display:flex}
+  .hb-t i{display:block;height:100%;border-radius:999px;animation:hbgrow .6s var(--ease-out) both;transform-origin:left}
+  .hb-v{font-family:var(--font-display);font-weight:700;font-size:16px;color:var(--ink);min-width:26px;text-align:right}
+  @keyframes hbgrow{from{transform:scaleX(.02)}to{transform:scaleX(1)}}
+
+  /* Toolbars: switch, search, and the filters in force. */
+  .toolbar{display:flex;gap:8px 10px;flex-wrap:wrap;align-items:center;margin:4px 0 12px}
+  .seg{display:inline-flex;flex-wrap:wrap;background:var(--bg-2);border-radius:999px;padding:3px;gap:2px}
+  .seg button{border:0;background:none;padding:7px 13px;border-radius:999px;font:600 13px var(--font-body);
+    color:var(--ink-mute);cursor:pointer;white-space:nowrap}
+  .seg button:hover{color:var(--ink)}
+  .seg button.on{background:var(--card);color:var(--ink);box-shadow:var(--shadow-sm)}
+  .seg button:focus-visible{outline:2px solid var(--brand);outline-offset:1px}
+  .seg button .n{font-weight:700;color:var(--ink-faint);margin-left:4px}
+  .seg button.on .n{color:var(--brand)}
+  .search{flex:1 1 200px;min-width:0;position:relative}
+  .search input{width:100%;height:40px;padding:8px 14px 8px 36px;border-radius:999px;font:14px var(--font-body);
+    border:1.5px solid var(--rule-strong);background:#fff;color:var(--ink);-webkit-appearance:none;appearance:none}
+  .search input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-wash)}
+  .search::before{content:'';position:absolute;left:14px;top:50%;width:12px;height:12px;margin-top:-8px;
+    border:2px solid var(--ink-faint);border-radius:50%}
+  .search::after{content:'';position:absolute;left:25px;top:50%;width:6px;height:2px;margin-top:5px;
+    background:var(--ink-faint);transform:rotate(45deg)}
+  .fchips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
+  .fchip{display:inline-flex;align-items:center;gap:4px;background:var(--brand-wash);color:var(--brand);
+    border-radius:999px;padding:4px 5px 4px 12px;font:700 12.5px var(--font-body)}
+  .fchip button{border:0;background:none;color:inherit;cursor:pointer;font:700 15px/1 var(--font-body);
+    width:24px;height:24px;border-radius:50%}
+  .fchip button:hover{background:rgba(140,28,43,.12)}
+
+  /* ---------- Jumpkits & Bags ---------------------------------------------- */
+  .board{display:flex;flex-direction:column;gap:12px}
+  .board-g{display:grid;grid-template-columns:104px 1fr;gap:10px;align-items:start}
+  .board-gl{font-size:13px;font-weight:700;color:var(--ink-mute);padding-top:12px}
+  .board-ts{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px}
+  .bagtile{display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-align:left;cursor:pointer;
+    border:1px solid var(--rule);border-left:4px solid var(--ok);border-radius:10px;background:var(--card);
+    padding:9px 11px;font:inherit;color:var(--ink);min-width:0;box-shadow:var(--shadow-sm)}
+  .bagtile:hover{border-color:var(--rule-strong)}
+  .bagtile:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+  .bagtile.s-warn{border-left-color:var(--warn);background:linear-gradient(90deg,var(--warn-wash),var(--card) 80%)}
+  .bagtile.s-crit{border-left-color:var(--oos);background:linear-gradient(90deg,var(--oos-wash),var(--card) 80%)}
+  .bagtile.sel{box-shadow:0 0 0 2px var(--brand);border-color:var(--brand)}
+  .bt-name{font-size:14px;font-weight:700;line-height:1.2;overflow-wrap:anywhere}
+  .bt-state{font-size:12px;font-weight:600;color:var(--ok)}
+  .s-warn .bt-state{color:var(--warn)} .s-crit .bt-state{color:var(--oos)}
+
+  .kitgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px}
+  .kitcard{border:1px solid var(--rule);border-top:4px solid var(--warn);border-radius:var(--r-md);
+    background:var(--card);box-shadow:var(--shadow-md);padding:16px 18px 14px;min-width:0;display:flex;flex-direction:column}
+  .kitcard.s-crit{border-top-color:var(--oos)}
+  .kitcard.sel{box-shadow:0 0 0 2px var(--brand),var(--shadow-md)}
+  .kc-head{display:flex;align-items:flex-start;gap:10px;margin-bottom:6px}
+  .kc-head h4{font-family:var(--font-display);font-size:20px;margin:0;line-height:1.15}
+  .kc-head h4 button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;text-align:left}
+  .kc-head h4 button:hover{color:var(--brand)}
+  .kc-meta{font-size:12.5px;color:var(--ink-mute);margin-top:3px}
+  .kc-head .tag{margin-left:auto;flex:0 0 auto}
+  .kc-group{border-top:1px solid var(--rule-soft);padding:10px 0 4px}
+  .kc-gh{font-size:12.5px;font-weight:700;color:var(--ink-mute);margin:0 0 7px;display:flex;align-items:center;gap:7px}
+  .kc-gh .gi{width:20px;height:20px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;
+    font-size:11px;font-weight:800}
+  .gi.i-used{background:var(--brand-wash);color:var(--brand)}
+  .gi.i-miss{background:var(--warn-wash);color:var(--warn)}
+  .gi.i-exp{background:var(--oos-wash);color:var(--oos)}
+  .gi.i-note{background:var(--bg-2);color:var(--ink-soft)}
+  .gi.i-date{background:var(--gold-wash);color:#7a5f1c}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{display:inline-flex;align-items:baseline;gap:5px;background:var(--bg-2);border-radius:8px;padding:5px 10px;
+    font-size:13.5px;color:var(--ink)}
+  .chip b{color:var(--brand);font-weight:800}
+  .kc-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+  .kc-list li{display:flex;align-items:center;gap:10px}
+  .kc-item{flex:1;min-width:0}
+  .kc-item b{display:block;font-weight:600;font-size:14.5px;line-height:1.35;overflow-wrap:anywhere}
+  .kc-item span{display:block;font-size:12.5px;color:var(--ink-mute);margin-top:1px}
+  .kc-quote{font-size:14px;line-height:1.45;color:var(--ink-soft);border-left:3px solid var(--rule-strong);
+    padding:2px 0 2px 10px;overflow-wrap:anywhere}
+  .tick{flex:0 0 auto;width:40px;height:40px;border-radius:50%;border:1.5px solid var(--rule-strong);background:var(--card);
+    color:var(--ok);font-size:17px;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
+  .tick:hover{background:var(--ok-wash);border-color:var(--ok)}
+  .tick:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+  .kc-foot{margin-top:auto;padding-top:12px}
+  .kc-foot .btn{width:100%;justify-content:center}
+  .kc-msg{font-size:12.5px;color:var(--oos);margin:8px 0 0}
+  .daysleft{font-size:12px;font-weight:700;border-radius:999px;padding:2px 8px;white-space:nowrap}
+  .daysleft.bad{background:var(--oos-wash);color:var(--oos)} .daysleft.soon{background:var(--warn-wash);color:var(--warn)}
+
+  /* The timeline of forms. */
+  .tl-day{display:flex;align-items:baseline;gap:10px;margin:18px 0 8px;position:sticky;top:62px;z-index:2;
+    background:var(--bg);padding:6px 0}
+  .tl-day b{font-family:var(--font-display);font-size:16.5px}
+  .tl-day span{font-size:12.5px;color:var(--ink-mute)}
+  .tl{list-style:none;margin:0;padding:0;border:1px solid var(--rule);border-radius:var(--r-md);background:var(--card);
+    box-shadow:var(--shadow-sm);overflow:hidden}
+  .tl-row{display:grid;grid-template-columns:20px 1fr;gap:10px;padding:11px 16px;border-top:1px solid var(--rule-soft)}
+  .tl-row:first-child{border-top:0}
+  .tl-dot{width:12px;height:12px;border-radius:50%;margin-top:4px;background:var(--ok);box-shadow:0 0 0 3px var(--ok-wash)}
+  .tl-row.found .tl-dot{background:var(--warn);box-shadow:0 0 0 3px var(--warn-wash)}
+  .tl-row.found{background:linear-gradient(90deg,rgba(166,75,8,.035),transparent 40%)}
+  .tl-top{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px}
+  .tl-top b{font-size:14.5px}
+  .tl-kind{font-size:12px;font-weight:700;border-radius:6px;padding:1px 7px;background:var(--bg-2);color:var(--ink-soft)}
+  .tl-kind.k-postcall{background:var(--brand-wash);color:var(--brand)}
+  .tl-kind.k-bagcheck{background:var(--gold-wash);color:#6f561a}
+  .tl-meta{font-size:12.5px;color:var(--ink-mute);margin-left:auto;white-space:nowrap}
+  .tl-row.clean .tl-top b{font-weight:600;color:var(--ink-soft)}
+  .tl-items{list-style:none;margin:8px 0 2px;padding:0;display:flex;flex-direction:column;gap:6px}
+  .tl-items li{font-size:13.5px;color:var(--ink);display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;line-height:1.4}
+  .tl-w{font-size:12px;font-weight:700;color:var(--ink-mute);min-width:74px}
+  .tl-items .dim{font-size:12.5px}
+  .tl-more{display:flex;gap:10px;align-items:center;margin-top:12px}
+
+  /* ---------- Missed chores ------------------------------------------------ */
+  .chorelead{font-size:15px;margin:2px 0 0}
+  .missrow{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:12px 0 0}
+  .missrow .lbl{font-size:13px;font-weight:700;color:var(--ink-mute);margin-right:4px}
+  .person{display:inline-flex;align-items:baseline;gap:6px;background:var(--oos-wash);color:var(--ink);border-radius:8px;padding:4px 10px;font-size:13.5px}
+  .person b{font-family:var(--font-mono);color:var(--oos);font-size:13px}
+  .person.ok{background:var(--ok-wash)} .person.ok b{color:var(--ok)}
+  .chorewrap{overflow-x:auto;border:1px solid var(--rule);border-radius:var(--r-md);background:var(--card);box-shadow:var(--shadow-sm)}
+  .choretab{border-collapse:separate;border-spacing:0;width:100%}
+  .choretab th,.choretab td{padding:8px 8px;border-bottom:1px solid var(--rule-soft);font-size:14px;text-align:center;
+    white-space:nowrap;background:var(--card)}
+  .choretab tr:last-child td{border-bottom:0}
+  .choretab th{background:var(--bg-2);font-family:var(--font-body);font-size:13px;font-weight:700;text-transform:none;
+    letter-spacing:0;color:var(--ink-mute);position:relative}
+  .choretab th button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;padding:2px 6px;border-radius:6px}
+  .choretab th button:hover{background:var(--card)}
+  .choretab th.now{color:var(--brand)}
+  .choretab th.sel,.choretab td.sel{background:var(--brand-tint)}
+  .choretab th.sel{color:var(--brand)}
+  .choretab td:first-child,.choretab th:first-child{position:sticky;left:0;z-index:1;text-align:left;
+    box-shadow:1px 0 0 var(--rule-soft)}
+  .choretab tbody tr:hover td{background:var(--card-2)}
+  .choretab tbody tr:hover td.sel{background:var(--brand-tint)}
+  .who-cs{display:inline-block;font-family:var(--font-mono);font-weight:700;font-size:13px;background:var(--bg-2);
+    border-radius:6px;padding:2px 7px;margin-right:8px;color:var(--ink)}
+  .who-nm{font-size:14px;color:var(--ink)}
+  .misscount{display:inline-flex;min-width:26px;justify-content:center;font-weight:800;font-size:13px;border-radius:999px;padding:2px 8px}
+  .misscount.m1{background:var(--warn-wash);color:var(--warn)} .misscount.m2{background:var(--oos-wash);color:var(--oos)}
+  .misscount.m0{color:var(--ink-faint)}
+  .cc{display:inline-flex;align-items:center;justify-content:center;width:38px;height:32px;border-radius:9px;
+    font:800 15px var(--font-body);border:0;background:none;color:var(--ink-faint)}
+  .cc.done{background:var(--ok-wash);color:var(--ok)}
+  .cc.missed{background:var(--oos);color:#fff}
+  .cc.excused{background:var(--bg-2);color:var(--ink-mute);font-size:11.5px;font-weight:700;width:auto;padding:0 8px}
+  .cc.pending{border:1.5px dashed var(--rule-strong);color:var(--ink-faint);font-weight:600}
+  .cc.none{width:38px}
+  button.cc{cursor:pointer}
+  button.cc.missed:hover{background:#a50d25}
+  button.cc:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+  .rmbtn{border:0;background:none;color:var(--ink-mute);font:600 12.5px var(--font-body);cursor:pointer;
+    padding:6px 8px;border-radius:6px;text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--rule-strong)}
+  .rmbtn:hover{color:var(--oos)}
+  .gone{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+  .gone li{border:1px solid var(--rule);border-radius:10px;padding:10px 12px;background:var(--card-2);display:flex;gap:10px;align-items:flex-start}
+  .gone li div{flex:1;min-width:0}
+  .gone .g-why{font-size:12.5px;color:var(--ink-mute);margin-top:3px}
+
+  @media(max-width:760px){
+    .glance{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+    .glance .gl-hero{grid-column:1/-1}
+    .glance .gl:not(.gl-hero) .gl-l{font-size:12px}
+    .board-g{grid-template-columns:1fr;gap:6px}
+    .board-gl{padding-top:0}
+    .board-ts{grid-template-columns:repeat(auto-fill,minmax(104px,1fr))}
+    .twoup{grid-template-columns:1fr}
+  }
+  @media(max-width:560px){
+    .repgrid{grid-template-columns:repeat(2,1fr)}
+    .repstat .rs-n{font-size:24px}
+    .repstat .rs-l{font-size:12px;letter-spacing:0}
+    .gl{padding:13px 14px}
+    .gl-n{font-size:25px}
+    .kitgrid{grid-template-columns:1fr}
+    .tl-row{padding:10px 12px;grid-template-columns:16px 1fr;gap:8px}
+    .tl-meta{margin-left:0;width:100%}
+    .tl-w{min-width:0}
+    .hbars li{grid-template-columns:minmax(0,1fr) 80px auto}
+    .colchart{padding-left:24px}
+    .cc-grid span{left:-24px}
+    .cc-grid span em{width:18px}
+    .seg button{padding:7px 10px;font-size:12.5px}
+    .tl-day{top:56px}
+  }
+  @media (prefers-reduced-motion:reduce){ .cc-stack,.hb-t i{animation:none} }
 
   /* ---------- touch sizing, last on purpose ----------------------------
      A checklist item is the most-tapped thing on this site — thirty-four in one
@@ -8717,6 +8935,25 @@ function choreBy(d){
   return r && ROLE_LABEL[r] ? ROLE_LABEL[r] : d.who;
 }
 
+var choreSel=0;                      // duty period picked on the chart; 0 = the last finished
+var choreView={show:'', q:''};       // show: '' everyone, 'sel' missed the picked DP, 'any' missed any
+
+/* Per duty period: how many did theirs, were excused, missed, or have yet to. */
+function choreCounts(t,n){
+  var c={n:n, done:0, excused:0, missed:0, todo:0, expected:0};
+  t.rows.forEach(function(r){
+    var cell=r.cells.filter(function(x){ return x.n===n; })[0];
+    if(!cell || cell.st==='none') return;
+    c.expected++;
+    if(cell.st==='done') c.done++;
+    else if(cell.st==='excused') c.excused++;
+    else if(cell.st==='missed') c.missed++;
+    else c.todo++;
+  });
+  return c;
+}
+function chorePct(c){ return c.expected ? Math.round(c.done/c.expected*100) : 0; }
+
 function renderChores(){
   var host=document.getElementById('choresHost'); if(!host) return;
   var h=liveNote(dpState, !!remoteDP, 'filed', 'checks', 'fetchDutyPeriods().then(renderChores)');
@@ -8732,77 +8969,133 @@ function renderChores(){
   var t=choreTable();
 
   if(!t.cols.length){
-    h+='<div class="card"><p class="hint" style="margin:0">Counting starts at DP '+CHORE_FIRST_DP+'.'+
+    h+='<div class="panel"><p class="hint" style="margin:0">Counting starts at DP '+CHORE_FIRST_DP+'.'+
        (t.known?' '+t.known+' call sign'+(t.known===1?'':'s')+' so far.':'')+'</p></div>';
     host.innerHTML=h+choreRemovedHtml(t,decide);
     return;
   }
+  if(choreSel && t.cols.indexOf(choreSel)<0) choreSel=0;
+  var sel=choreSel||t.lastDone||t.curN;
+  var last=t.lastDone ? choreCounts(t,t.lastDone) : null;
+  var cur=choreCounts(t,t.curN);
+  var repeat=t.rows.filter(function(r){ return r.misses>=2; }).length;
 
-  // The answer to the question this screen is opened for, before the grid.
-  if(t.lastDone){
-    var missed=t.rows.filter(function(r){
-      return r.cells.some(function(c){ return c.n===t.lastDone && c.st==='missed'; });
-    });
-    h+='<p class="chorelead"><b>DP '+t.lastDone+':</b> '+
-       (missed.length
-         ? missed.length+' missed — '+missed.map(function(r){
-             return '<b class="cs">'+esc(r.shown)+'</b>'+(r.name?' '+esc(r.name):'');
-           }).join(', ')
-         : 'everybody did theirs.')+'</p>';
-  }
-
-  h+='<div class="legend">'+
-     '<span class="item"><span class="cc done">✓</span> Did one</span>'+
-     '<span class="item"><span class="cc missed">✗</span> Missed</span>'+
-     '<span class="item"><span class="cc excused">Excused</span></span>'+
-     '<span class="item"><span class="cc">·</span> DP '+t.curN+', still running</span>'+
+  // ---- the answer first
+  var hero=last||cur;
+  h+='<div class="glance">'+
+     '<div class="gl gl-hero">'+ringSVG([{v:hero.done,cls:'r-ok'},{v:hero.excused,cls:'r-mute'},
+                                        {v:hero.missed,cls:'r-crit'},{v:hero.todo,cls:'r-mute'}], chorePct(hero)+'%')+
+       '<div><div class="gl-n">'+hero.done+'<small>of '+hero.expected+'</small></div>'+
+       '<div class="gl-l">did it in DP '+hero.n+(last?'':' so far')+'</div>'+
+       '<ul class="key"><li><i class="p-ok"></i>Did it</li><li><i class="p-crit"></i>Missed</li>'+
+       '<li><i class="p-mute"></i>Excused</li></ul></div></div>'+
+     (last?glTile(cur.done+' of '+cur.expected, 'DP '+t.curN+' so far', cur.todo+' still to go',''):'')+
+     (last?glTile(last.missed, 'missed DP '+last.n, '', last.missed?'crit':'ok'):'')+
+     glTile(repeat, 'missed two or more', t.rows.length+' people tracked', repeat?'warn':'ok')+
      '</div>';
 
-  h+='<div class="chorewrap"><table class="choretab"><thead><tr><th>Call sign</th><th>Missed</th>'+
+  // ---- every duty period as a column
+  var cols=t.cols.slice().reverse().map(function(n){
+    var c=choreCounts(t,n);
+    return {key:String(n), label:'DP '+n, sel:n===sel,
+            title:'DP '+n+': '+c.done+' of '+c.expected+' did it'+(c.missed?', '+c.missed+' missed':'')+
+                  (c.todo?', '+c.todo+' still to go':''),
+            parts:[{v:c.done,cls:'p-ok'},{v:c.excused,cls:'p-mute'},{v:c.missed,cls:'p-crit'},{v:c.todo,cls:'p-todo'}],
+            pct:chorePct(c)};
+  });
+  h+='<div class="sec"><h3>By duty period</h3></div><div class="panel">'+
+     '<ul class="key" style="margin:0 0 4px"><li><i class="p-ok"></i>Did it</li><li><i class="p-crit"></i>Missed</li>'+
+     '<li><i class="p-mute"></i>Excused</li><li><i class="p-todo"></i>Still to go</li></ul>'+
+     colChart(cols,{h:150,gap:10,bw:46,pick:'choreDpPick',valueText:function(c){ return c.pct+'%'; }});
+  var sc=choreCounts(t,sel);
+  var who=t.rows.filter(function(r){
+    return r.cells.some(function(c){ return c.n===sel && (c.st==='missed' || (sel===t.curN && c.st==='pending')); });
+  });
+  h+='<div class="missrow"><span class="lbl">'+(sel===t.curN?'Still to go in DP '+sel+':':'Missed DP '+sel+':')+'</span>'+
+     (who.length ? who.map(function(r){
+        return '<span class="person'+(sel===t.curN?' ok':'')+'"><b>'+esc(r.shown)+'</b>'+(r.name?esc(r.name):'')+'</span>';
+      }).join('')
+      : '<span class="tag ok">'+(sel===t.curN?'Everybody has done theirs':'Nobody')+'</span>')+
+     '</div></div>';
+
+  // ---- everybody
+  var missedSel=t.rows.filter(function(r){
+    return r.cells.some(function(c){ return c.n===sel && c.st==='missed'; }); }).length;
+  var missedAny=t.rows.filter(function(r){ return r.misses>0; }).length;
+  h+='<div class="sec"><h3>Everybody</h3><span class="sec-n">'+t.rows.length+'</span></div>'+
+     '<div class="toolbar"><div class="seg" role="group" aria-label="Who to show">'+
+     [['','Everyone',t.rows.length],['sel','Missed DP '+sel,missedSel],['any','Missed any',missedAny]]
+       .filter(function(o){ return o[0]!=='sel' || sel!==t.curN; })
+       .map(function(o){
+         return '<button type="button" class="'+(choreView.show===o[0]?'on':'')+'" aria-pressed="'+(choreView.show===o[0])+'" '+
+                'onclick="choreShow(\''+o[0]+'\')">'+esc(o[1])+'<span class="n">'+o[2]+'</span></button>';
+       }).join('')+'</div>'+
+     '<div class="search"><input type="search" placeholder="Search" aria-label="Search call signs and names" '+
+       'value="'+esc(choreView.q)+'" oninput="choreSearch(this.value)"></div></div>'+
+     '<div id="choreGridHost">'+choreGridHtml(t,sel,decide)+'</div>';
+  host.innerHTML=h+choreRemovedHtml(t,decide);
+}
+
+function choreGridHtml(t,sel,decide){
+  var q=choreView.q.trim().toLowerCase();
+  var rows=t.rows.filter(function(r){
+    if(choreView.show==='any' && !r.misses) return false;
+    if(choreView.show==='sel' && !r.cells.some(function(c){ return c.n===sel && c.st==='missed'; })) return false;
+    if(q && (r.shown+' '+r.name+' '+r.cs).toLowerCase().indexOf(q)<0) return false;
+    return true;
+  });
+  if(!rows.length) return '<div class="panel"><p class="hint" style="margin:0">Nobody matches.</p></div>';
+  var h='<div class="chorewrap"><table class="choretab"><thead><tr><th>Who</th><th>Missed</th>'+
      t.cols.map(function(n){
-       return '<th'+(n===t.curN?' class="now"':'')+'>DP '+n+'</th>';
+       return '<th class="'+(n===t.curN?'now ':'')+(n===sel?'sel':'')+'"><button type="button" '+
+              'aria-pressed="'+(n===sel)+'" onclick="choreDpPick(\''+n+'\')">DP '+n+'</button></th>';
      }).join('')+(decide?'<th></th>':'')+'</tr></thead><tbody>';
-  t.rows.forEach(function(r){
+  rows.forEach(function(r){
     var cs=jsq(r.cs);
-    h+='<tr><td><span class="cs">'+esc(r.shown)+'</span>'+
-       (r.name?'<span class="nm">'+esc(r.name)+'</span>':'')+'</td>'+
-       '<td class="n">'+(r.misses||'')+'</td>';
+    h+='<tr><td><span class="who-cs">'+esc(r.shown)+'</span><span class="who-nm">'+esc(r.name||'')+'</span></td>'+
+       '<td><span class="misscount '+(r.misses>=2?'m2':r.misses?'m1':'m0')+'">'+(r.misses||'–')+'</span></td>';
     r.cells.forEach(function(c){
-      var lab=esc(r.shown)+', DP '+c.n;
-      if(c.st==='none') h+='<td class="c"></td>';
-      else if(c.st==='done') h+='<td class="c"><span class="cc done" title="'+lab+': did one">✓</span></td>';
-      else if(c.st==='pending') h+='<td class="c"><span class="cc" title="'+lab+': not yet">·</span></td>';
-      else if(c.st==='missed') h+='<td class="c">'+(decide
-          ? '<button type="button" class="cc missed" aria-label="'+lab+': missed. Excuse it" '+
+      var lab=esc(r.shown)+', DP '+c.n, sc=(c.n===sel?' class="sel"':'');
+      if(c.st==='none') h+='<td'+sc+'><span class="cc none"></span></td>';
+      else if(c.st==='done') h+='<td'+sc+'><span class="cc done" title="'+lab+': did it" aria-label="'+lab+': did it">✓</span></td>';
+      else if(c.st==='pending') h+='<td'+sc+'><span class="cc pending" title="'+lab+': not yet" aria-label="'+lab+': not yet">·</span></td>';
+      else if(c.st==='missed') h+='<td'+sc+'>'+(decide
+          ? '<button type="button" class="cc missed" title="Missed — tap to excuse" aria-label="'+lab+': missed. Excuse it" '+
             'onclick="choreExcuse(\''+cs+'\','+c.n+')">✗</button>'
-          : '<span class="cc missed" title="'+lab+': missed">✗</span>')+'</td>';
-      else h+='<td class="c">'+(decide
+          : '<span class="cc missed" title="'+lab+': missed" aria-label="'+lab+': missed">✗</span>')+'</td>';
+      else h+='<td'+sc+'>'+(decide
           ? '<button type="button" class="cc excused" aria-label="'+lab+': excused. Count it again" '+
             'onclick="choreUnexcuse(\''+cs+'\','+c.n+')">Excused</button>'
           : '<span class="cc excused">Excused</span>')+'</td>';
     });
-    if(decide) h+='<td><button type="button" class="btn xs" onclick="choreRemove(\''+cs+'\')">Remove</button></td>';
+    if(decide) h+='<td><button type="button" class="rmbtn" onclick="choreRemove(\''+cs+'\')">Remove</button></td>';
     h+='</tr>';
   });
-  h+='</tbody></table></div>';
-  host.innerHTML=h+choreRemovedHtml(t,decide);
+  return h+'</tbody></table></div>';
+}
+
+function choreDpPick(n){ n=parseInt(n,10)||0; choreSel=(choreSel===n)?0:n; renderChores(); }
+function choreShow(v){ choreView.show=v||''; renderChores(); }
+/* Only the grid repaints, so the search box keeps its focus while typing. */
+function choreSearch(v){
+  choreView.q=String(v||'');
+  var host=document.getElementById('choreGridHost'); if(!host) return;
+  var t=choreTable();
+  host.innerHTML=choreGridHtml(t, choreSel||t.lastDone||t.curN, can('office') && Array.isArray(remoteChores));
 }
 
 /* Everybody taken off the list, why, and by whom — and the way back. */
 function choreRemovedHtml(t,decide){
   if(!t.removed.length) return '';
-  return '<div class="acc mt"><button type="button" class="acchead" onclick="toggleAcc(this)">'+
-    '<span class="num">'+t.removed.length+'</span><span>Removed</span><span class="chev">▾</span></button>'+
-    '<div class="accbody"><ul class="isslist">'+t.removed.map(function(r){
+  return '<div class="sec"><h3>Removed</h3><span class="sec-n">'+t.removed.length+'</span></div>'+
+    '<ul class="gone">'+t.removed.map(function(r){
       var d=r.d||{};
-      return '<li><b><span class="mono">'+esc(r.shown)+'</span>'+(r.name?' '+esc(r.name):'')+'</b>'+
-        '<div style="font-size:11.5px;color:var(--ink-faint);margin-top:2px">'+
-        esc(d.why||'Removed')+' · DP '+esc(String(dpParse(d.dp||'').n||''))+
-        (d.date?' · '+esc(kitWhen(d.date)):'')+
-        (choreBy(d)?' · '+esc(choreBy(d)):'')+'</div>'+
-        (decide?'<button class="issx" onclick="choreRestore(\''+jsq(r.cs)+'\')">Restore</button>':'')+
+      return '<li><div><span class="who-cs">'+esc(r.shown)+'</span><span class="who-nm">'+esc(r.name||'')+'</span>'+
+        '<div class="g-why">'+esc(d.why||'Removed')+' · after DP '+esc(String(dpParse(d.dp||'').n||''))+
+        (d.date?' · '+esc(kitWhen(d.date)):'')+(choreBy(d)?' · '+esc(choreBy(d)):'')+'</div></div>'+
+        (decide?'<button type="button" class="btn xs" onclick="choreRestore(\''+jsq(r.cs)+'\')">Restore</button>':'')+
         '</li>';
-    }).join('')+'</ul></div></div>';
+    }).join('')+'</ul>';
 }
 
 function choreRemove(cs){
@@ -9434,6 +9727,91 @@ function fallbackCopy(t,done){
 }
 
 /* ============================================================================
+   CHARTS — drawn in plain HTML
+   ============================================================================
+   No library. This page is opened on a phone on campus wifi, and a few bar
+   charts do not justify the weight of one. HTML rather than SVG for the bars
+   because an SVG scales its text with its width, so the same chart that reads
+   well on a laptop has six-pixel labels on a phone; here every label is page
+   text at page size. The ring is the one SVG, and carries no text inside it. */
+function niceTop(v){
+  v=Math.max(1,Math.ceil(v));
+  if(v<=5) return v;
+  var p=Math.pow(10,Math.floor(Math.log(v)/Math.LN10)), m=v/p;
+  // Fine steps, so a busiest day of 11 draws against 12 and not against 20 —
+  // a scale nearly twice the data makes every bar look half empty.
+  var steps=[1,1.2,1.5,2,2.5,3,4,5,6,8,10];
+  for(var i=0;i<steps.length;i++) if(m<=steps[i]) return Math.round(steps[i]*p);
+  return 10*p;
+}
+function sumParts(parts){ return parts.reduce(function(a,p){ return a+(p.v||0); },0); }
+
+/* cols: [{key,label,title,parts:[{v,cls}],sel,dim}]. With `pick`, every column
+   is a button calling that function with its key. */
+function colChart(cols,o){
+  o=o||{};
+  var top=niceTop(o.max||Math.max.apply(null,cols.map(function(c){ return sumParts(c.parts); }).concat([1])));
+  var h='<div class="colchart" style="--h:'+(o.h||170)+'px;--gap:'+(o.gap==null?4:o.gap)+'px;--bw:'+(o.bw||34)+'px">'+
+        '<div class="cc-plot"><div class="cc-grid">';
+  [top, top/2, 0].forEach(function(t){
+    if(t!==Math.round(t)) return;
+    h+='<span style="bottom:'+(t/top*100)+'%"><em>'+t+'</em></span>';
+  });
+  h+='</div><div class="cc-cols">';
+  cols.forEach(function(c){
+    var t=sumParts(c.parts);
+    // `valueText`, not `valueOf`: every object already has a valueOf, so a test
+    // for that name is always true and printed "[object Object]" on every bar.
+    var v=o.valueText ? o.valueText(c) : (o.values===false ? '' : (t||''));
+    var inner='<span class="cc-v">'+v+'</span><span class="cc-stack" style="height:'+(t/top*100)+'%">'+
+      c.parts.map(function(p){ return p.v?'<i class="'+p.cls+'" style="flex:'+p.v+'"></i>':''; }).join('')+'</span>';
+    var cls='cc-col'+(c.sel?' sel':'')+(c.dim?' dim':'');
+    h+= o.pick
+      ? '<button type="button" class="'+cls+'" aria-pressed="'+!!c.sel+'" aria-label="'+esc(c.title)+'" '+
+        'title="'+esc(c.title)+'" onclick="'+o.pick+'(\''+jsq(c.key)+'\')">'+inner+'</button>'
+      : '<div class="'+cls+'" role="img" aria-label="'+esc(c.title)+'" title="'+esc(c.title)+'">'+inner+'</div>';
+  });
+  h+='</div></div><div class="cc-xs" aria-hidden="true">'+cols.map(function(c){
+    return '<span'+(c.sel?' class="sel"':'')+'>'+esc(c.label||'')+'</span>'; }).join('')+'</div></div>';
+  return h;
+}
+
+// rows: [{label,sub,v,cls}] — ranked, longest bar first.
+function hBars(rows){
+  var max=Math.max.apply(null,rows.map(function(r){ return r.v; }).concat([1]));
+  return '<ul class="hbars">'+rows.map(function(r){
+    return '<li><span class="hb-l" title="'+esc(r.label)+'">'+esc(r.label)+(r.sub?'<small>'+esc(r.sub)+'</small>':'')+'</span>'+
+      '<span class="hb-t"><i class="'+(r.cls||'p-brand')+'" style="width:'+Math.max(2,r.v/max*100)+'%"></i></span>'+
+      '<span class="hb-v">'+esc(String(r.v))+'</span></li>';
+  }).join('')+'</ul>';
+}
+
+// A ring of parts, with a word in the middle.
+function ringSVG(parts,center){
+  var r=37, C=2*Math.PI*r, tot=sumParts(parts)||1, off=0, segs='';
+  parts.forEach(function(p){
+    if(!p.v) return;
+    var len=C*p.v/tot;
+    segs+='<circle class="'+p.cls+'" cx="43" cy="43" r="'+r+'" stroke-dasharray="'+len.toFixed(2)+' '+(C-len).toFixed(2)+
+          '" stroke-dashoffset="'+(-off).toFixed(2)+'"/>';
+    off+=len;
+  });
+  return '<div class="ring"><svg viewBox="0 0 86 86" aria-hidden="true"><circle class="r-bg" cx="43" cy="43" r="'+r+'"/>'+
+         segs+'</svg><b>'+esc(String(center))+'</b></div>';
+}
+
+function segBar(parts){
+  var tot=sumParts(parts)||1;
+  return '<div class="segbar">'+parts.map(function(p){
+    return p.v?'<i class="'+p.cls+'" style="width:'+(p.v/tot*100)+'%"></i>':''; }).join('')+'</div>';
+}
+
+function glTile(n,label,sub,tone){
+  return '<div class="gl'+(tone?' t-'+tone:'')+'"><div class="gl-n">'+esc(String(n))+'</div>'+
+         '<div class="gl-l">'+esc(label)+'</div>'+(sub?'<div class="gl-s">'+esc(sub)+'</div>':'')+'</div>';
+}
+
+/* ============================================================================
    JUMPKITS & BAGS — the Equipment Manager's screen
    ============================================================================
    One question, answered first: which bags need something, and what. Before
@@ -9457,9 +9835,13 @@ var kitState={loading:false, error:'', at:0, total:0, more:false, sig:''};
 var kitUnit='';          // the bag the list of forms is narrowed to; '' for all
 var kitMarks={};         // unitId -> {at} marked restocked here, until the sheet agrees
 var kitNote={};          // unitId -> a message for that bag's card
+var kitStats=null;       // the last thirty days, from the sheet
+/* How the list of forms is narrowed on this screen. All of it applies to what
+   has already loaded, so every switch is instant; only choosing a bag goes back
+   to the sheet, because a bag's history is longer than any one page. */
+var kitView={kind:'', day:'', q:''};
 var LS_KITFOUND='emsops_kitfound_v1';
-var kitOnlyFound=false;
-try{ kitOnlyFound=localStorage.getItem(LS_KITFOUND)==='1'; }catch(e){}
+try{ if(localStorage.getItem(LS_KITFOUND)==='1') kitView.kind='found'; }catch(e){}
 
 function kitUnitsAll(){
   return (DB.bagUnits||[]).filter(function(u){ return u && u.active && (!u.need || can(u.need)); });
@@ -9529,7 +9911,7 @@ function fetchBagForms(more){
   var offset=more?kitForms.length:0;
   // A refresh asks for as much as is already showing, so a live update never
   // quietly shrinks a list somebody has paged down through.
-  var limit=more?40:Math.min(200,Math.max(40,kitForms.length));
+  var limit=more?100:Math.min(200,Math.max(150,kitForms.length));
   kitState.loading=true;
   var q=url+(url.indexOf('?')<0?'?':'&')+'bagforms=1&limit='+limit+'&offset='+offset+
         (unit?'&unit='+encodeURIComponent(unit)+'&type='+encodeURIComponent(kitTypeOf(unit)):'');
@@ -9550,6 +9932,7 @@ function fetchBagForms(more){
     if(unit!==kitUnit) return fetchBagForms(false);
     kitForms=more?kitForms.concat(j.rows):j.rows;
     if(j.bags && typeof j.bags==='object'){ kitOwed=j.bags; kitSettleMarks(); }
+    if(j.stats && typeof j.stats==='object' && Array.isArray(j.stats.days)) kitStats=j.stats;
     kitState.total=j.total||kitForms.length; kitState.more=!!j.more;
     kitState.error=''; kitState.at=Date.now();
     kitState.sig=JSON.stringify([kitForms.length?kitForms[0].sid:'', kitState.total, kitOwed]);
@@ -9597,38 +9980,124 @@ function kitNeeds(u,exp){
   var dates=(exp||[]).filter(function(r){
     return r.key.indexOf(u.id+'|')===0 && r.days<=30 && !said[String(r.item).toLowerCase()];
   });
+  var things=used.length+lines.filter(function(l){ return l.k!=='note'; }).length;
+  var notes=lines.length-lines.filter(function(l){ return l.k!=='note'; }).length;
+  var any=!!(lines.length||used.length||flag||dates.length);
+  var state = (u.oos||blocking) ? 'crit' : any ? 'warn' : 'ok';
+  var say = u.oos ? 'Out of service'
+          : blocking ? 'Expired stock'
+          : things ? things+' to replace'
+          : notes ? notes+' report'+(notes===1?'':'s')
+          : flag ? 'Check it over'
+          : dates.length ? 'Dates due'
+          : 'Complete';
   return {u:u, lines:lines, used:used, calls:calls, flag:flag, dates:dates, blocking:blocking,
-          last:owed&&owed.last,
-          any:!!(lines.length||used.length||flag||dates.length),
+          last:owed&&owed.last, things:things, notes:notes, state:state, say:say, any:any,
           restock:!!(used.length||flag||lines.some(function(l){ return l.k!=='note'; }))};
+}
+
+function kitGroups(needs){
+  var g=[{name:'Jumpkits', t:{jumpkit:1}, items:[]},{name:'Event bags', t:{event:1}, items:[]},
+         {name:'Vehicle & kits', t:null, items:[]}];
+  needs.forEach(function(n){
+    var hit=g[2];
+    if(g[0].t[n.u.type]) hit=g[0]; else if(g[1].t[n.u.type]) hit=g[1];
+    hit.items.push(n);
+  });
+  return g.filter(function(x){ return x.items.length; });
 }
 
 function renderKits(){
   var host=document.getElementById('kitsHost'); if(!host) return;
   var exp=expiringRows();
   var needs=kitUnitsAll().map(function(u){ return kitNeeds(u,exp); });
-  var busy=needs.filter(function(n){ return n.any; });
-  var quiet=needs.filter(function(n){ return !n.any; });
+  var busy=needs.filter(function(n){ return n.any || n.u.oos; });
+  var crit=needs.filter(function(n){ return n.state==='crit'; }).length;
+  var ok=needs.length-busy.length;
+  var things=0, notes=0;
+  busy.forEach(function(n){ things+=n.things; notes+=n.notes; });
 
   var h=liveNote(stateFetch, !!remoteConcerns, 'reported', 'reports', 'kitsFetch().then(renderKits)');
   if(kitState.error && ROLE!=='member')
     h+='<p class="dpsrc bad">Forms: '+esc(kitState.error)+'. '+
        '<button type="button" class="btn xs" onclick="kitsFetch().then(renderKits)">Try again</button></p>';
 
-  h+='<h3 class="tgsec">Needs something'+(busy.length?' — '+busy.length:'')+'</h3>';
-  h+= busy.length ? '<div class="kitgrid">'+busy.map(kitCardHtml).join('')+'</div>'
-                  : '<p class="hint">Every bag is complete.</p>';
-  if(quiet.length)
-    h+='<p class="kitquiet"><b>Nothing to replace</b> '+quiet.map(function(n){
-      return '<button type="button" class="kc-name" onclick="kitShow(\''+jsq(n.u.id)+'\')">'+
-             esc(n.u.name)+'</button>';
-    }).join('')+'</p>';
+  // ---- the answer first
+  h+='<div class="glance">'+
+     '<div class="gl gl-hero">'+ringSVG([{v:ok,cls:'r-ok'},{v:busy.length-crit,cls:'r-warn'},{v:crit,cls:'r-crit'}],
+                                        needs.length?Math.round(ok/needs.length*100)+'%':'—')+
+       '<div><div class="gl-n">'+ok+'<small>of '+needs.length+'</small></div>'+
+       '<div class="gl-l">bags complete</div>'+
+       '<ul class="key"><li><i class="p-ok"></i>Complete</li><li><i class="p-warn"></i>Needs something</li>'+
+       (crit?'<li><i class="p-crit"></i>Expired or out</li>':'')+'</ul></div></div>'+
+     glTile(busy.length, 'bag'+(busy.length===1?' needs':'s need')+' something', '', busy.length?'warn':'ok')+
+     glTile(things, 'thing'+(things===1?'':'s')+' to replace',
+            notes?notes+' report'+(notes===1?'':'s')+' to look at':'', things?'warn':'ok')+
+     glTile(kitStats?kitStats.week:'—', 'forms in the last 7 days',
+            kitStats?kitStats.calls+' call'+(kitStats.calls===1?'':'s')+' in 30 days':'')+
+     '</div>';
 
-  h+='<div class="feedhead" id="kitFeedTop"><h3 class="tgsec">'+
-     (kitUnit?esc(kitUnitName(kitUnit)):'Every form')+'</h3>'+
-     (kitUnit?'<button type="button" class="btn xs" onclick="kitShow(\'\')">All bags</button>':'')+
-     '<button type="button" class="btn xs'+(kitOnlyFound?' on':'')+'" aria-pressed="'+kitOnlyFound+'" '+
-     'onclick="kitToggleFound()">Only forms that found something</button></div>';
+  // ---- every bag, as a board
+  h+='<div class="sec"><h3>Every bag</h3><span class="sec-n">'+needs.length+'</span></div><div class="board">'+
+     kitGroups(needs).map(function(g){
+       return '<div class="board-g"><div class="board-gl">'+esc(g.name)+'</div><div class="board-ts">'+
+         g.items.map(function(n){
+           return '<button type="button" class="bagtile s-'+n.state+(kitUnit===n.u.id?' sel':'')+'" '+
+             'aria-pressed="'+(kitUnit===n.u.id)+'" onclick="kitPick(\''+jsq(n.u.id)+'\')">'+
+             '<span class="bt-name">'+esc(n.u.name)+'</span><span class="bt-state">'+esc(n.say)+'</span></button>';
+         }).join('')+'</div></div>';
+     }).join('')+'</div>';
+
+  // ---- what needs doing
+  h+='<div class="sec"><h3>Needs something</h3><span class="sec-n">'+busy.length+'</span></div>';
+  h+= busy.length ? '<div class="kitgrid">'+busy.map(kitCardHtml).join('')+'</div>'
+                  : '<div class="panel"><p class="hint" style="margin:0">Every bag is complete.</p></div>';
+
+  // ---- the month in two charts
+  if(kitStats){
+    var days=kitStats.days||[], last=days.length-1;
+    var cols=days.map(function(d,i){
+      var t=d.clean+d.found;
+      return {key:d.d, label:((last-i)%7===0)?kitDay(d.d):'', sel:kitView.day===d.d,
+              dim:!!kitView.day && kitView.day!==d.d,
+              title:kitDayLong(d.d)+': '+t+' form'+(t===1?'':'s')+(d.found?', '+d.found+' found something':''),
+              parts:[{v:d.clean,cls:'p-ok'},{v:d.found,cls:'p-warn'}]};
+    });
+    var top=(kitStats.used||[]).map(function(e){
+      return {label:e.n, sub:(e.bags||[]).join(', '), v:e.q, cls:'p-brand'};
+    });
+    h+='<div class="sec"><h3>Last 30 days</h3></div><div class="twoup">'+
+       '<div class="panel"><h4>Forms each day</h4>'+
+       '<ul class="key" style="margin:4px 0 6px"><li><i class="p-ok"></i>All clear</li><li><i class="p-warn"></i>Found something</li></ul>'+
+       colChart(cols,{h:160,gap:2,bw:22,pick:'kitDayPick',values:false})+'</div>'+
+       '<div class="panel"><h4>Most used on calls</h4>'+
+       (top.length?'<div style="margin-top:12px">'+hBars(top)+'</div>'
+                  :'<p class="hint" style="margin:10px 0 0">Nothing logged as used.</p>')+
+       '</div></div>';
+  }
+
+  // ---- every form
+  var base=kitBaseRows();
+  var nFound=base.filter(kitFound).length;
+  var cnt=function(k){ return base.filter(function(r){ return r.kind===k; }).length; };
+  h+='<div class="sec" id="kitFeedTop"><h3>'+(kitUnit?esc(kitUnitName(kitUnit)):'Every form')+'</h3>'+
+     '<span class="sec-n">'+kitState.total+'</span></div>';
+  h+='<div class="toolbar"><div class="seg" role="group" aria-label="Which forms">'+
+     [['','All',base.length],['found','Found something',nFound],['checkout','Checkouts',cnt('checkout')],
+      ['postcall','After a call',cnt('postcall')],['bagcheck','Full checks',cnt('bagcheck')]]
+       .filter(function(o){ return !o[0] || o[0]==='found' || o[2] || kitView.kind===o[0]; })
+       .map(function(o){
+         return '<button type="button" class="'+(kitView.kind===o[0]?'on':'')+'" aria-pressed="'+(kitView.kind===o[0])+'" '+
+                'onclick="kitSetKind(\''+o[0]+'\')">'+o[1]+'<span class="n">'+o[2]+'</span></button>';
+       }).join('')+'</div>'+
+     '<div class="search"><input type="search" id="kitQ" placeholder="Search" '+
+       'aria-label="Search the forms" value="'+esc(kitView.q)+'" oninput="kitSearch(this.value)"></div></div>';
+  var chips='';
+  if(kitUnit) chips+='<span class="fchip">'+esc(kitUnitName(kitUnit))+
+    '<button type="button" aria-label="Show every bag" onclick="kitShow(\'\')">×</button></span>';
+  if(kitView.day) chips+='<span class="fchip">'+esc(kitDayLong(kitView.day))+
+    '<button type="button" aria-label="Show every day" onclick="kitDayPick(\'\')">×</button></span>';
+  if(chips) h+='<div class="fchips">'+chips+'</div>';
   h+='<div id="kitFeedHost">'+kitFeedHtml()+'</div>';
   host.innerHTML=h;
   applyGates(host);
@@ -9636,41 +10105,53 @@ function renderKits(){
 
 function kitCardHtml(n){
   var u=n.u, id=jsq(u.id);
-  var h='<div class="kitcard'+(n.blocking?' crit':'')+'"><div class="kc-top"><div class="kc-title">'+
-    '<button type="button" class="kc-name" onclick="kitShow(\''+id+'\')">'+esc(u.name)+'</button>'+
-    (n.last?'<span class="kc-last">last out '+esc(kitDay(n.last.date))+'</span>':'')+'</div>'+
-    (n.restock?'<button type="button" class="btn xs" data-need="equipment" '+
-      'onclick="kitRestocked(\''+id+'\')">Restocked</button>':'')+
-    '</div><ul class="kc-lines">';
+  var count=n.things+n.notes;
+  var h='<article class="kitcard s-'+n.state+(kitUnit===u.id?' sel':'')+'" id="kc-'+esc(u.id)+'">'+
+    '<div class="kc-head"><div><h4><button type="button" onclick="kitPick(\''+id+'\')">'+esc(u.name)+'</button></h4>'+
+    '<div class="kc-meta">'+(n.last?'Last out '+esc(kitDay(n.last.date)):'Not out recently')+
+    (count?' · '+count+' thing'+(count===1?'':'s'):'')+'</div></div>'+
+    '<span class="tag '+(n.state==='crit'?'crit':'warn')+'">'+esc(n.say)+'</span></div>';
+  if(u.oos && u.oosWhy)
+    h+='<div class="kc-group"><div class="kc-quote">'+esc(u.oosWhy)+'</div></div>';
   if(n.used.length || n.flag){
     var latest='';
     n.used.forEach(function(x){ if(x.last>latest) latest=x.last; });
-    var when = n.used.length
-      ? (n.calls>1?n.calls+' calls · ':'')+kitDay(latest)
-      : 'used on a call '+kitWhen(n.flag.at);
-    h+='<li><span class="kc-k">Used</span><span class="kc-v">'+
-       (n.used.length
-         ? n.used.map(function(x){ return esc(x.n)+(x.q>1?' ×'+x.q:''); }).join(' · ')
-         : 'Check it over')+
-       ' <span class="kc-when">'+esc(when)+'</span></span></li>';
+    h+='<div class="kc-group"><div class="kc-gh"><span class="gi i-used">↺</span>'+
+       (n.used.length ? 'Used on '+(n.calls>1?n.calls+' calls':'a call')+' · '+esc(kitDay(latest))
+                      : 'Used on a call '+esc(kitWhen(n.flag.at))+' · check it over')+'</div>'+
+       (n.used.length?'<div class="chips">'+n.used.map(function(x){
+         return '<span class="chip">'+esc(x.n)+(x.q>1?' <b>×'+x.q+'</b>':'')+'</span>'; }).join('')+'</div>':'')+
+       '</div>';
   }
-  n.lines.forEach(function(l){
-    var k={missing:'Missing', expired:'Expired', note:'Reported'}[l.k];
-    h+='<li><span class="kc-k">'+k+'</span><span class="kc-v">'+
-       (l.k==='note'?'“'+esc(l.label)+'”':esc(l.label))+
-       (l.sec?' <span class="kc-sec">· '+esc(l.sec)+'</span>':'')+
-       ' <span class="kc-when">'+esc(kitWhen(l.c.at))+'</span></span>'+
-       '<button type="button" class="btn xs" data-need="equipment" '+
-       'aria-label="'+esc(l.k==='note'?'Dealt with: ':'Replaced: ')+esc(l.label)+'" '+
-       'onclick="kitLineDone(\''+jsq(l.c.what)+'\',\''+jsq(l.c.where)+'\')">✓</button></li>';
+  var groups=[['missing','Missing','i-miss','○'],['expired','Expired','i-exp','!'],['note','Reported','i-note','“']];
+  groups.forEach(function(g){
+    var ls=n.lines.filter(function(l){ return l.k===g[0]; });
+    if(!ls.length) return;
+    h+='<div class="kc-group"><div class="kc-gh"><span class="gi '+g[2]+'">'+g[3]+'</span>'+g[1]+'</div><ul class="kc-list">'+
+       ls.map(function(l){
+         var body = g[0]==='note'
+           ? '<div class="kc-item"><div class="kc-quote">'+esc(l.label)+'</div>'+
+             '<span style="padding-left:13px">'+esc(kitWhen(l.c.at))+'</span></div>'
+           : '<div class="kc-item"><b>'+esc(l.label)+'</b><span>'+
+             (l.sec?esc(l.sec)+' · ':'')+'reported '+esc(kitWhen(l.c.at))+'</span></div>';
+         return '<li>'+body+'<button type="button" class="tick" data-need="equipment" '+
+           'title="'+(g[0]==='note'?'Dealt with':'Replaced')+'" '+
+           'aria-label="'+esc((g[0]==='note'?'Dealt with: ':'Replaced: ')+l.label)+'" '+
+           'onclick="kitLineDone(\''+jsq(l.c.what)+'\',\''+jsq(l.c.where)+'\')">✓</button></li>';
+       }).join('')+'</ul></div>';
   });
   if(n.dates.length)
-    h+='<li><span class="kc-k">Dates</span><span class="kc-v">'+n.dates.map(function(d){
-      var w = d.days<0 ? 'expired' : d.days===0 ? 'today' : 'in '+d.days+'d';
-      return esc(d.item)+' <span class="kc-when">'+w+'</span>';
-    }).join(' · ')+'</span></li>';
-  h+='</ul>'+(kitNote[u.id]?'<p class="kc-msg dpsrc bad">'+kitNote[u.id]+'</p>':'')+'</div>';
-  return h;
+    h+='<div class="kc-group"><div class="kc-gh"><span class="gi i-date">◷</span>Expiry dates</div><ul class="kc-list">'+
+       n.dates.map(function(d){
+         var w = d.days<0 ? 'expired '+(-d.days)+'d ago' : d.days===0 ? 'expires today' : d.days+' days left';
+         return '<li><div class="kc-item"><b>'+esc(d.item)+'</b></div>'+
+                '<span class="daysleft '+(d.days<0?'bad':'soon')+'">'+w+'</span></li>';
+       }).join('')+'</ul></div>';
+  if(kitNote[u.id]) h+='<p class="kc-msg">'+kitNote[u.id]+'</p>';
+  if(n.restock)
+    h+='<div class="kc-foot" data-need="equipment"><button type="button" class="btn solid" '+
+       'onclick="kitRestocked(\''+id+'\')">Mark '+esc(u.name)+' restocked</button></div>';
+  return h+'</article>';
 }
 
 /* ---- the forms ---- */
@@ -9681,65 +10162,77 @@ function kitFormFound(r){
   return (r.missing||[]).length>0 || r.missingCount>0 || (r.expired||[]).length>0 ||
          (r.soon||[]).length>0 || !!r.note;
 }
+// The sheet decides and says so on the row; the local rule is only for a row
+// from before it did.
+function kitFound(r){ return (r && typeof r.found==='boolean') ? r.found : kitFormFound(r); }
+
+/* Everything that has loaded, narrowed by the day picked on the chart. The
+   switch and the search narrow further; this is what their counts count. */
+function kitBaseRows(){
+  return kitForms.filter(function(r){
+    return r && typeof r==='object' && (!kitView.day || r.date===kitView.day);
+  });
+}
+function kitSearchText(r){
+  var t=[r.who, r.bag, r.call, r.note, kitUnitName(r.unit)];
+  (r.missing||[]).concat(r.expired||[], r.soon||[], r.meds||[]).forEach(function(x){ t.push(x); });
+  (r.used||[]).forEach(function(u){ t.push(u.n, u.fn); });
+  return t.join(' ').toLowerCase();
+}
 
 function kitFeedHtml(){
-  var rows=kitForms.filter(function(r){ return r && typeof r==='object'; });
-  var all=rows.length;
-  if(kitOnlyFound) rows=rows.filter(kitFormFound);
+  var rows=kitBaseRows();
+  if(kitView.kind==='found') rows=rows.filter(kitFound);
+  else if(kitView.kind) rows=rows.filter(function(r){ return r.kind===kitView.kind; });
+  var q=kitView.q.trim().toLowerCase();
+  if(q) rows=rows.filter(function(r){ return kitSearchText(r).indexOf(q)>=0; });
   var h='';
   if(!rows.length){
     var msg = kitState.loading || (!kitState.at && !kitState.error) ? 'Reading the spreadsheet…'
             : kitState.error ? 'The forms could not be read.'
-            : (kitOnlyFound && all) ? 'Nothing in what has loaded found anything.'
+            : (kitView.kind||q||kitView.day) && kitForms.length ? 'Nothing here matches.'
             : 'Nothing filed yet.';
-    h+='<div class="card"><p class="hint" style="margin:0">'+msg+'</p></div>';
+    h+='<div class="panel"><p class="hint" style="margin:0">'+msg+'</p></div>';
   }else{
-    var day='';
-    rows.forEach(function(r){
-      if(r.date!==day){
-        if(day) h+='</ul>';
-        day=r.date;
-        h+='<div class="fday">'+esc(kitDayLong(day))+'</div><ul class="feed">';
-      }
-      h+=kitFormHtml(r);
+    var byDay={}, order=[];
+    rows.forEach(function(r){ if(!byDay[r.date]){ byDay[r.date]=[]; order.push(r.date); } byDay[r.date].push(r); });
+    order.forEach(function(day){
+      var list=byDay[day], f=list.filter(kitFound).length;
+      h+='<div class="tl-day"><b>'+esc(kitDayLong(day))+'</b><span>'+list.length+' form'+(list.length===1?'':'s')+
+         (f?' · '+f+' found something':'')+'</span></div><ol class="tl">'+list.map(kitFormHtml).join('')+'</ol>';
     });
-    h+='</ul>';
   }
   if(kitState.more)
-    h+='<div class="row mt"><button type="button" class="btn" onclick="kitMore()"'+
-       (kitState.loading?' disabled':'')+'>'+(kitState.loading?'Loading…':'Load more')+'</button>'+
-       '<span class="hint">'+kitForms.length+' of '+kitState.total+'</span></div>';
+    h+='<div class="tl-more"><button type="button" class="btn" onclick="kitMore()"'+
+       (kitState.loading?' disabled':'')+'>'+(kitState.loading?'Loading…':'Load older forms')+'</button>'+
+       '<span class="hint" style="margin:0">'+kitForms.length+' of '+kitState.total+' loaded</span></div>';
   return h;
 }
 
 function kitFormHtml(r){
-  var found=kitFormFound(r);
-  var form = r.kind==='postcall' ? 'After a call'+(r.call?' #'+r.call:'')
-           : r.kind==='bagcheck' ? 'Full contents check' : 'Checkout';
+  var found=kitFound(r);
+  var kind={checkout:'Checkout', postcall:'After a call', bagcheck:'Full check'}[r.kind]||'Form';
   var bag;
   if(r.kind==='postcall'){
     var seen={}, names=[];
     (r.used||[]).forEach(function(u){
       if(u.f && !seen[u.f]){ seen[u.f]=1; names.push(u.fn||kitUnitName(u.f)); }
     });
-    bag=names.join(', ');
+    bag=names.join(', ')||'Nothing used';
   }else bag=r.bag||kitUnitName(r.unit);
-  var h='<li class="fd'+(found?'':' clean')+'"><div class="fd-head">'+
-    '<span class="fd-time">'+esc(kitTime(r.time))+'</span>'+
-    (found?'<span class="fd-dot" aria-hidden="true">●</span>'
-          :'<span class="fd-ok" title="Nothing to replace">✓</span>')+
-    '<span class="fd-form">'+esc(form)+(bag?' · '+esc(bag):'')+'</span>'+
-    '<span class="fd-who">'+esc(r.who||'')+'</span></div>';
-  if(found) h+='<ul class="fd-items">'+kitFormItems(r)+'</ul>';
-  return h+'</li>';
+  var meta=kitTime(r.time)+(r.who?' · '+r.who:'')+(r.kind==='postcall'&&r.call?' · call '+r.call:'');
+  return '<li class="tl-row '+(found?'found':'clean')+'"><span class="tl-dot" aria-hidden="true"></span><div>'+
+    '<div class="tl-top"><span class="tl-kind k-'+esc(r.kind)+'">'+kind+'</span><b>'+esc(bag)+'</b>'+
+    '<span class="tl-meta">'+esc(meta)+'</span></div>'+
+    (found?'<ul class="tl-items">'+kitFormItems(r)+'</ul>':'')+'</div></li>';
 }
 
 /* Whether each thing a form named is still owed. A checklist line is owed
    while its report is open; something used on a call is owed until the bag it
    came out of was restocked after the call. */
 function kitStatus(open,note){
-  return open===true ? '<span class="st open">'+(note?'open':'still needed')+'</span>'
-       : open===false ? '<span class="st done">'+(note?'dealt with':'done')+'</span>' : '';
+  return open===true ? '<span class="tag warn">'+(note?'Open':'Still needed')+'</span>'
+       : open===false ? '<span class="tag ok">'+(note?'Dealt with':'Done')+'</span>' : '';
 }
 function kitConcernOpen(what,where){
   var sig=concernKey(what,where), hit=null;
@@ -9764,55 +10257,74 @@ function kitFormItems(r){
       by[u.f].push(u);
     });
     order.forEach(function(f){
-      var bike=(f===BIKE_SOURCE.id);
-      h+='<li><span class="kc-k">'+esc(by[f][0].fn||kitUnitName(f))+'</span>'+by[f].map(function(u){
-        var tag = u.r ? '<span class="st back">put back</span>'
-                : bike ? '<span class="st back">bike list</span>'
-                : kitStatus(kitUsedOpen(r,f));
-        return esc(u.n)+(u.q>1?' ×'+u.q:'')+tag;
-      }).join(' · ')+'</li>';
+      var bike=(f===BIKE_SOURCE.id), out=by[f].filter(function(u){ return !u.r; });
+      var back=by[f].filter(function(u){ return u.r; });
+      var nm=function(u){ return esc(u.n)+(u.q>1?' ×'+u.q:''); };
+      h+='<li><span class="tl-w">'+esc(by[f][0].fn||kitUnitName(f))+'</span>'+
+         (out.length?out.map(nm).join(' · '):'')+
+         (back.length?' <span class="dim">'+(out.length?'· ':'')+back.map(nm).join(', ')+' put back</span>':'')+
+         (bike?'<span class="tag mute">Bike list</span>':out.length?kitStatus(kitUsedOpen(r,f)):'')+'</li>';
     });
     if((r.meds||[]).length)
-      h+='<li><span class="kc-k">Meds given</span>'+esc(r.meds.join(', '))+'</li>';
+      h+='<li><span class="tl-w">Meds given</span>'+esc(r.meds.join(', '))+'</li>';
     return h;
   }
   var where=r.bag||kitUnitName(r.unit);
   var type=r.kind==='bagcheck' ? r.type : kitTypeOf(r.unit);
   (r.missing||[]).forEach(function(m){
     var sec=kitSection(type,m);
-    h+='<li><span class="kc-k">Missing</span>'+esc(m)+
-       (sec?' <span class="kc-sec">· '+esc(sec)+'</span>':'')+
+    h+='<li><span class="tl-w">Missing</span>'+esc(m)+
+       (sec?' <span class="dim">· '+esc(sec)+'</span>':'')+
        kitStatus(kitConcernOpen(m+' missing',where))+'</li>';
   });
   // Rows from before the form recorded WHICH items: say how many, and no more.
   if(!(r.missing||[]).length && r.missingCount>0)
-    h+='<li><span class="kc-k">Missing</span>'+r.missingCount+' item'+(r.missingCount===1?'':'s')+
-       ' <span class="kc-sec">· not named on this form</span></li>';
+    h+='<li><span class="tl-w">Missing</span>'+r.missingCount+' item'+(r.missingCount===1?'':'s')+
+       ' <span class="dim">· not named on this form</span></li>';
   (r.expired||[]).forEach(function(m){
-    h+='<li><span class="kc-k">Expired</span>'+esc(m)+kitStatus(kitConcernOpen(m+' is expired',where))+'</li>';
+    h+='<li><span class="tl-w">Expired</span>'+esc(m)+kitStatus(kitConcernOpen(m+' is expired',where))+'</li>';
   });
   (r.soon||[]).forEach(function(m){
-    h+='<li><span class="kc-k">Expiring</span>'+esc(m)+'</li>';
+    h+='<li><span class="tl-w">Expiring</span>'+esc(m)+'</li>';
   });
   if(r.note)
-    h+='<li><span class="kc-k">Note</span>“'+esc(r.note)+'”'+kitStatus(kitConcernOpen(r.note,where),true)+'</li>';
+    h+='<li><span class="tl-w">Note</span>“'+esc(r.note)+'”'+kitStatus(kitConcernOpen(r.note,where),true)+'</li>';
   return h;
 }
 
 /* ---- acting on it ---- */
-function kitShow(id){
+function kitShow(id,scrollTo){
   kitUnit=id||'';
   kitForms=[]; kitState.total=0; kitState.more=false; kitState.at=0;
   renderKits();
-  var top=document.getElementById('kitFeedTop');
-  if(top && id && top.scrollIntoView) top.scrollIntoView({block:'start',behavior:'smooth'});
+  var el=document.getElementById(scrollTo||'kitFeedTop');
+  if(el && id && el.scrollIntoView) el.scrollIntoView({block:'start',behavior:'smooth'});
   fetchBagForms(false).then(function(){ renderKits(); });
 }
+/* A bag on the board: pick it to see its card and its forms, pick it again to
+   go back to everything. Its card is where the work is, so that is where the
+   screen goes; a bag with nothing owed has no card, so its forms instead. */
+function kitPick(id){
+  if(kitUnit===id){ kitShow(''); return; }
+  kitShow(id, document.getElementById('kc-'+id) ? 'kc-'+id : 'kitFeedTop');
+}
 function kitMore(){ fetchBagForms(true).then(function(){ renderKits(); }); }
-function kitToggleFound(){
-  kitOnlyFound=!kitOnlyFound;
-  try{ localStorage.setItem(LS_KITFOUND,kitOnlyFound?'1':'0'); }catch(e){}
+function kitSetKind(k){
+  kitView.kind=k||'';
+  try{ localStorage.setItem(LS_KITFOUND,kitView.kind==='found'?'1':'0'); }catch(e){}
   renderKits();
+}
+/* Only the list repaints, so the search box keeps its focus — and on a phone,
+   its keyboard — while somebody types. */
+function kitSearch(v){
+  kitView.q=String(v||'');
+  var host=document.getElementById('kitFeedHost'); if(host) host.innerHTML=kitFeedHtml();
+}
+function kitDayPick(d){
+  kitView.day=(kitView.day===d)?'':(d||'');
+  renderKits();
+  var top=document.getElementById('kitFeedTop');
+  if(top && kitView.day && top.scrollIntoView) top.scrollIntoView({block:'start',behavior:'smooth'});
 }
 
 function kitLineDone(what,where){

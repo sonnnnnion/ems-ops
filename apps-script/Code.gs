@@ -2295,6 +2295,16 @@ function bagFormRows(unit, type, offset, limit) {
       used: used, meds: list(x.get('meds')), n: x.n, t: 2 });
   });
 
+  /* Whether a form found anything — decided HERE, once, and sent on the row.
+     The site filters on it and the chart below counts it, and two copies of
+     the rule are two answers the day one of them is changed. */
+  out.forEach(function (r) {
+    r.found = r.kind === 'postcall'
+      ? r.used.some(function (u) { return !u.r; }) || r.meds.length > 0
+      : r.missing.length > 0 || r.missingCount > 0 || r.expired.length > 0 ||
+        r.soon.length > 0 || !!r.note;
+  });
+
   /* Newest first. The row's own position breaks a tie within a tab, because
      rows are only ever appended — so position is the order they were filed. */
   out.sort(function (a, b) {
@@ -2306,7 +2316,7 @@ function bagFormRows(unit, type, offset, limit) {
   var reply = { ok: true };
   // Only on the first page: it is computed across everything, and page two of a
   // feed does not need it sent again.
-  if (!start) reply.bags = bagOwed(out, units);
+  if (!start) { reply.bags = bagOwed(out, units); reply.stats = bagStats(out); }
 
   var rows = out.filter(function (r) {
     if (!unit) return true;
@@ -2379,6 +2389,44 @@ function bagOwed(rows, units) {
     });
   });
   return out;
+}
+
+/* The last thirty days at a glance: how many forms came in each day and how
+   many of them found something, and what calls used most. Counted from every
+   row, not the page the site happens to have loaded, so the chart is the same
+   whichever bag the list below is narrowed to. The bike kit is left out of the
+   usage count — it is shopped for from the bike list, by somebody else. */
+function bagStats(rows) {
+  var tz = Session.getScriptTimeZone(), now = new Date();
+  var days = [], at = {};
+  for (var i = 29; i >= 0; i--) {
+    var d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+    var key = Utilities.formatDate(d, tz, 'yyyy-MM-dd');
+    at[key] = days.length;
+    days.push({ d: key, clean: 0, found: 0, calls: 0 });
+  }
+  var weekFrom = days[23].d, used = {}, calls = 0, week = 0;
+  rows.forEach(function (r) {
+    var ix = at[r.date];
+    if (ix === undefined) return;
+    if (r.found) days[ix].found++; else days[ix].clean++;
+    if (r.date >= weekFrom) week++;
+    if (r.kind !== 'postcall') return;
+    days[ix].calls++; calls++;
+    r.used.forEach(function (u) {
+      if (!u.n || u.f === BIKE_SOURCE_ID) return;
+      var e = used[u.n] || (used[u.n] = { n: u.n, q: 0, bags: {} });
+      e.q += u.q;
+      if (u.fn) e.bags[u.fn] = (e.bags[u.fn] || 0) + u.q;
+    });
+  });
+  var top = Object.keys(used).map(function (k) { return used[k]; })
+    .sort(function (a, b) { return b.q - a.q || a.n.localeCompare(b.n); }).slice(0, 8)
+    .map(function (e) {
+      return { n: e.n, q: e.q, bags: Object.keys(e.bags)
+        .sort(function (a, b) { return e.bags[b] - e.bags[a]; }).slice(0, 3) };
+    });
+  return { days: days, used: top, calls: calls, week: week };
 }
 
 /* Marking a bag restocked: one tap for what used to be a tick per line on two
