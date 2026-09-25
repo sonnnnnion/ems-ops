@@ -1186,7 +1186,7 @@
          staring at a heading with nothing beneath it. -->
     <div class="sb-label">On duty</div>
     <button type="button" class="sb-item active" data-need="mgr" data-view="checkout"><span class="ic">▸</span>Check Out a Bag</button>
-    <button type="button" class="sb-item" data-view="readiness"><span class="ic">◉</span>What's Ready</button>
+    <button type="button" class="sb-item" data-need="mgr" data-view="readiness"><span class="ic">◉</span>What's Ready</button>
     <button type="button" class="sb-item" data-need="mgr" data-view="post-call"><span class="ic">↻</span>After a Call</button>
     <button type="button" class="sb-item" data-view="report"><span class="ic">⚑</span>Report a Problem</button>
 
@@ -1427,7 +1427,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260925141638';
+var BUILD='20260925141852';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -2971,8 +2971,10 @@ var MANAGER_VIEWS={
      everything they write still works, and a manager who signs in gets both
      back. To hand them to members again, delete these two lines and the
      matching data-need on their sidebar buttons — homeFor() and the QR sheet
-     read this object, so they follow on their own. */
-  checkout:'mgr', 'post-call':'mgr',
+     read this object, so they follow on their own. What's Ready is here for the
+     same reason: it is a board about bags you check out, and it reads as broken
+     next to no way to check one out. */
+  checkout:'mgr', 'post-call':'mgr', readiness:'mgr',
   /* The tracker is a board, and a board is for the people doing the work.
      Everybody files room checks into a duty period, so everybody has a reason
      to see how much of it is left — it was gated to the Office Manager, who is
@@ -4263,13 +4265,17 @@ function publishContent(opts){
 // manager dashboard here; it was a second menu in front of the one job the site
 // is opened to do, so it went. Anything it counted is on the view that acts on
 // it — flagged bags on What's Ready, concerns on Reported Problems.
-// ...unless the checkout form is one of the ones currently paused for members,
-// in which case landing there would bounce them straight back to it. The
-// readiness board is the next thing a member on duty opens, and it is never
-// gated, so it cannot bounce.
+// ...unless it is one of the screens currently paused for members, in which
+// case landing there would bounce them straight back to it. So home is the
+// first of these the reader can actually open, most useful first. Nothing gates
+// "What's in each bag", so the walk always ends somewhere.
+var HOME_ORDER=['checkout','readiness','room-check','report','bags'];
 function homeFor(){
-  if(MANAGER_VIEWS.checkout && !can(MANAGER_VIEWS.checkout)) return 'readiness';
-  return 'checkout';
+  for(var i=0;i<HOME_ORDER.length;i++){
+    var v=HOME_ORDER[i];
+    if(!MANAGER_VIEWS[v] || can(MANAGER_VIEWS[v])) return v;
+  }
+  return 'bags';
 }
 function navIsOpen(){ return document.body.classList.contains('nav-open'); }
 
