@@ -1185,9 +1185,9 @@
          so applyGates() empties a whole group at once and nobody is left
          staring at a heading with nothing beneath it. -->
     <div class="sb-label">On duty</div>
-    <button type="button" class="sb-item active" data-view="checkout"><span class="ic">▸</span>Check Out a Bag</button>
+    <button type="button" class="sb-item active" data-need="mgr" data-view="checkout"><span class="ic">▸</span>Check Out a Bag</button>
     <button type="button" class="sb-item" data-view="readiness"><span class="ic">◉</span>What's Ready</button>
-    <button type="button" class="sb-item" data-view="post-call"><span class="ic">↻</span>After a Call</button>
+    <button type="button" class="sb-item" data-need="mgr" data-view="post-call"><span class="ic">↻</span>After a Call</button>
     <button type="button" class="sb-item" data-view="report"><span class="ic">⚑</span>Report a Problem</button>
 
     <div class="sb-label">Reference</div>
@@ -1427,7 +1427,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260913180631';
+var BUILD='20260925141638';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -2965,6 +2965,14 @@ function setStaleDays(v){
    Now they can read the list. Ticking something off is still a manager's call,
    and the buttons that do it are gated inside renderLog. */
 var MANAGER_VIEWS={
+  /* TEMPORARY. Checking a bag out and filing an after-a-call are being handled
+     by another system for now, so a member opening this site should not be
+     offered two forms nobody is reading. They are gated rather than deleted:
+     everything they write still works, and a manager who signs in gets both
+     back. To hand them to members again, delete these two lines and the
+     matching data-need on their sidebar buttons — homeFor() and the QR sheet
+     read this object, so they follow on their own. */
+  checkout:'mgr', 'post-call':'mgr',
   /* The tracker is a board, and a board is for the people doing the work.
      Everybody files room checks into a duty period, so everybody has a reason
      to see how much of it is left — it was gated to the Office Manager, who is
@@ -4255,7 +4263,14 @@ function publishContent(opts){
 // manager dashboard here; it was a second menu in front of the one job the site
 // is opened to do, so it went. Anything it counted is on the view that acts on
 // it — flagged bags on What's Ready, concerns on Reported Problems.
-function homeFor(){ return 'checkout'; }
+// ...unless the checkout form is one of the ones currently paused for members,
+// in which case landing there would bounce them straight back to it. The
+// readiness board is the next thing a member on duty opens, and it is never
+// gated, so it cannot bounce.
+function homeFor(){
+  if(MANAGER_VIEWS.checkout && !can(MANAGER_VIEWS.checkout)) return 'readiness';
+  return 'checkout';
+}
 function navIsOpen(){ return document.body.classList.contains('nav-open'); }
 
 function setNav(open){
@@ -4267,6 +4282,7 @@ function toggleNav(){ setNav(!navIsOpen()); }
 function closeNav(){ if(navIsOpen()) setNav(false); }
 
 function go(v,fromHash){
+  var asked=v;
   // Enforced here, not just by hiding the nav item — every view is
   // hash-addressable, so hiding the button alone would gate nothing.
   if(v==='learn' && !canSeeLearn()) v=homeFor();
@@ -4284,7 +4300,11 @@ function go(v,fromHash){
     items[j].classList.toggle('active',on);
     if(on) items[j].setAttribute('aria-current','page'); else items[j].removeAttribute('aria-current');
   }
-  if(!fromHash && location.hash.slice(1)!==v) location.hash=v;
+  /* A hash normally does not need writing back — it is where the request came
+     from. The exception is a request that got redirected: #post-call for a
+     member opens the readiness board, and leaving the address saying post-call
+     means every reload bounces again and the link shares wrong. */
+  if((!fromHash || v!==asked) && location.hash.slice(1)!==v) location.hash=v;
 
   // Views that summarise other data have to be rebuilt on arrival, not just at
   // boot. Submitting a post-call form adds usage rows and re-renders that form,
@@ -8184,7 +8204,7 @@ var QR_TARGETS=[
 function renderQR(){
   var host=document.getElementById('qrHost'); if(!host) return;
   var base=publicBase();
-  // Three codes, one card each. There used to be a big "Check out a bag" hero
+  // One card per code. There used to be a big "Check out a bag" hero
   // above these and the same code again in the grid below it — two of the three
   // stickers you print are the same sticker, which is only confusing.
   var h='<div class="row noprint" style="margin-bottom:4px">'+
@@ -8196,7 +8216,11 @@ function renderQR(){
      'One code per page. In the print dialog turn <b>Headers and footers</b> off, '+
      'or each sheet carries a date and a link across the top and bottom.</p>';
   h+='<div class="qrsheet">';
-  QR_TARGETS.forEach(function(t){
+  // A sticker for a view a member cannot open sends whoever scans it to the
+  // home page, which reads as a broken sticker — so a paused form drops off the
+  // sheet rather than being printed and taped to a wall. Tested against the
+  // member role, not the reader's: the person printing these is a manager.
+  QR_TARGETS.filter(function(t){ return !MANAGER_VIEWS[t.view]; }).forEach(function(t){
     var url=base+'#'+t.view;
     h+='<div class="qrcard">'+
        '<div class="qrkicker">CMU EMS · Operations</div>'+
