@@ -9,10 +9,40 @@
 
 var BRAND = '#8c1c2b';
 
+/* ONE CLOCK.
+   Dates and times used to be formatted in the SCRIPT's time zone, which is a
+   setting of its own in the Apps Script project and nothing to do with the
+   spreadsheet's. When the two differ, every time written is shifted by the gap,
+   and every date read back from a date-typed cell can land on the wrong day —
+   the Equipment Manager saw forms stamped at times that did not match anybody's
+   shift. The spreadsheet's zone is the one its cells are displayed in, so that
+   is the one used everywhere. Forms also send the time they were filled in, and
+   that is what gets written: a phone with no signal can send a check hours
+   after it was done, and the row must say when it was done. */
+function sheetTZ() {
+  try { return SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone() || Session.getScriptTimeZone(); }
+  catch (err) { return Session.getScriptTimeZone(); }
+}
+
+/* A form's tab, found under the name it has now or any name it had before.
+   Tabs are renamed to match what the site calls each form, and until the first
+   submission or tidyUp does the renaming, the old tab still holds the rows. */
+function sheetOf(conf) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(conf.name);
+  if (sh) return sh;
+  for (var i = 0; conf.was && i < conf.was.length; i++) {
+    sh = ss.getSheetByName(conf.was[i]);
+    if (sh) return sh;
+  }
+  return null;
+}
+
 // name -> columns, widths, and how many left columns stay frozen.
 var SHEETS = {
   'Room Checks': {
     name: 'Room Checks', freeze: 3,
+    hide: ['Andrew ID', 'Submission ID', 'Room ID', 'DP Key', 'Missing'],
     /* NEW COLUMNS GO ON THE END. Inserting one in the middle does not delete a
        single row, but it moves every existing value one place sideways under
        headers that no longer describe them — which is worse than losing them,
@@ -32,8 +62,13 @@ var SHEETS = {
     headers: ['Date','Time','Name','Andrew ID','Room','Result','Missing','What Was Missing','Restock Needed','Maintenance','Submission ID','Duty Period','Call Sign','Room ID','DP Key'],
     widths:  [95, 70, 150, 100, 150, 150, 80, 320, 260, 260, 120, 120, 90, 110, 90]
   },
+  /* Keyed by the name the site sends, which never changes; `name` is what the
+     tab is called, which now matches what the site calls the form. `was` is how
+     the old tab is found and renamed rather than stranded. `hide` lists the
+     columns that are machinery — present, never deleted, just out of the way. */
   'Checkouts': {
-    name: 'Checkouts', freeze: 3,
+    name: 'Before Duty', was: ['Checkouts'], freeze: 3,
+    hide: ['Andrew ID', 'Submission ID', 'Bag ID', 'Missing'],
     // `Bag ID` appended so a flag raised here keys on the unit, not on the name
     // beside it — a rename would otherwise detach every flag against that bag.
     /* `What Was Missing` is appended LAST, so no existing row shifts. It should
@@ -49,7 +84,8 @@ var SHEETS = {
     widths:  [95, 70, 150, 100, 90, 160, 150, 80, 220, 220, 260, 120, 110, 340]
   },
   'Bag Checks': {
-    name: 'Bag Checks', freeze: 3,
+    name: 'Equipment Checks', was: ['Bag Checks'], freeze: 3,
+    hide: ['Andrew ID', 'Seal (no longer used)', 'Submission ID', 'Bag ID', 'Missing'],
     /* The form stopped asking for a seal number — the agency does not seal its
        kits. The COLUMN stays exactly where it was, because removing it would
        pull Submission ID one place left and every row already filed would show
@@ -60,7 +96,9 @@ var SHEETS = {
     widths:  [95, 70, 150, 100, 150, 150, 80, 220, 220, 100, 120, 110, 340]
   },
   'Post-Call': {
-    name: 'Post-Call', freeze: 3,
+    name: 'After Duty', was: ['Post-Call'], freeze: 3,
+    hide: ['Units Used', 'Could Not Replace (no longer used)', 'Used (data)', 'Submission ID'],
+    wrap: ['What Was Used', 'Replaced By Member', 'Medications Given'],
     // `replaced` reverses the old `short` ("Could Not Replace"). Members do not
     // restock, so the old column asked everybody to account for something that
     // was never their job and the honest answer was always "all of it". This
@@ -76,11 +114,12 @@ var SHEETS = {
        does not ask which, because a guess would be a wrong location against a
        real drug. Optional — most members cannot give medications at all. */
     keys:    ['date','time','name','callnum','result','usageCount','usageText','short','usageJson','sid','replaced','meds'],
-    headers: ['Date','Time','Name','Call Number','Result','Units Used','What Was Used','Could Not Replace (no longer used)','Used (data)','Submission ID','Replaced By Member','Medications Given'],
+    headers: ['Date','Time','Name','Incident Number','Result','Units Used','What Was Used','Could Not Replace (no longer used)','Used (data)','Submission ID','Replaced By Member','Medications Given'],
     widths:  [95, 70, 150, 110, 150, 90, 380, 200, 200, 120, 260, 260]
   },
   'Reports': {
     name: 'Reports', freeze: 3,
+    hide: ['Submission ID'],
     keys:    ['date','time','name','area','urgency','what','where','sid'],
     headers: ['Date','Time','Name','Area','Urgency','What Is Wrong','Where','Submission ID'],
     widths:  [95, 70, 150, 120, 110, 380, 180, 120]
@@ -197,6 +236,7 @@ var BIKE_RESTOCK = {
 var ACTIONS = {
   name: 'Actions',
   headers: ['Date','Time','Who','Site','Did','What','Where','Ref'],
+  hide: ['Site','Ref'],
   widths:  [95, 70, 150, 70, 120, 340, 170, 90]
 };
 
@@ -215,7 +255,7 @@ function ensureActions() {
 function logAction(site, who, did, what, where, ref) {
   try {
     var sh = ensureActions();
-    var tz = Session.getScriptTimeZone(), now = new Date();
+    var tz = sheetTZ(), now = new Date();
     sh.appendRow([Utilities.formatDate(now, tz, 'yyyy-MM-dd'),
                   Utilities.formatDate(now, tz, 'HH:mm'),
                   String(who || ''), site === 'bike' ? 'bike' : 'ops',
@@ -252,7 +292,7 @@ function recurrenceRows(site) {
   var out = {};
   var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(ACTIONS.name);
   if (!sh || sh.getLastRow() < 2) return out;
-  var tz = Session.getScriptTimeZone();
+  var tz = sheetTZ();
   var want = (site === 'bike') ? 'bike' : 'ops';
   var rows = sh.getRange(2, 1, sh.getLastRow() - 1, ACTIONS.headers.length).getValues();
   rows.forEach(function (r) {
@@ -276,7 +316,7 @@ function recurrenceRows(site) {
 function actionRows(site, sinceDay) {
   var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(ACTIONS.name);
   if (!sh || sh.getLastRow() < 2) return [];
-  var tz = Session.getScriptTimeZone();
+  var tz = sheetTZ();
   var asDate = function (v) {
     if (!v) return '';
     return (v instanceof Date) ? Utilities.formatDate(v, tz, 'yyyy-MM-dd') : String(v);
@@ -304,13 +344,16 @@ function actionRows(site, sinceDay) {
 var EXPIRY = {
   name: 'Expiry',
   headers: ['Key','Bag','Item','Expires','Last Reported By','Updated','Site'],
+  hide: ['Key','Site'],
   widths:  [220, 150, 320, 100, 150, 120, 70]
 };
 
 var CONCERNS = {
   name: 'Concerns',
+  // Plain headers: "First", "Last" and "Times" read as nothing on their own.
   headers: ['Resolved','Signature','What','Where','Bag ID','Area','Urgency',
-            'Times','First','Last','By','Resolved By','Site'],
+            'Times Reported','First Reported','Last Reported','Reported By','Resolved By','Site'],
+  hide: ['Signature','Bag ID','Site'],
   widths:  [80, 240, 340, 160, 120, 110, 100, 70, 110, 110, 140, 140, 70]
 };
 
@@ -365,7 +408,7 @@ function putExpiry(list, site, who) {
   var at = {};
   for (var i = 0; i < have.length; i++)
     at[rowSite(have[i][6]) + '\u0001' + String(have[i][0])] = i + 2;
-  var when = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  var when = Utilities.formatDate(new Date(), sheetTZ(), 'yyyy-MM-dd');
   var fresh = [];
   // Same collapse as putConcerns, for the same reason: a repeated key in one
   // payload would read the -1 sentinel back as a row number.
@@ -385,7 +428,7 @@ function expiryRows(site) {
   site = site === 'bike' ? 'bike' : 'ops';
   var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(EXPIRY.name);
   if (!sh || sh.getLastRow() < 2) return {};
-  var tz = Session.getScriptTimeZone();
+  var tz = sheetTZ();
   var asDate = function (v) {
     if (!v) return '';
     return (v instanceof Date) ? Utilities.formatDate(v, tz, 'yyyy-MM-dd') : String(v);
@@ -441,7 +484,7 @@ function noteUsedOnCall(p) {
   });
 
   var when = p.date ||
-    Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    Utilities.formatDate(new Date(), sheetTZ(), 'yyyy-MM-dd');
   var items = [];
   list.forEach(function (u) {
     if (!u || !u.id || openFor[u.id]) return;
@@ -537,7 +580,7 @@ function putConcerns(items, site, who, day) {
     at[rowSite(have[i][12]) + '\u0001' + String(have[i][1])] = i + 2;
   var when = /^\d{4}-\d{2}-\d{2}$/.test(String(day || ''))
     ? String(day)
-    : Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    : Utilities.formatDate(new Date(), sheetTZ(), 'yyyy-MM-dd');
   var fresh = [];
   /* One submission can name the same thing twice — two checklist lines with the
      same wording, or a note that repeats a fault. Collapsed here, because the
@@ -607,7 +650,7 @@ function bikeConcernSig(bike, bag, key) {
 function daysUntilISO(v) {
   var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(v || '').trim());
   if (!m) return null;
-  var t = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd').split('-');
+  var t = Utilities.formatDate(new Date(), sheetTZ(), 'yyyy-MM-dd').split('-');
   return Math.round((Date.UTC(+m[1], +m[2] - 1, +m[3]) -
                      Date.UTC(+t[0], +t[1] - 1, +t[2])) / 86400000);
 }
@@ -718,7 +761,7 @@ function bikeCheckRows() {
   var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(BIKE_SHEETS.safety.name);
   if (!sh || sh.getLastRow() < 2) return {};
   var n = BIKE_SHEETS.safety.headers.length;
-  var tz = Session.getScriptTimeZone();
+  var tz = sheetTZ();
   var asDate = function (v) {
     if (!v) return '';
     return (v instanceof Date) ? Utilities.formatDate(v, tz, 'yyyy-MM-dd') : String(v);
@@ -768,7 +811,7 @@ function concernRows(site) {
   site = site === 'bike' ? 'bike' : 'ops';
   var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONCERNS.name);
   if (!sh || sh.getLastRow() < 2) return [];
-  var tz = Session.getScriptTimeZone();
+  var tz = sheetTZ();
   var asDate = function (v) {
     if (!v) return '';
     return (v instanceof Date) ? Utilities.formatDate(v, tz, 'yyyy-MM-dd') : String(v);
@@ -904,7 +947,22 @@ function formatSheet(sh, conf) {
   sh.getRange(2, 1, Math.max(sh.getMaxRows() - 1, 1), n)
     .setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP)
     .setVerticalAlignment('top');
-  sh.hideColumns(n);                     // Submission ID is machinery, not information
+  /* Hidden BY NAME. This used to hide whichever column came last, on the
+     assumption that it was Submission ID — true until columns were appended
+     after it, and from then on it hid What Was Missing on the checkout and
+     equipment-check tabs and Medications Given on the post-call tab: the most
+     useful column on each, gone, with the ID it meant to hide left showing. */
+  sh.showColumns(1, n);
+  (conf.hide || ['Submission ID']).forEach(function (h) {
+    var i = conf.headers.indexOf(h);
+    if (i >= 0) sh.hideColumns(i + 1);
+  });
+  // A list of things reads as a list: one per line, not clipped to the first.
+  (conf.wrap || []).forEach(function (h) {
+    var i = conf.headers.indexOf(h);
+    if (i >= 0) sh.getRange(2, i + 1, Math.max(sh.getMaxRows() - 1, 1), 1)
+      .setWrapStrategy(SpreadsheetApp.WrapStrategy.WRAP);
+  });
   if (!sh.getFilter()) sh.getRange(1, 1, sh.getMaxRows(), n).createFilter();
 }
 
@@ -952,7 +1010,7 @@ function findFiled(sid) {
     var names = Object.keys(group);
     for (var n = 0; n < names.length; n++) {
       var conf = group[names[n]];
-      var sh = ss.getSheetByName(conf.name);
+      var sh = sheetOf(conf);
       if (!sh || sh.getLastRow() < 2) continue;
       if (alreadySeen(sh, conf, sid)) return { ok: true, found: true, tab: conf.name };
     }
@@ -973,6 +1031,9 @@ function doPost(e) {
     if (p.form === '__resolve') return setConcernResolved(p);
     if (p.form === '__bagdone') return setBagDone(p);
     if (p.form === '__chore') return setChore(p);
+    if (p.form === '__bagstatus') return setBagStatus(p);
+    if (p.form === '__tracker') return setTracker(p);
+    if (p.form === '__restockedit') return editRestock(p);
 
     // The bike site's forms, which post a different payload shape.
     if (BIKE_SHEETS[p.form]) return writeBikeRow(p);
@@ -995,8 +1056,11 @@ function doPost(e) {
     if (alreadySeen(sh, conf, p.sid)) return json({ result: 'duplicate ignored' });
 
     var now = new Date();
-    var tz = Session.getScriptTimeZone();
-    p.time = Utilities.formatDate(now, tz, 'HH:mm');
+    var tz = sheetTZ();
+    /* The time the form was filled in, from the phone that filled it in, when
+       it sent one that makes sense. Otherwise now, on the spreadsheet's clock. */
+    p.time = /^([01]?\d|2[0-3]):[0-5]\d$/.test(String(p.time || '')) ? String(p.time)
+           : Utilities.formatDate(now, tz, 'HH:mm');
     if (!p.date) p.date = Utilities.formatDate(now, tz, 'yyyy-MM-dd');
 
     var missingCount = Number(p.missingCount) || 0;
@@ -1029,6 +1093,7 @@ function doPost(e) {
     noteConcerns(p);
     noteUsedOnCall(p);
     saveExpiry(p);
+    try { trackerUse(p); } catch (err) { logError('tracker count-down failed: ' + err, ''); }
     return json({ result: 'saved' });
   } catch (err) {
     // Never throw: the site cannot read the response anyway, and throwing just
@@ -1202,7 +1267,7 @@ function addToRestock(p) {
   var wants = wantsFrom(p);
   if (!wants.length) return;
   var sh = ensureRestock();
-  var tz = Session.getScriptTimeZone();
+  var tz = sheetTZ();
   var when = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
   var who = p.name || p.callsign || '';
   var where = p.subject || '';
@@ -1309,7 +1374,7 @@ function paintRestock(sh) {
 // filter, so it is a flag and not a sentence.
 function expiryFlag(expiries) {
   if (!expiries) return '';
-  var today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  var today = Utilities.formatDate(new Date(), sheetTZ(), 'yyyy-MM-dd');
   var flagged = false;
   Object.keys(expiries).forEach(function (k) {
     var v = String(expiries[k] || '');
@@ -1339,7 +1404,7 @@ function writeBikeRow(p) {
   var missing = Array.isArray(p.missing) ? p.missing : [];
   var conditions = Array.isArray(p.conditions) ? p.conditions : [];
   var now = new Date();
-  var tz = Session.getScriptTimeZone();
+  var tz = sheetTZ();
   var isJk = p.form === 'jumpkit';
 
   var row = [
@@ -1411,7 +1476,7 @@ function addToBikeRestock(p, missing, opts) {
   if (!missing || !missing.length) return;
   opts = opts || {};
   var sh = ensureBikeRestock();
-  var tz = Session.getScriptTimeZone();
+  var tz = sheetTZ();
   var when = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
   var who = opts.who || ((p.firstName || '') + ' ' + (p.lastName || '')).trim();
   var where = opts.where ||
@@ -1456,7 +1521,7 @@ function addToBikeRestock(p, missing, opts) {
 function bikeRestockRows() {
   var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(BIKE_RESTOCK.name);
   if (!sh || sh.getLastRow() < 2) return [];
-  var tz = Session.getScriptTimeZone();
+  var tz = sheetTZ();
   var asDate = function (v) {
     if (!v) return '';
     return (v instanceof Date) ? Utilities.formatDate(v, tz, 'yyyy-MM-dd') : String(v);
@@ -1771,7 +1836,7 @@ function saveContent(p) {
    `sid` rides along so the site can tell its own just-filed check apart from the
    copy that has come back, instead of counting one filing twice. */
 function dutyPeriodRows() {
-  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS['Room Checks'].name);
+  var sh = sheetOf(SHEETS['Room Checks']);
   if (!sh || sh.getLastRow() < 2) return {};
   var head = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
   var cDp = head.indexOf('DP Key'), cRoom = head.indexOf('Room ID');
@@ -1796,6 +1861,345 @@ function dutyPeriodRows() {
     });
   });
   return out;
+}
+
+/* ============================================================================
+   BAG STATUS — in service or out, the same answer on every device
+   ============================================================================
+   Taking a bag out of service used to be an edit to the site's published copy.
+   That copy travels only when a signed-in manager's device publishes it, and a
+   device holding an edit it had not sent yet stopped taking anybody else's —
+   so one phone said Jumpkit D was out of service and the Equipment Manager's
+   said it was not, and neither was wrong about what it held.
+
+   It is a row here now, written the moment it is changed and read by everybody
+   from the same place. The first time this tab is needed it starts from what the
+   published copy says, so nothing changes state just because the tab appeared. */
+var BAG_STATUS = {
+  name: 'Bag Status',
+  headers: ['Bag', 'Status', 'Why', 'Changed By', 'Changed', 'Bag ID'],
+  widths: [170, 130, 340, 190, 130, 90],
+  hide: ['Bag ID']
+};
+var OUT_OF_SERVICE = 'Out of service', IN_SERVICE = 'In service';
+
+function publishedUnits() {
+  var c = readContent('ops');
+  var u = c && c.content && c.content.bagUnits;
+  return Array.isArray(u) ? u : [];
+}
+
+function ensureBagStatus() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(BAG_STATUS.name);
+  if (!sh) {
+    sh = ss.insertSheet(BAG_STATUS.name);
+    sh.appendRow(BAG_STATUS.headers);
+    var at = Utilities.formatDate(new Date(), sheetTZ(), 'yyyy-MM-dd HH:mm');
+    var rows = publishedUnits().filter(function (u) { return u && u.id && u.oos; })
+      .map(function (u) {
+        return [String(u.name || u.id), OUT_OF_SERVICE, String(u.oosWhy || ''), 'carried over', at, String(u.id)];
+      });
+    if (rows.length) sh.getRange(2, 1, rows.length, BAG_STATUS.headers.length).setValues(rows);
+  }
+  var have = sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), 1)).getValues()[0];
+  if (have.join('|') !== BAG_STATUS.headers.join('|'))
+    sh.getRange(1, 1, 1, BAG_STATUS.headers.length).setValues([BAG_STATUS.headers]);
+  return sh;
+}
+
+/* {bagId: {oos, why, by, at}}. Before the tab exists, the published copy is
+   still the answer — read, not written, so a plain page load changes nothing. */
+function bagStatusRows() {
+  var out = {};
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(BAG_STATUS.name);
+  if (!sh) {
+    publishedUnits().forEach(function (u) {
+      if (u && u.id && u.oos) out[u.id] = { oos: true, why: String(u.oosWhy || ''), by: '', at: '' };
+    });
+    return out;
+  }
+  if (sh.getLastRow() < 2) return out;
+  sh.getRange(2, 1, sh.getLastRow() - 1, BAG_STATUS.headers.length).getValues().forEach(function (r) {
+    var id = String(r[5] || '').trim();
+    if (!id) return;
+    out[id] = { oos: String(r[1]) === OUT_OF_SERVICE, why: String(r[2] || ''),
+                by: String(r[3] || ''), at: String(r[4] || '') };
+  });
+  return out;
+}
+
+function setBagStatus(p) {
+  var c = writerCheck(p);
+  if (!c.name) {
+    logError('Bag status change REFUSED: ' + c.why, String(p.unit || ''));
+    return json({ ok: false, error: 'not allowed: ' + c.why });
+  }
+  var unit = String(p.unit || '').trim();
+  if (!unit) return json({ ok: false, error: 'bad request' });
+  var oos = p.oos === true, why = String(p.why || '').slice(0, 300);
+  var name = String(p.name || unit);
+  var sh = ensureBagStatus();
+  var at = Utilities.formatDate(new Date(), sheetTZ(), 'yyyy-MM-dd HH:mm');
+  var row = [name, oos ? OUT_OF_SERVICE : IN_SERVICE, oos ? why : '', c.name, at, unit];
+  var last = sh.getLastRow(), hit = 0;
+  if (last > 1) {
+    var ids = sh.getRange(2, 6, last - 1, 1).getValues();
+    for (var i = 0; i < ids.length; i++) if (String(ids[i][0]) === unit) { hit = i + 2; break; }
+  }
+  if (hit) sh.getRange(hit, 1, 1, row.length).setValues([row]);
+  else sh.appendRow(row);
+  logAction('ops', c.name, oos ? 'Took out of service' : 'Put back in service', name, oos ? why : '', unit);
+  return json({ ok: true });
+}
+
+/* ============================================================================
+   EQUIPMENT TRACKER — every piece of stock, in one list the site can edit
+   ============================================================================
+   The Equipment Manager keeps her own tracker: item, where it lives, how many,
+   par, when it expires, notes, brand. The site showed a thinner copy of it,
+   held in its published content — so counts typed on one phone could sit there
+   unsent, and the list could not grow past what the site shipped with.
+
+   It lives here now, in her own columns, and the site reads and writes it
+   directly. Status is a formula, so "Short by 3" and "Expires in 12 days" stay
+   true on the sheet from one day to the next without anybody touching it. The
+   first time the tab is needed it starts from the site's existing list, so
+   nothing already counted is lost. */
+var TRACKER = {
+  name: 'Equipment Tracker',
+  headers: ['List', 'Item', 'Location', 'Stock', 'Par', 'Expiration', 'Status', 'Notes', 'Brand',
+            'Counts Down With', 'Updated', 'Updated By', 'ID'],
+  widths: [160, 300, 150, 70, 60, 110, 150, 260, 130, 150, 130, 180, 90],
+  hide: ['Counts Down With', 'ID']
+};
+var TRACKER_LISTS = ['Medications & supplies', 'General equipment'];
+var TCOL = { list: 1, item: 2, loc: 3, stock: 4, par: 5, exp: 6, status: 7, notes: 8, brand: 9,
+             link: 10, updated: 11, by: 12, id: 13 };
+
+// The site's existing list, as tracker rows. Read-only: used to start the tab.
+function trackerFromContent() {
+  var c = readContent('ops');
+  var k = (c && c.content) || {};
+  var inv = Array.isArray(k.inventory) ? k.inventory : [];
+  var stock = (k.stock && typeof k.stock === 'object') ? k.stock : {};
+  var link = (k.stockLink && typeof k.stockLink === 'object') ? k.stockLink : {};
+  return inv.filter(function (r) { return r && r.id && r.item; }).map(function (r) {
+    var n = stock[r.id];
+    return { id: String(r.id), list: TRACKER_LISTS[0], item: String(r.item), loc: String(r.loc || ''),
+             stock: (typeof n === 'number' && isFinite(n)) ? n : null,
+             par: (typeof r.par === 'number' && isFinite(r.par)) ? r.par : null,
+             exp: '', notes: '', brand: '', link: String(link[r.id] || ''), updated: '', by: 'carried over' };
+  });
+}
+
+function trackerCells(o, who, at) {
+  var d = null;
+  if (o.exp && /^\d{4}-\d{2}-\d{2}$/.test(o.exp)) {
+    var p = o.exp.split('-'); d = new Date(+p[0], +p[1] - 1, +p[2]);
+  }
+  return [o.list || TRACKER_LISTS[0], o.item || '', o.loc || '',
+          (o.stock === null || o.stock === undefined || o.stock === '') ? '' : Number(o.stock),
+          (o.par === null || o.par === undefined || o.par === '') ? '' : Number(o.par),
+          d || '', '', o.notes || '', o.brand || '', o.link || '', at, who, o.id];
+}
+
+function ensureTracker() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(TRACKER.name);
+  if (!sh) {
+    sh = ss.insertSheet(TRACKER.name);
+    sh.appendRow(TRACKER.headers);
+    var at = Utilities.formatDate(new Date(), sheetTZ(), 'yyyy-MM-dd HH:mm');
+    var rows = trackerFromContent().map(function (o) { return trackerCells(o, 'carried over', at); });
+    if (rows.length) sh.getRange(2, 1, rows.length, TRACKER.headers.length).setValues(rows);
+    sh.setFrozenRows(1);
+    paintTrackerStatus();
+  }
+  var have = sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), 1)).getValues()[0];
+  if (have.join('|') !== TRACKER.headers.join('|'))
+    sh.getRange(1, 1, 1, TRACKER.headers.length).setValues([TRACKER.headers]);
+  return sh;
+}
+
+/* Status, as a formula per row, so the sheet itself stays current. */
+function paintTrackerStatus() {
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(TRACKER.name);
+  if (!sh || sh.getLastRow() < 2) return;
+  var n = sh.getLastRow() - 1, f = [];
+  for (var i = 0; i < n; i++) {
+    var r = i + 2, S = 'D' + r, P = 'E' + r, E = 'F' + r;
+    f.push(['=IF(AND(ISNUMBER(' + S + '),ISNUMBER(' + P + '),' + S + '<' + P + '),"Short by "&(' + P + '-' + S + '),' +
+            'IF(ISNUMBER(' + E + '),IF(' + E + '<TODAY(),"Expired",IF(' + E + '-TODAY()<=60,"Expires in "&(' + E + '-TODAY())&" days","OK")),' +
+            'IF(ISNUMBER(' + S + '),"OK","Not counted")))']);
+  }
+  sh.getRange(2, TCOL.status, n, 1).setFormulas(f);
+  try {
+    var rng = sh.getRange(2, TCOL.status, Math.max(sh.getMaxRows() - 1, 1), 1);
+    var rule = function (text, bg, fg) {
+      return SpreadsheetApp.newConditionalFormatRule().whenTextStartsWith(text)
+        .setBackground(bg).setFontColor(fg).setRanges([rng]).build();
+    };
+    sh.setConditionalFormatRules([rule('Short', '#fce8e6', '#b3261e'), rule('Expired', '#fce8e6', '#b3261e'),
+      rule('Expires', '#fef7e0', '#8a5300'), rule('OK', '#e6f4ea', '#1e6b34')]);
+  } catch (err) {}
+}
+
+function trackerRows() {
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(TRACKER.name);
+  if (!sh) return { rows: trackerFromContent(), fromContent: true };
+  if (sh.getLastRow() < 2) return { rows: [], fromContent: false };
+  var tzz = sheetTZ();
+  var rows = sh.getRange(2, 1, sh.getLastRow() - 1, TRACKER.headers.length).getValues()
+    .map(function (r, i) {
+      var num = function (v) { return (v === '' || v === null || isNaN(Number(v))) ? null : Number(v); };
+      var exp = r[TCOL.exp - 1];
+      exp = exp instanceof Date ? Utilities.formatDate(exp, tzz, 'yyyy-MM-dd') : String(exp || '').trim();
+      return { id: String(r[TCOL.id - 1] || '').trim() || ('row' + (i + 2)), list: String(r[0] || TRACKER_LISTS[0]),
+               item: String(r[1] || '').trim(), loc: String(r[2] || '').trim(), stock: num(r[3]), par: num(r[4]),
+               exp: /^\d{4}-\d{2}-\d{2}$/.test(exp) ? exp : '', notes: String(r[7] || ''), brand: String(r[8] || ''),
+               link: String(r[9] || ''),
+               updated: r[10] instanceof Date ? Utilities.formatDate(r[10], tzz, 'yyyy-MM-dd HH:mm') : String(r[10] || ''),
+               by: String(r[11] || '') };
+    })
+    .filter(function (o) { return o.item; });
+  return { rows: rows, fromContent: false };
+}
+
+/* A batch of changes from the site: `set` a row (new, or matched by id — or,
+   for an import, by list, item and location, so pasting the same tracker twice
+   updates it instead of doubling it), or `del` one. One read, one write per
+   changed row, and deletes last and bottom-up so earlier row numbers hold. */
+function setTracker(p) {
+  var c = writerCheck(p);
+  if (!c.name) {
+    logError('Equipment Tracker change REFUSED: ' + c.why, '');
+    return json({ ok: false, error: 'not allowed: ' + c.why });
+  }
+  var ops = Array.isArray(p.ops) ? p.ops.slice(0, 600) : [];
+  if (!ops.length) return json({ ok: false, error: 'nothing to do' });
+  var sh = ensureTracker();
+  var n = TRACKER.headers.length, last = sh.getLastRow();
+  var vals = last > 1 ? sh.getRange(2, 1, last - 1, n).getValues() : [];
+  var byId = {}, byKey = {};
+  var keyOf = function (list, item, loc) {
+    return [list, item, loc].map(function (x) { return String(x || '').trim().toLowerCase(); }).join('\u0001');
+  };
+  vals.forEach(function (r, i) {
+    if (r[TCOL.id - 1]) byId[String(r[TCOL.id - 1])] = i;
+    byKey[keyOf(r[0], r[1], r[2])] = i;
+  });
+  var tzz = sheetTZ(), at = Utilities.formatDate(new Date(), tzz, 'yyyy-MM-dd HH:mm');
+  var fresh = [], dels = [], touched = {}, names = [];
+  var asObj = function (r) {
+    var exp = r[TCOL.exp - 1];
+    return { list: r[0], item: r[1], loc: r[2], stock: r[3], par: r[4],
+             exp: exp instanceof Date ? Utilities.formatDate(exp, tzz, 'yyyy-MM-dd') : String(exp || ''),
+             notes: r[7], brand: r[8], link: r[9], id: r[TCOL.id - 1] };
+  };
+  ops.forEach(function (op) {
+    if (!op || typeof op !== 'object') return;
+    if (op.op === 'del') {
+      var d = byId[String(op.id || '')];
+      if (d !== undefined && dels.indexOf(d) < 0) { dels.push(d); names.push('removed ' + vals[d][1]); }
+      return;
+    }
+    var row = op.row || {};
+    var ix = row.id !== undefined ? byId[String(row.id)] : undefined;
+    if (ix === undefined && op.match) ix = byKey[keyOf(row.list || TRACKER_LISTS[0], row.item, row.loc)];
+    var base = ix !== undefined ? asObj(vals[ix]) : { id: String(row.id || ('t' + Utilities.getUuid().slice(0, 8))) };
+    ['list', 'item', 'loc', 'stock', 'par', 'exp', 'notes', 'brand', 'link'].forEach(function (k) {
+      if (Object.prototype.hasOwnProperty.call(row, k)) base[k] = row[k];
+    });
+    if (!String(base.item || '').trim()) return;
+    base.item = String(base.item).trim().slice(0, 200);
+    var cells = trackerCells(base, c.name, at);
+    if (ix !== undefined) { vals[ix] = cells; touched[ix] = 1; }
+    else { fresh.push(cells); byId[base.id] = -1; byKey[keyOf(base.list, base.item, base.loc)] = -1; }
+    names.push(base.item);
+  });
+  Object.keys(touched).forEach(function (i) {
+    sh.getRange(Number(i) + 2, 1, 1, n).setValues([vals[i]]);
+  });
+  if (fresh.length) sh.getRange(sh.getLastRow() + 1, 1, fresh.length, n).setValues(fresh);
+  dels.sort(function (a, b) { return b - a; }).forEach(function (d) { sh.deleteRow(d + 2); });
+  paintTrackerStatus();
+  logAction('ops', c.name, 'Updated the tracker',
+            names.length > 4 ? names.length + ' changes' : names.join(', '), '', '');
+  return json({ ok: true, changed: names.length });
+}
+
+/* Something taken off a shelf to refill a bag comes off the tracker's count —
+   the one shelf with the most of it, which is the one somebody would reach for
+   and the only choice that cannot push a short shelf further down. A row only
+   counts down if it is linked to that consumable; nothing is guessed. */
+function trackerUse(p) {
+  if (!p.usageJson) return;
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(TRACKER.name);
+  if (!sh || sh.getLastRow() < 2) return;
+  var list;
+  try { list = JSON.parse(p.usageJson); } catch (err) { return; }
+  if (!Array.isArray(list)) return;
+  var n = TRACKER.headers.length;
+  var vals = sh.getRange(2, 1, sh.getLastRow() - 1, n).getValues();
+  var at = Utilities.formatDate(new Date(), sheetTZ(), 'yyyy-MM-dd HH:mm');
+  list.forEach(function (u) {
+    if (!u || !u.r || !u.i) return;
+    var best = -1;
+    vals.forEach(function (r, i) {
+      if (String(r[TCOL.link - 1]) !== String(u.i) || typeof r[3] !== 'number') return;
+      if (best < 0 || r[3] > vals[best][3]) best = i;
+    });
+    if (best < 0) return;
+    vals[best][3] = Math.max(0, vals[best][3] - (Number(u.q) || 1));
+    sh.getRange(best + 2, TCOL.stock).setValue(vals[best][3]);
+    sh.getRange(best + 2, TCOL.updated, 1, 2).setValues([[at, 'After duty form']]);
+  });
+}
+
+/* The shopping list, edited from the site. Adding used to write to one phone's
+   own copy — and the list on screen is the sheet's, so a manager added a line,
+   and it never appeared, anywhere. Nothing here deletes: taking a line off the
+   list ticks it, which keeps the record and can be undone. */
+function editRestock(p) {
+  var c = writerCheck(p);
+  if (!c.name) {
+    logError('Restock edit REFUSED: ' + c.why, String(p.item || ''));
+    return json({ ok: false, error: 'not allowed: ' + c.why });
+  }
+  var sh = ensureRestock();
+  var n = RESTOCK.headers.length, last = sh.getLastRow();
+  var rows = last > 1 ? sh.getRange(2, 1, last - 1, n).getValues() : [];
+  var when = Utilities.formatDate(new Date(), sheetTZ(), 'yyyy-MM-dd');
+  var item = String(p.item || '').trim().slice(0, 200), where = String(p.where || '').trim();
+  if (!item) return json({ ok: false, error: 'bad request' });
+  var find = function () {
+    for (var i = 0; i < rows.length; i++)
+      if (String(rows[i][1]) === item && String(rows[i][7] || '') === where) return i;
+    return -1;
+  };
+  var i = find(), qty = Math.max(1, Math.min(9999, Number(p.qty) || 1));
+  if (p.op === 'add') {
+    if (i >= 0 && rows[i][0] !== true) {
+      sh.getRange(i + 2, 4).setValue((Number(rows[i][3]) || 0) + qty);
+      sh.getRange(i + 2, 7).setValue(when);
+    } else if (i >= 0) {
+      sh.getRange(i + 2, 1, 1, n).setValues([[false, item, rows[i][2] || 'Equipment', qty, 1, when, when, where, c.name, 'buy']]);
+    } else {
+      sh.appendRow([false, item, String(p.cat || 'Equipment'), qty, 1, when, when, where, c.name, 'buy']);
+      sh.getRange(sh.getLastRow(), 1).insertCheckboxes();
+    }
+    logAction('ops', c.name, 'Added to the list', item, where);
+  } else if (p.op === 'edit') {
+    if (i < 0) return json({ ok: false, error: 'not found' });
+    var newItem = String(p.newItem || item).trim().slice(0, 200);
+    sh.getRange(i + 2, 2).setValue(newItem);
+    if (p.qty !== undefined) sh.getRange(i + 2, 4).setValue(qty);
+    if (p.newWhere !== undefined) sh.getRange(i + 2, 8).setValue(String(p.newWhere || ''));
+    logAction('ops', c.name, 'Edited on the list', newItem, String(p.newWhere !== undefined ? p.newWhere : where));
+  } else return json({ ok: false, error: 'bad request' });
+  paintRestock(sh);
+  return json({ ok: true });
 }
 
 /* WHO IS NOT DOING THEIR CHORE — the decisions half.
@@ -1848,7 +2252,7 @@ function ensureChores() {
 function choreRows() {
   var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CHORES.name);
   if (!sh || sh.getLastRow() < 2) return [];
-  var tz = Session.getScriptTimeZone();
+  var tz = sheetTZ();
   var asDate = function (v) {
     if (!v) return '';
     return (v instanceof Date) ? Utilities.formatDate(v, tz, 'yyyy-MM-dd') : String(v);
@@ -1877,7 +2281,7 @@ function setChore(p) {
   var cs = String(p.cs || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
   var dp = /^\d{4}:\d{1,3}$/.test(String(p.dp || '')) ? String(p.dp) : '';
   if (!did || !cs || !dp) return json({ ok: false, error: 'bad request' });
-  var tz = Session.getScriptTimeZone(), now = new Date();
+  var tz = sheetTZ(), now = new Date();
   ensureChores().appendRow([Utilities.formatDate(now, tz, 'yyyy-MM-dd'),
                             Utilities.formatDate(now, tz, 'HH:mm'),
                             c.name, cs, did, dp, CHORE_WHY[String(p.why || '')] || '']);
@@ -1890,7 +2294,7 @@ function restockRows(site) {
   if (!sh) return [];
   var last = sh.getLastRow();
   if (last < 2) return [];
-  var tz = Session.getScriptTimeZone();
+  var tz = sheetTZ();
   var asDate = function (v) {
     if (!v) return '';
     // Written as yyyy-MM-dd strings, but a human editing the cell can turn one
@@ -1929,7 +2333,7 @@ function setRestockGot(p) {
      read back, so it only ever grew. */
   var site = siteOf(p);
   var conf = site === 'bike' ? BIKE_RESTOCK : RESTOCK;
-  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(conf.name);
+  var sh = sheetOf(conf);
   if (!sh) return json({ ok: false, error: 'no restock tab' });
   var last = sh.getLastRow();
   if (last < 2) return json({ ok: false, error: 'nothing to tick' });
@@ -1986,10 +2390,10 @@ function setRestockGot(p) {
    Newest wins. */
 function lastCheckedRows() {
   var conf = SHEETS['Bag Checks'];
-  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(conf.name);
+  var sh = sheetOf(conf);
   var out = {};
   if (!sh || sh.getLastRow() < 2) return out;
-  var tz = Session.getScriptTimeZone();
+  var tz = sheetTZ();
   var iDate = conf.keys.indexOf('date'), iName = conf.keys.indexOf('name');
   var iSubj = conf.keys.indexOf('subject'), iBag = conf.keys.indexOf('bagId');
   var rows = sh.getRange(2, 1, sh.getLastRow() - 1, conf.headers.length).getValues();
@@ -2022,7 +2426,7 @@ function periodStartMs(period) {
 
 function rowsSince(name, since) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sh = ss.getSheetByName(name);
+  var sh = sheetOf(SHEETS[name]);
   if (!sh || sh.getLastRow() < 2) return { cols: [], rows: [] };
   var cols = SHEETS[name].keys;
   var vals = sh.getRange(2, 1, sh.getLastRow() - 1, cols.length).getValues();
@@ -2041,7 +2445,7 @@ function rowsSince(name, since) {
      A row with no readable date is kept rather than dropped: it is a real
      submission and a report that silently omits one is worse than a report with
      an undated line in it. */
-  var tz = Session.getScriptTimeZone();
+  var tz = sheetTZ();
   var sinceDay = Utilities.formatDate(new Date(since), tz, 'yyyy-MM-dd');
   var dayOf = function (v) {
     if (!v) return '';
@@ -2114,7 +2518,7 @@ function activitySpec(site) {
    again. Sorting happens before the cut, or page two would not follow page one. */
 function activityRows(site, sinceDay, offset, limit) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var tz = Session.getScriptTimeZone();
+  var tz = sheetTZ();
   var map = nameMap(), units = map.units || {};
   var asDate = function (v) {
     if (!v) return '';
@@ -2128,7 +2532,7 @@ function activityRows(site, sinceDay, offset, limit) {
 
   var out = [];
   activitySpec(site).forEach(function (spec) {
-    var sh = ss.getSheetByName(spec.conf.name);
+    var sh = sheetOf(spec.conf);
     if (!sh || sh.getLastRow() < 2) return;
     var width = spec.conf.headers.length;
     var vals = sh.getRange(2, 1, sh.getLastRow() - 1, width).getValues();
@@ -2217,7 +2621,7 @@ function activityRows(site, sinceDay, offset, limit) {
    says which. */
 function bagFormRows(unit, type, offset, limit) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var tz = Session.getScriptTimeZone();
+  var tz = sheetTZ();
   var map = nameMap(), units = map.units || {}, items = map.items || {};
   // Rows filed before `Bag ID` existed name the bag only by its printed name.
   var idByName = {};
@@ -2244,7 +2648,7 @@ function bagFormRows(unit, type, offset, limit) {
     return s.indexOf('free:') === 0 ? s.slice(5) : s;
   };
   var read = function (conf) {
-    var sh = ss.getSheetByName(conf.name);
+    var sh = sheetOf(conf);
     if (!sh || sh.getLastRow() < 2) return [];
     var at = {};
     conf.keys.forEach(function (k, i) { at[k] = i; });
@@ -2345,7 +2749,7 @@ function bagFormRows(unit, type, offset, limit) {
 function bagOwed(rows, units) {
   var since = {}, nameToId = {};
   Object.keys(units).forEach(function (id) { nameToId[String(units[id]).toLowerCase()] = id; });
-  var tz = Session.getScriptTimeZone();
+  var tz = sheetTZ();
   var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(ACTIONS.name);
   if (sh && sh.getLastRow() >= 2) {
     sh.getRange(2, 1, sh.getLastRow() - 1, ACTIONS.headers.length).getValues().forEach(function (r) {
@@ -2397,7 +2801,7 @@ function bagOwed(rows, units) {
    whichever bag the list below is narrowed to. The bike kit is left out of the
    usage count — it is shopped for from the bike list, by somebody else. */
 function bagStats(rows) {
-  var tz = Session.getScriptTimeZone(), now = new Date();
+  var tz = sheetTZ(), now = new Date();
   var days = [], at = {};
   for (var i = 29; i >= 0; i--) {
     var d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
@@ -2488,7 +2892,7 @@ function collectReport(period) {
 
      Dates on that tab are yyyy-MM-dd strings, so the period cut is made on the
      same shape rather than by parsing back into a Date. */
-  var sinceDay = Utilities.formatDate(new Date(since), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  var sinceDay = Utilities.formatDate(new Date(since), sheetTZ(), 'yyyy-MM-dd');
   concernRows('ops').forEach(function (c) {
     var day = String(c.last || c.first || '');
     if (day && day < sinceDay) return;
@@ -2537,6 +2941,10 @@ function doGet(e) {
   if (p.dp) {
     return json({ ok: true, dp: dutyPeriodRows(), chores: choreRows() });
   }
+  if (p.tracker) {
+    var tr = trackerRows();
+    return json({ ok: true, rows: tr.rows, fromContent: tr.fromContent, lists: TRACKER_LISTS });
+  }
   if (p.bagforms) {
     return json(bagFormRows(String(p.unit || ''), String(p.type || ''), p.offset, p.limit));
   }
@@ -2549,6 +2957,7 @@ function doGet(e) {
   if (p.state) {
     var st = siteOf(p);
     var o = { ok: true, site: st, concerns: concernRows(st), expiry: expiryRows(st) };
+    if (st === 'ops') o.bagStatus = bagStatusRows();
     // Only the bike site has a fleet whose status is derived from checks.
     if (st === 'bike') o.checks = bikeCheckRows();
     else o.lastChecked = lastCheckedRows();
@@ -2561,9 +2970,12 @@ function doGet(e) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var out = { ok: true, sheet: ss.getName(), tabs: {} };
   Object.keys(SHEETS).forEach(function (nm) {
-    var sh = ss.getSheetByName(nm);
-    out.tabs[nm] = sh ? Math.max(0, sh.getLastRow() - 1) : 0;
+    var sh = sheetOf(SHEETS[nm]);
+    out.tabs[SHEETS[nm].name] = sh ? Math.max(0, sh.getLastRow() - 1) : 0;
   });
+  // Both clocks, so a mismatch shows up in Test connection instead of as times
+  // that are quietly an hour or five out.
+  out.timeZone = { sheet: sheetTZ(), script: Session.getScriptTimeZone() };
   // The bike tabs answer here too, so "Test connection" on either site proves it
   // is talking to the one file that holds both.
   Object.keys(BIKE_SHEETS).forEach(function (k) {
@@ -2628,8 +3040,8 @@ function checkTabShapes() {
    then the machinery nobody opens by choice. */
 /* Checkouts first and Restock second: the two anybody actually opens the file
    to read. Moved with moveActiveSheet, which reorders without touching a row. */
-var TAB_ORDER = ['Checkouts', 'Restock', 'Room Checks', 'Bag Checks', 'Post-Call',
-                 'Reports', 'Concerns', 'Expiry',
+var TAB_ORDER = ['Before Duty', 'After Duty', 'Equipment Tracker', 'Restock', 'Bag Status',
+                 'Equipment Checks', 'Concerns', 'Room Checks', 'Reports', 'Expiry',
                  'Bike Jumpkit Checks', 'Bike Safety Checks',
                  'Bike Restock', 'Actions', 'Chore Log', 'Items'];
 
@@ -2675,16 +3087,30 @@ function tidyUp() {
   paintRestock(ensureRestock());
   paintBikeRestock(ensureBikeRestock());
   [ [ensureExpiry(), EXPIRY], [ensureConcerns(), CONCERNS],
-    [ensureActions(), ACTIONS], [ensureChores(), CHORES] ].forEach(function (pair) {
+    [ensureActions(), ACTIONS], [ensureChores(), CHORES],
+    [ensureBagStatus(), BAG_STATUS], [ensureTracker(), TRACKER] ].forEach(function (pair) {
     var sh = pair[0], conf = pair[1];
     sh.setFrozenRows(1);
     sh.getRange(1, 1, 1, conf.headers.length)
       .setFontWeight('bold').setBackground(BRAND).setFontColor('#ffffff');
     conf.widths.forEach(function (w, i) { sh.setColumnWidth(i + 1, w); });
+    sh.showColumns(1, conf.headers.length);
+    (conf.hide || []).forEach(function (h) {
+      var i = conf.headers.indexOf(h);
+      if (i >= 0) sh.hideColumns(i + 1);
+    });
   });
+  paintTrackerStatus();
+  // The per-item log is machinery the site reads nobody's way; tucked away.
+  var items = ss.getSheetByName(ITEMS.name);
+  if (items) items.hideSheet();
 
   orderTabs();
-  return 'All tabs are present. Order: ' + TAB_ORDER.join(', ');
+  var zones = sheetTZ() === Session.getScriptTimeZone() ? '' :
+    ' NOTE: the spreadsheet runs on ' + sheetTZ() + ' and this script on ' +
+    Session.getScriptTimeZone() + '. Set both to America/New_York (File > Settings in the ' +
+    'sheet; Project Settings in the script editor).';
+  return 'All tabs are present. Order: ' + TAB_ORDER.join(', ') + '.' + zones;
 }
 
 // Puts the tabs in TAB_ORDER. Anything not on that list (an Errors tab, or
