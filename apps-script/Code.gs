@@ -113,9 +113,12 @@ var SHEETS = {
        with no location: the same drug sits on more than one shelf and the form
        does not ask which, because a guess would be a wrong location against a
        real drug. Optional — most members cannot give medications at all. */
-    keys:    ['date','time','name','callnum','result','usageCount','usageText','short','usageJson','sid','replaced','meds'],
-    headers: ['Date','Time','Name','Incident Number','Result','Units Used','What Was Used','Could Not Replace (no longer used)','Used (data)','Submission ID','Replaced By Member','Medications Given'],
-    widths:  [95, 70, 150, 110, 150, 90, 380, 200, 200, 120, 260, 260]
+    /* `Calls` appended last: the After Duty form covers a whole shift, so it
+       says how many calls the jumpkit went on, and Incident Number now holds
+       one IN per call, comma-separated, any of them optional. */
+    keys:    ['date','time','name','callnum','result','usageCount','usageText','short','usageJson','sid','replaced','meds','calls'],
+    headers: ['Date','Time','Name','Incident Numbers','Result','Units Used','What Was Used','Could Not Replace (no longer used)','Used (data)','Submission ID','Replaced By Member','Medications Given','Calls'],
+    widths:  [95, 70, 150, 150, 150, 90, 380, 200, 200, 120, 260, 260, 70]
   },
   'Reports': {
     name: 'Reports', freeze: 3,
@@ -1968,14 +1971,35 @@ function setBagStatus(p) {
    nothing already counted is lost. */
 var TRACKER = {
   name: 'Equipment Tracker',
-  headers: ['List', 'Item', 'Location', 'Stock', 'Par', 'Expiration', 'Status', 'Notes', 'Brand',
-            'Counts Down With', 'Updated', 'Updated By', 'ID'],
-  widths: [160, 300, 150, 70, 60, 110, 150, 260, 130, 150, 130, 180, 90],
+  // Her own tracker's columns, in her order, with her words — Target, Status —
+  // and the site's reading of each row in Alert beside them.
+  headers: ['List', 'Item', 'Location', 'Stock', 'Target', 'Expiration', 'Status', 'Alert', 'Order Notes',
+            'Notes', 'Brand', 'Counts Down With', 'Updated', 'Updated By', 'ID'],
+  widths: [200, 300, 140, 70, 70, 110, 120, 150, 240, 230, 120, 150, 130, 180, 90],
   hide: ['Counts Down With', 'ID']
 };
-var TRACKER_LISTS = ['Medications & supplies', 'General equipment'];
-var TCOL = { list: 1, item: 2, loc: 3, stock: 4, par: 5, exp: 6, status: 7, notes: 8, brand: 9,
-             link: 10, updated: 11, by: 12, id: 13 };
+// Her two sheets, by the names she gave them.
+var TRACKER_LISTS = ['Medication Tracker', 'General Equipment Inventory'];
+/* Her ordering workflow, as her Status column already had it: in stock, needs
+   buying, or bought and on its way. Short or not is arithmetic and lives in
+   Alert; whether it has been ORDERED is a fact only she knows. */
+var TRACKER_STATUS = ['Stocked', 'Purchase', 'More coming'];
+// Field name -> header. Columns are found by name, never by a number written
+// in two places.
+var TF = { list: 'List', item: 'Item', loc: 'Location', stock: 'Stock', par: 'Target', exp: 'Expiration',
+           status: 'Status', alert: 'Alert', order: 'Order Notes', notes: 'Notes', brand: 'Brand',
+           link: 'Counts Down With', updated: 'Updated', by: 'Updated By', id: 'ID' };
+var TRACKER_EDITABLE = ['list', 'item', 'loc', 'stock', 'par', 'exp', 'status', 'order', 'notes', 'brand', 'link'];
+function tcol(f) { return TRACKER.headers.indexOf(TF[f]) + 1; }
+function colLetter(n) { var s = ''; while (n > 0) { var m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = (n - m - 1) / 26; } return s; }
+
+function normStatus(v) {
+  var t = String(v || '').trim().toLowerCase();
+  if (!t) return 'Stocked';
+  if (/more|coming|ordered|on order|incoming|arriv/.test(t)) return 'More coming';
+  if (/purchase|buy|need|order/.test(t)) return 'Purchase';
+  return 'Stocked';
+}
 
 // The site's existing list, as tracker rows. Read-only: used to start the tab.
 function trackerFromContent() {
@@ -1989,19 +2013,36 @@ function trackerFromContent() {
     return { id: String(r.id), list: TRACKER_LISTS[0], item: String(r.item), loc: String(r.loc || ''),
              stock: (typeof n === 'number' && isFinite(n)) ? n : null,
              par: (typeof r.par === 'number' && isFinite(r.par)) ? r.par : null,
-             exp: '', notes: '', brand: '', link: String(link[r.id] || ''), updated: '', by: 'carried over' };
+             exp: '', status: 'Stocked', order: '', notes: '', brand: '', link: String(link[r.id] || ''),
+             updated: '', by: 'carried over' };
   });
 }
 
 function trackerCells(o, who, at) {
-  var d = null;
-  if (o.exp && /^\d{4}-\d{2}-\d{2}$/.test(o.exp)) {
-    var p = o.exp.split('-'); d = new Date(+p[0], +p[1] - 1, +p[2]);
-  }
-  return [o.list || TRACKER_LISTS[0], o.item || '', o.loc || '',
-          (o.stock === null || o.stock === undefined || o.stock === '') ? '' : Number(o.stock),
-          (o.par === null || o.par === undefined || o.par === '') ? '' : Number(o.par),
-          d || '', '', o.notes || '', o.brand || '', o.link || '', at, who, o.id];
+  var d = '';
+  if (o.exp && /^\d{4}-\d{2}-\d{2}$/.test(o.exp)) { var p = o.exp.split('-'); d = new Date(+p[0], +p[1] - 1, +p[2]); }
+  var num = function (v) { return (v === null || v === undefined || v === '' || isNaN(Number(v))) ? '' : Number(v); };
+  var val = { list: o.list || TRACKER_LISTS[0], item: o.item || '', loc: o.loc || '', stock: num(o.stock), par: num(o.par),
+              exp: d, status: normStatus(o.status), alert: '', order: o.order || '', notes: o.notes || '',
+              brand: o.brand || '', link: o.link || '', updated: at, by: who, id: o.id };
+  var fieldOf = {};
+  Object.keys(TF).forEach(function (f) { fieldOf[TF[f]] = f; });
+  return TRACKER.headers.map(function (h) { var f = fieldOf[h]; return val[f] === undefined ? '' : val[f]; });
+}
+
+function trackerObj(r, i, tzz) {
+  var g = function (f) { var c = tcol(f); return c ? r[c - 1] : ''; };
+  var num = function (v) { return (v === '' || v === null || isNaN(Number(v))) ? null : Number(v); };
+  var exp = g('exp');
+  exp = exp instanceof Date ? Utilities.formatDate(exp, tzz, 'yyyy-MM-dd') : String(exp || '').trim();
+  var up = g('updated');
+  return { id: String(g('id') || '').trim() || ('row' + (i + 2)), list: String(g('list') || TRACKER_LISTS[0]),
+           item: String(g('item') || '').trim(), loc: String(g('loc') || '').trim(), stock: num(g('stock')),
+           par: num(g('par')), exp: /^\d{4}-\d{2}-\d{2}$/.test(exp) ? exp : '', status: normStatus(g('status')),
+           order: String(g('order') || ''), notes: String(g('notes') || ''), brand: String(g('brand') || ''),
+           link: String(g('link') || ''),
+           updated: up instanceof Date ? Utilities.formatDate(up, tzz, 'yyyy-MM-dd HH:mm') : String(up || ''),
+           by: String(g('by') || '') };
 }
 
 function ensureTracker() {
@@ -2022,26 +2063,33 @@ function ensureTracker() {
   return sh;
 }
 
-/* Status, as a formula per row, so the sheet itself stays current. */
+/* Alert, as a formula per row, so the sheet stays current from one day to the
+   next; Status, as a dropdown of her three words; and colour on both. */
 function paintTrackerStatus() {
   var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(TRACKER.name);
   if (!sh || sh.getLastRow() < 2) return;
   var n = sh.getLastRow() - 1, f = [];
+  var S = colLetter(tcol('stock')), P = colLetter(tcol('par')), E = colLetter(tcol('exp'));
   for (var i = 0; i < n; i++) {
-    var r = i + 2, S = 'D' + r, P = 'E' + r, E = 'F' + r;
-    f.push(['=IF(AND(ISNUMBER(' + S + '),ISNUMBER(' + P + '),' + S + '<' + P + '),"Short by "&(' + P + '-' + S + '),' +
-            'IF(ISNUMBER(' + E + '),IF(' + E + '<TODAY(),"Expired",IF(' + E + '-TODAY()<=60,"Expires in "&(' + E + '-TODAY())&" days","OK")),' +
-            'IF(ISNUMBER(' + S + '),"OK","Not counted")))']);
+    var r = i + 2, s = S + r, p = P + r, e = E + r;
+    f.push(['=IF(AND(ISNUMBER(' + s + '),ISNUMBER(' + p + '),' + s + '<' + p + '),"Short by "&(' + p + '-' + s + '),' +
+            'IF(ISNUMBER(' + e + '),IF(' + e + '<TODAY(),"Expired",IF(' + e + '-TODAY()<=60,"Expires in "&(' + e + '-TODAY())&" days","OK")),' +
+            'IF(ISNUMBER(' + s + '),"OK","Not counted")))']);
   }
-  sh.getRange(2, TCOL.status, n, 1).setFormulas(f);
+  sh.getRange(2, tcol('alert'), n, 1).setFormulas(f);
   try {
-    var rng = sh.getRange(2, TCOL.status, Math.max(sh.getMaxRows() - 1, 1), 1);
-    var rule = function (text, bg, fg) {
+    var rows = Math.max(sh.getMaxRows() - 1, 1);
+    sh.getRange(2, tcol('status'), rows, 1).setDataValidation(
+      SpreadsheetApp.newDataValidation().requireValueInList(TRACKER_STATUS, true).setAllowInvalid(true).build());
+    var alert = sh.getRange(2, tcol('alert'), rows, 1), status = sh.getRange(2, tcol('status'), rows, 1);
+    var rule = function (rng, text, bg, fg) {
       return SpreadsheetApp.newConditionalFormatRule().whenTextStartsWith(text)
         .setBackground(bg).setFontColor(fg).setRanges([rng]).build();
     };
-    sh.setConditionalFormatRules([rule('Short', '#fce8e6', '#b3261e'), rule('Expired', '#fce8e6', '#b3261e'),
-      rule('Expires', '#fef7e0', '#8a5300'), rule('OK', '#e6f4ea', '#1e6b34')]);
+    sh.setConditionalFormatRules([
+      rule(alert, 'Short', '#fce8e6', '#b3261e'), rule(alert, 'Expired', '#fce8e6', '#b3261e'),
+      rule(alert, 'Expires', '#fef7e0', '#8a5300'), rule(alert, 'OK', '#e6f4ea', '#1e6b34'),
+      rule(status, 'Purchase', '#fef7e0', '#8a5300'), rule(status, 'More coming', '#e8f0fe', '#1a4f9c')]);
   } catch (err) {}
 }
 
@@ -2051,17 +2099,7 @@ function trackerRows() {
   if (sh.getLastRow() < 2) return { rows: [], fromContent: false };
   var tzz = sheetTZ();
   var rows = sh.getRange(2, 1, sh.getLastRow() - 1, TRACKER.headers.length).getValues()
-    .map(function (r, i) {
-      var num = function (v) { return (v === '' || v === null || isNaN(Number(v))) ? null : Number(v); };
-      var exp = r[TCOL.exp - 1];
-      exp = exp instanceof Date ? Utilities.formatDate(exp, tzz, 'yyyy-MM-dd') : String(exp || '').trim();
-      return { id: String(r[TCOL.id - 1] || '').trim() || ('row' + (i + 2)), list: String(r[0] || TRACKER_LISTS[0]),
-               item: String(r[1] || '').trim(), loc: String(r[2] || '').trim(), stock: num(r[3]), par: num(r[4]),
-               exp: /^\d{4}-\d{2}-\d{2}$/.test(exp) ? exp : '', notes: String(r[7] || ''), brand: String(r[8] || ''),
-               link: String(r[9] || ''),
-               updated: r[10] instanceof Date ? Utilities.formatDate(r[10], tzz, 'yyyy-MM-dd HH:mm') : String(r[10] || ''),
-               by: String(r[11] || '') };
-    })
+    .map(function (r, i) { return trackerObj(r, i, tzz); })
     .filter(function (o) { return o.item; });
   return { rows: rows, fromContent: false };
 }
@@ -2080,46 +2118,48 @@ function setTracker(p) {
   if (!ops.length) return json({ ok: false, error: 'nothing to do' });
   var sh = ensureTracker();
   var n = TRACKER.headers.length, last = sh.getLastRow();
+  var tzz = sheetTZ(), at = Utilities.formatDate(new Date(), tzz, 'yyyy-MM-dd HH:mm');
   var vals = last > 1 ? sh.getRange(2, 1, last - 1, n).getValues() : [];
+  var objs = vals.map(function (r, i) { return trackerObj(r, i, tzz); });
   var byId = {}, byKey = {};
   var keyOf = function (list, item, loc) {
     return [list, item, loc].map(function (x) { return String(x || '').trim().toLowerCase(); }).join('\u0001');
   };
-  vals.forEach(function (r, i) {
-    if (r[TCOL.id - 1]) byId[String(r[TCOL.id - 1])] = i;
-    byKey[keyOf(r[0], r[1], r[2])] = i;
+  /* A row typed straight into the sheet has no ID; the site knows it as
+     "row<number>", and the first change made to it from the site writes that
+     down as its ID, so it can be found again after rows above it move. */
+  objs.forEach(function (o, i) {
+    byId[o.id] = i;
+    byKey[keyOf(o.list, o.item, o.loc)] = i;
   });
-  var tzz = sheetTZ(), at = Utilities.formatDate(new Date(), tzz, 'yyyy-MM-dd HH:mm');
   var fresh = [], dels = [], touched = {}, names = [];
-  var asObj = function (r) {
-    var exp = r[TCOL.exp - 1];
-    return { list: r[0], item: r[1], loc: r[2], stock: r[3], par: r[4],
-             exp: exp instanceof Date ? Utilities.formatDate(exp, tzz, 'yyyy-MM-dd') : String(exp || ''),
-             notes: r[7], brand: r[8], link: r[9], id: r[TCOL.id - 1] };
-  };
   ops.forEach(function (op) {
     if (!op || typeof op !== 'object') return;
     if (op.op === 'del') {
       var d = byId[String(op.id || '')];
-      if (d !== undefined && dels.indexOf(d) < 0) { dels.push(d); names.push('removed ' + vals[d][1]); }
+      if (d !== undefined && dels.indexOf(d) < 0) { dels.push(d); names.push('removed ' + objs[d].item); }
       return;
     }
     var row = op.row || {};
     var ix = row.id !== undefined ? byId[String(row.id)] : undefined;
     if (ix === undefined && op.match) ix = byKey[keyOf(row.list || TRACKER_LISTS[0], row.item, row.loc)];
-    var base = ix !== undefined ? asObj(vals[ix]) : { id: String(row.id || ('t' + Utilities.getUuid().slice(0, 8))) };
-    ['list', 'item', 'loc', 'stock', 'par', 'exp', 'notes', 'brand', 'link'].forEach(function (k) {
+    var base = ix !== undefined ? objs[ix] : { id: String(row.id || ('t' + Utilities.getUuid().slice(0, 8))), status: 'Stocked' };
+    if (ix !== undefined && dels.indexOf(ix) >= 0) return;
+    TRACKER_EDITABLE.forEach(function (k) {
       if (Object.prototype.hasOwnProperty.call(row, k)) base[k] = row[k];
     });
     if (!String(base.item || '').trim()) return;
     base.item = String(base.item).trim().slice(0, 200);
     var cells = trackerCells(base, c.name, at);
-    if (ix !== undefined) { vals[ix] = cells; touched[ix] = 1; }
-    else { fresh.push(cells); byId[base.id] = -1; byKey[keyOf(base.list, base.item, base.loc)] = -1; }
+    if (ix !== undefined) { vals[ix] = cells; objs[ix] = base; touched[ix] = 1; }
+    else {
+      fresh.push(cells);
+      byId[base.id] = -1; byKey[keyOf(base.list, base.item, base.loc)] = -1;
+    }
     names.push(base.item);
   });
   Object.keys(touched).forEach(function (i) {
-    sh.getRange(Number(i) + 2, 1, 1, n).setValues([vals[i]]);
+    if (dels.indexOf(Number(i)) < 0) sh.getRange(Number(i) + 2, 1, 1, n).setValues([vals[i]]);
   });
   if (fresh.length) sh.getRange(sh.getLastRow() + 1, 1, fresh.length, n).setValues(fresh);
   dels.sort(function (a, b) { return b - a; }).forEach(function (d) { sh.deleteRow(d + 2); });
@@ -2140,20 +2180,21 @@ function trackerUse(p) {
   var list;
   try { list = JSON.parse(p.usageJson); } catch (err) { return; }
   if (!Array.isArray(list)) return;
-  var n = TRACKER.headers.length;
+  var n = TRACKER.headers.length, cs = tcol('stock') - 1, cl = tcol('link') - 1;
   var vals = sh.getRange(2, 1, sh.getLastRow() - 1, n).getValues();
   var at = Utilities.formatDate(new Date(), sheetTZ(), 'yyyy-MM-dd HH:mm');
   list.forEach(function (u) {
     if (!u || !u.r || !u.i) return;
     var best = -1;
     vals.forEach(function (r, i) {
-      if (String(r[TCOL.link - 1]) !== String(u.i) || typeof r[3] !== 'number') return;
-      if (best < 0 || r[3] > vals[best][3]) best = i;
+      if (String(r[cl]) !== String(u.i) || typeof r[cs] !== 'number') return;
+      if (best < 0 || r[cs] > vals[best][cs]) best = i;
     });
     if (best < 0) return;
-    vals[best][3] = Math.max(0, vals[best][3] - (Number(u.q) || 1));
-    sh.getRange(best + 2, TCOL.stock).setValue(vals[best][3]);
-    sh.getRange(best + 2, TCOL.updated, 1, 2).setValues([[at, 'After duty form']]);
+    vals[best][cs] = Math.max(0, vals[best][cs] - (Number(u.q) || 1));
+    sh.getRange(best + 2, cs + 1).setValue(vals[best][cs]);
+    sh.getRange(best + 2, tcol('updated')).setValue(at);
+    sh.getRange(best + 2, tcol('by')).setValue('After duty form');
   });
 }
 
@@ -2693,9 +2734,10 @@ function bagFormRows(unit, type, offset, limit) {
                     fn: unitName(String(u.f || '')), r: !!u.r });
       });
     }
+    var cn = callsOf(x.get('calls'), x.get('callnum'));
     out.push({ kind: 'postcall', date: date, time: asTime(x.get('time')),
       who: String(x.get('name') || '').trim(), sid: String(x.get('sid') || ''),
-      call: String(x.get('callnum') || '').trim(), result: String(x.get('result') || ''),
+      call: String(x.get('callnum') || '').trim(), calls: cn.n, result: String(x.get('result') || ''),
       used: used, meds: list(x.get('meds')), n: x.n, t: 2 });
   });
 
@@ -2785,7 +2827,7 @@ function bagOwed(rows, units) {
       if (!s.last) s.last = { kind: 'postcall', date: r.date, time: r.time, who: r.who };
       if (u.r) return;
       if (s.since && at <= s.since.at) return;
-      if (!seen[u.f]) { seen[u.f] = 1; s.calls++; }
+      if (!seen[u.f]) { seen[u.f] = 1; s.calls += Math.max(1, r.calls || 0); }
       var hit = null;
       for (var i = 0; i < s.used.length; i++) if (s.used[i].n === u.n) { hit = s.used[i]; break; }
       if (hit) hit.q += u.q;
@@ -2809,14 +2851,18 @@ function bagStats(rows) {
     at[key] = days.length;
     days.push({ d: key, clean: 0, found: 0, calls: 0 });
   }
-  var weekFrom = days[23].d, used = {}, calls = 0, week = 0;
+  var weekFrom = days[23].d, used = {}, calls = 0, week = 0, seenIn = {};
   rows.forEach(function (r) {
     var ix = at[r.date];
     if (ix === undefined) return;
     if (r.found) days[ix].found++; else days[ix].clean++;
     if (r.date >= weekFrom) week++;
     if (r.kind !== 'postcall') return;
-    days[ix].calls++; calls++;
+    // The same rule as the report: an IN already counted is the same call.
+    var k = callsOf(r.calls, r.call), fresh = 0;
+    k.ins.forEach(function (x) { if (!seenIn[x]) { seenIn[x] = 1; fresh++; } });
+    var n = fresh + Math.max(0, k.n - k.ins.length);
+    days[ix].calls += n; calls += n;
     r.used.forEach(function (u) {
       if (!u.n || u.f === BIKE_SOURCE_ID) return;
       var e = used[u.n] || (used[u.n] = { n: u.n, q: 0, bags: {} });
@@ -2851,6 +2897,16 @@ function setBagDone(p) {
   return json({ ok: true });
 }
 
+/* How many calls one After Duty form stands for. It says so now; a form from
+   before it did was one call, as it always counted. INs are listed so the same
+   call filed by two people is counted once. */
+function callsOf(countCell, inCell) {
+  var ins = String(inCell || '').split(/[,;\s]+/).map(function (x) { return x.trim(); }).filter(Boolean);
+  var n = (countCell === '' || countCell === null || countCell === undefined || isNaN(Number(countCell)))
+    ? Math.max(1, ins.length) : Math.max(0, Number(countCell));
+  return { n: n, ins: ins };
+}
+
 function collectReport(period) {
   var since = periodStartMs(period);
   var used = {}, calls = {}, concerns = [];
@@ -2858,15 +2914,15 @@ function collectReport(period) {
   var callCount = 0;
   var pc = rowsSince('Post-Call', since);
   if (pc.rows.length) {
-    var iJson = pc.cols.indexOf('usageJson'), iCall = pc.cols.indexOf('callnum');
+    var iJson = pc.cols.indexOf('usageJson'), iCall = pc.cols.indexOf('callnum'), iCalls = pc.cols.indexOf('calls');
     var unnumbered = 0;
     pc.rows.forEach(function (r) {
-      /* A post-call form IS a call. The call number only decides whether two
-         forms describe the SAME one — two people filing for one call is one
-         call. Counting only the rows that carried a number meant a form filed
-         without one vanished from the count entirely, so the report said fewer
-         calls than the tab plainly showed. */
-      if (r[iCall]) calls[String(r[iCall])] = 1; else unnumbered++;
+      /* Each form says how many calls it covers; an IN only decides whether two
+         forms describe the SAME call — two people filing for one call is one
+         call. A call with no IN still counts. */
+      var k = callsOf(iCalls >= 0 ? r[iCalls] : '', r[iCall]);
+      k.ins.forEach(function (x) { calls[x] = 1; });
+      unnumbered += Math.max(0, k.n - k.ins.length);
       if (!r[iJson]) return;
       var list;
       try { list = JSON.parse(r[iJson]); } catch (err) { return; }

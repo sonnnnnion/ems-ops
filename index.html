@@ -965,6 +965,7 @@
   .exprow{display:flex;align-items:center;gap:10px;padding:6px 0 10px 30px;flex-wrap:wrap}
   .exprow label{margin:0;font-size:10.5px}
   .exprow input[type=date]{width:auto;min-width:150px;padding:7px 10px;font-size:14px}
+  .callins .field{margin-top:10px}
   .exprow.expnote .checkline{margin:0;background:var(--gold-wash);border-radius:10px;padding:8px 10px}
   .exprow.expnote .lbl{font-size:13.5px;color:var(--ink-soft);text-transform:none;letter-spacing:0;font-weight:500}
   .expbadge{font-family:var(--font-mono);font-size:11px;padding:3px 8px;border-radius:999px;
@@ -1296,13 +1297,20 @@
 
   /* ---------- Equipment Tracker ------------------------------------------- */
   .trk{border:1px solid var(--rule);border-radius:var(--r-md);background:var(--card);box-shadow:var(--shadow-sm);overflow:hidden}
-  .trk-head,.trk-row{display:grid;grid-template-columns:minmax(0,2.4fr) 128px 64px minmax(180px,1.4fr) 150px 120px;
+  .trk-head,.trk-row{display:grid;grid-template-columns:minmax(0,2.3fr) 124px 64px 132px minmax(150px,1.3fr) 142px 112px;
     gap:10px;align-items:center;padding:9px 14px}
   .trk-head{background:var(--bg-2);font-size:12px;font-weight:700;color:var(--ink-mute)}
   .trk-row{border-top:1px solid var(--rule-soft)}
   .trk-row.s-short{background:linear-gradient(90deg,var(--oos-wash),transparent 45%)}
   .trk-row.s-expired{background:linear-gradient(90deg,var(--oos-wash),transparent 45%)}
   .trk-row.s-expiring{background:linear-gradient(90deg,var(--warn-wash),transparent 45%)}
+  .trk-row.s-ordered{background:linear-gradient(90deg,#EAF0FA,transparent 45%)}
+  .trk-status select{padding:6px 8px;font-size:13px;font-weight:700;border-radius:8px;height:36px;width:100%}
+  .trk-status select.s-purchase{background:var(--warn-wash);color:var(--warn);border-color:#E5C79F}
+  .trk-status select.s-more-coming{background:#EAF0FA;color:#1a4f9c;border-color:#C5D5EE}
+  .trk-exp.none{min-height:1px}
+  .toolbar.sticky{position:sticky;top:62px;z-index:4;background:var(--bg);padding:8px 0;margin:10px 0 4px;
+    box-shadow:0 8px 12px -12px rgba(36,26,29,.25)}
   .trk-loch{display:flex;gap:8px;align-items:baseline;padding:8px 14px 6px;border-top:1px solid var(--rule);
     background:var(--card-2);font-size:12.5px;font-weight:800;color:var(--ink-soft)}
   .trk-loch span{font-weight:600;color:var(--ink-faint)}
@@ -1331,8 +1339,11 @@
     border-radius:8px;padding:4px 6px}
   @media(max-width:860px){
     .trk-head{display:none}
-    .trk-row{grid-template-columns:1fr auto;grid-template-areas:"item item" "st st" "stock par" "exp exp" "act act";row-gap:8px}
-    .trk-item{grid-area:item} .trk-st{grid-area:st}
+    .trk-row{grid-template-columns:1fr auto;grid-template-areas:"item item" "st status" "stock par" "exp exp" "act act";row-gap:8px}
+    .trk-item{grid-area:item} .trk-st{grid-area:st} .trk-status{grid-area:status}
+    .trk-status select{width:auto}
+    .trk-exp.none{display:none}
+    .toolbar.sticky{top:56px}
     .trk-stock{grid-area:stock} .trk-par{grid-area:par;display:flex;align-items:center;gap:6px}
     .trk-exp{grid-area:exp;display:flex;align-items:center;gap:8px} .trk-act{grid-area:act;justify-content:flex-start}
     .trk-mini{display:inline;margin:0;font-size:12px;text-transform:none;letter-spacing:0;color:var(--ink-mute)}
@@ -1850,7 +1861,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260928190003';
+var BUILD='20260928192645';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -4930,7 +4941,10 @@ var FORMS={
     // not — and asking it the other way round still could not say WHICH of four
     // items went back, so nothing could act on the answer. It is a tick against
     // each item instead, on the usage row itself. See `refilled`.
-    extras:[{id:'callnum', label:'Incident number (IN)', short:true, hint:'The incident number assigned to this call.'}]
+    /* The After Duty form covers a whole shift, not one call, so it asks how
+       many calls the jumpkit went on and then offers one incident number box
+       per call. All optional. */
+    extras:[{id:'callnum', label:'How many calls did this jumpkit go on?', calls:true}]
   },
   'report':{
     host:'reportHost', tab:'Reports',
@@ -5101,6 +5115,10 @@ function renderCheck(fid){
     });
   }
 
+  /* How many calls the shift was, and their incident numbers, asked straight
+     after who is filing: it is the frame for everything below it. */
+  (c.extras||[]).forEach(function(x){ if(x.calls) h+=callsCardHtml(fid,x); });
+
   /* --- checklist --- */
   // The edit row sits directly above the list it edits, and gets its own node so
   // setPick can refresh it: which bag is picked decides what the button opens.
@@ -5133,6 +5151,7 @@ function renderCheck(fid){
 
   /* --- extras --- */
   (c.extras||[]).forEach(function(x){
+    if(x.calls) return;     // drawn near the top, see callsCardHtml
     h+='<div class="card mt"><h3>'+esc(x.label)+'</h3>'+
        // One line, under the heading, only where an extra asks for it. A box
        // whose answer needs explaining is better off saying so than being
@@ -5521,6 +5540,30 @@ function pickOff(id){
   var o=bagOOS(u);
   uiAlert(u.name+' is out of service'+(o.why?': '+o.why:'')+'. Pick another bag.','Out of service');
 }
+/* One incident number box per call, as many as the count says. What was typed
+   in a box survives the count going up or down. */
+function callsCardHtml(fid,x){
+  return '<div class="card mt"><h3>'+esc(x.label)+'</h3>'+
+    '<div class="field"><select id="'+fid+'-x-calls" aria-label="Number of calls" '+
+    'onchange="renderCallIns(\''+fid+'\');onFormInput(\''+fid+'\')">'+
+    '<option value="">Optional</option>'+
+    [0,1,2,3,4,5,6,7,8,9,10,11,12].map(function(n){ return '<option value="'+n+'">'+n+(n===1?' call':' calls')+'</option>'; }).join('')+
+    '</select></div><div id="'+fid+'-x-callins" class="callins"></div></div>';
+}
+function callInValues(fid){
+  return [].slice.call(document.querySelectorAll('#'+fid+'-x-callins input')).map(function(i){ return i.value.trim(); });
+}
+function renderCallIns(fid,vals){
+  var host=document.getElementById(fid+'-x-callins'); if(!host) return;
+  var n=parseInt((document.getElementById(fid+'-x-calls')||{}).value,10)||0;
+  var have=vals||callInValues(fid);
+  var h='';
+  for(var i=0;i<n;i++)
+    h+='<div class="field"><label for="'+fid+'-x-in-'+i+'">Call '+(i+1)+' \u2014 incident number (IN)</label>'+
+       '<input type="text" id="'+fid+'-x-in-'+i+'" inputmode="text" autocomplete="off" placeholder="Optional" '+
+       'value="'+esc(have[i]||'')+'" oninput="onFormInput(\''+fid+'\')"></div>';
+  host.innerHTML=h;
+}
 function setPick(fid,id){
   formPick[fid]=id;
   var host=document.getElementById(fcfg(fid).host);
@@ -5560,6 +5603,12 @@ function readCheck(fid){
   var radios=host.querySelectorAll('[data-radio]');
   for(var j=0;j<radios.length;j++) if(radios[j].checked) out.radios[radios[j].getAttribute('data-radio')]=radios[j].value;
   (c.extras||[]).forEach(function(x){
+    if(x.calls){
+      var n=document.getElementById(fid+'-x-calls');
+      out.extras.calls=n?n.value:'';
+      out.extras[x.id]=callInValues(fid).filter(Boolean).join(', ');
+      return;
+    }
     var e=document.getElementById(fid+'-x-'+x.id);
     out.extras[x.id]=e?e.value.trim():'';
   });
@@ -5925,8 +5974,11 @@ function restoreDraft(fid){
     if(r) r.checked=true;
   });
   Object.keys(d.extras||{}).forEach(function(k){
-    var e=document.getElementById(fid+'-x-'+k); if(e) e.value=d.extras[k]||'';
+    var e=document.getElementById(fid+'-x-'+k); if(e && e.tagName!=='DIV') e.value=d.extras[k]||'';
   });
+  // The incident number boxes follow the count, then take back what was typed.
+  if(document.getElementById(fid+'-x-callins'))
+    renderCallIns(fid, String((d.extras||{}).callnum||'').split(/\s*,\s*/));
   if(fcfg(fid).usage && (d.usage||[]).length){
     // Drop any row whose item or unit has since been deleted in manager mode,
     // rather than restoring a select that has no matching option.
@@ -7249,6 +7301,11 @@ function liveTick(){
     // Navigated away while the request was in the air. Repainting now would
     // draw the old view over the new one.
     if(liveView!==v) return;
+    /* Never redrawn under somebody's hands. A field on this screen with the
+       cursor in it — a count half typed, a date being picked — means the new
+       answer waits for the next tick instead of wiping what is being typed. */
+    var ae=document.activeElement, cur=document.querySelector('.view.active');
+    if(ae && cur && cur.contains(ae) && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)){ liveWait=LIVE_MIN; liveArm(); return; }
     if(ent.st().sig!==before){ liveWait=LIVE_MIN; ent.draw(); }
     else liveWait=Math.min(LIVE_MAX, Math.round(liveWait*1.5));
     liveArm();
@@ -7943,7 +8000,9 @@ function setBagStatus(id, oos, why){
   if(!url){ uiAlert('No spreadsheet is connected.','Not saved'); return; }
   bagPending[id]={oos:!!oos, why:why||'', at:Date.now()};
   kitNote[id]='';
-  // Kept in step on this device too, for a page that has not heard from the sheet.
+  // Kept in step on this device too, for a page that has not heard from the
+  // sheet — and put back exactly as it was if the sheet never records it.
+  var was={oos:u.oos, why:u.oosWhy};
   if(oos){ u.oos=true; u.oosWhy=why||''; } else { delete u.oos; delete u.oosWhy; }
   saveDB();
   afterBagChange();
@@ -7959,6 +8018,8 @@ function setBagStatus(id, oos, why){
         if(!bagPending[id]){ afterBagChange(); return; }
         if(tries<2){ check(tries+1); return; }
         delete bagPending[id];
+        if(was.oos){ u.oos=true; u.oosWhy=was.why||''; } else { delete u.oos; delete u.oosWhy; }
+        saveDB();
         kitNote[id]='<b>That did not save.</b> Sign in again and retry \u2014 or the spreadsheet '+
                     'is running an older copy of the script.';
         afterBagChange();
@@ -8381,21 +8442,24 @@ function wantExpiring(key){
 /* ============================================================================
    EQUIPMENT TRACKER — every piece of equipment, and what to buy
    ============================================================================
-   What To Get, Equipment Inventory and Expiring each held a slice of: the
-   Equipment Manager's own tracker, in her own columns — item, where it lives,
-   how many, par, when it expires, notes, brand — with what is short, what to
-   buy and what is about to lapse as three ways of looking at that one list.
+   The Equipment Manager's own tracker, in her own shape: her two sheets
+   (Medication Tracker, General Equipment Inventory), her columns (stock,
+   target or minimum, expiration, notes, brand) and her workflow — each item
+   Stocked, needing a Purchase, or with More coming because it has been ordered.
+   What the numbers say (short, expiring) is worked out beside that, never
+   instead of it: an item she has already ordered is not an alarm.
 
-   The list lives in the spreadsheet's Equipment Tracker tab and is read from
-   there by every device. Every change goes straight to it and is read back; a
-   change the sheet never records is put back and says so. */
+   The list lives in the spreadsheet's Equipment Tracker tab and every device
+   reads it from there. Every change goes straight to it and is read back; one
+   the sheet never records is put back, and says so. */
 var remoteTracker=null, trackerSeeded=false;
 var trackerState={loading:false, error:'', at:0, sig:''};
 var trackerLocal={};       // id -> {f:{fields}, isNew} changed here, awaiting the sheet
 var trackerGone={};        // id -> true, removed here, awaiting the sheet
 var trackerQueue={}, trackerTimer=null;
 var trackerView={show:'all', q:''};
-var TRACKER_LISTS=['Medications & supplies','General equipment'];
+var TRACKER_LISTS=['Medication Tracker','General Equipment Inventory'];
+var TRACKER_STATUS=['Stocked','Purchase','More coming'];
 
 function fetchTracker(){
   var url=(DB.api&&DB.api.url)||'';
@@ -8423,7 +8487,6 @@ function trackerLiveState(){
   return {loading:trackerState.loading||restockState.loading, sig:trackerState.sig+'\u0001'+restockState.sig};
 }
 
-var TRK_FIELDS=['list','item','loc','stock','par','exp','notes','brand','link'];
 function trkSame(a,b){ return String(a==null?'':a)===String(b==null?'':b); }
 function settleTracker(){
   var byId={}; (remoteTracker||[]).forEach(function(r){ byId[r.id]=r; });
@@ -8439,7 +8502,7 @@ function trackerAll(){
     return trackerLocal[r.id] ? Object.assign({},r,trackerLocal[r.id].f) : r; });
   Object.keys(trackerLocal).forEach(function(id){
     if(trackerLocal[id].isNew && !rows.some(function(r){ return r.id===id; }))
-      rows.push(Object.assign({id:id, list:TRACKER_LISTS[0], stock:null, par:null, exp:''}, trackerLocal[id].f));
+      rows.push(Object.assign({id:id, list:TRACKER_LISTS[0], stock:null, par:null, exp:'', status:'Stocked'}, trackerLocal[id].f));
   });
   return rows;
 }
@@ -8449,8 +8512,12 @@ function trackerLists(rows){
     if(l && !seen[l]){ seen[l]=1; out.push(l); } });
   return out;
 }
-/* One word for where a line stands. Short comes first: a shelf that is empty
-   now matters more than a date that is weeks off. */
+// What she calls the "how many there should be" column, per list.
+function parWord(list){ return list===TRACKER_LISTS[1] ? 'Minimum' : 'Target'; }
+function trkStatus(r){ var s=String(r.status||''); return TRACKER_STATUS.indexOf(s)>=0 ? s : 'Stocked'; }
+
+/* What the numbers say. Short comes first: a shelf that is low now matters
+   more than a date weeks off. */
 function trackStatus(r){
   var days = r.exp ? daysUntil(r.exp) : null;
   if(r.stock!=null && r.par!=null && r.stock<r.par) return {k:'short', label:'Short by '+(r.par-r.stock), days:days};
@@ -8459,9 +8526,16 @@ function trackStatus(r){
   if(r.stock==null) return {k:'none', label:'Not counted', days:days};
   return {k:'ok', label:'OK', days:days};
 }
+// Needs buying: she has marked it Purchase, or it is short and nothing is on order.
+function trkNeedsBuying(r){
+  var st=trkStatus(r);
+  return st==='Purchase' || (st==='Stocked' && trackStatus(r).k==='short');
+}
+function trkOnOrder(r){ return trkStatus(r)==='More coming'; }
+function trkExpiring(r){ var d=r.exp?daysUntil(r.exp):null; return d!=null && d<=60; }
 
 /* ---- writing ---- */
-function trackerSend(ops, onFail){
+function trackerSend(ops){
   var url=(DB.api&&DB.api.url)||'';
   if(!url){ uiAlert('No spreadsheet is connected.','Not saved'); return; }
   try{
@@ -8474,18 +8548,18 @@ function trackerSend(ops, onFail){
     setTimeout(function(){
       fetchTracker().then(function(){
         var waiting=ids.filter(function(id){ return trackerLocal[id]||trackerGone[id]; });
-        if(!waiting.length){ toast('Saved for everyone.'); renderToGet(); return; }
+        if(!waiting.length){ toast('Saved for everyone.'); trackerRefreshSoft(); return; }
         if(tries<2){ check(tries+1); return; }
         waiting.forEach(function(id){ delete trackerLocal[id]; delete trackerGone[id]; });
         toast('That did not save — sign in again, or the spreadsheet needs the current script.', true);
         renderToGet();
-        if(onFail) onFail();
       });
     }, tries?3000:1800);
   })(0);
 }
 /* Edits settle for a moment before they go, so tapping + five times is one
-   request with the final number, not five racing each other. */
+   request with the final number, not five racing each other. The row changes
+   where it stands — nothing else on the screen is redrawn under her hands. */
 function trackerSet(id, fields, isNew){
   if(!requireAuth('this change')) return false;
   var l=trackerLocal[id]||(trackerLocal[id]={f:{}, isNew:!!isNew});
@@ -8497,7 +8571,7 @@ function trackerSet(id, fields, isNew){
     trackerQueue={};
     if(ops.length) trackerSend(ops);
   }, 1100);
-  renderToGet();
+  if(isNew || !trackerPatch(id)) renderToGet();
   return true;
 }
 function trkRow(id){ return trackerAll().filter(function(r){ return r.id===id; })[0]||null; }
@@ -8514,18 +8588,25 @@ function trackerDate(id,v){
   var r=trkRow(id); if(!r || trkSame(r.exp,v)) return;
   trackerSet(id,{exp:v||''});
 }
+function trackerStatusSet(id,v){
+  var r=trkRow(id); if(!r || trkStatus(r)===v) return;
+  trackerSet(id,{status:v});
+}
 function trackerForm(r){
   var rows=trackerAll(), lists=trackerLists(rows);
   var cons=[{v:'',t:'Nothing — counted by hand'}].concat((DB.consumables||[]).map(function(c){ return {v:c.id,t:c.name}; }));
   return [
     {key:'item',label:'Item',type:'text',required:true,value:r?r.item:''},
-    {key:'list',label:'List',type:'select',value:r?r.list:TRACKER_LISTS[0],
+    {key:'list',label:'List',type:'select',value:r?r.list:(trackerView.list||TRACKER_LISTS[0]),
       options:lists.map(function(l){ return {v:l,t:l}; }).concat([{v:'__new',t:'A new list…'}])},
     {key:'newlist',label:'New list name',type:'text'},
     {key:'loc',label:'Where it lives',type:'text',value:r?r.loc:''},
-    {key:'stock',label:'How many there are',type:'number',value:r&&r.stock!=null?r.stock:''},
-    {key:'par',label:'How many there should be',type:'number',value:r&&r.par!=null?r.par:''},
-    {key:'exp',label:'Expires',type:'date',value:r?r.exp:''},
+    {key:'stock',label:'Stock',type:'number',value:r&&r.stock!=null?r.stock:''},
+    {key:'par',label:'Target (or minimum)',type:'number',value:r&&r.par!=null?r.par:''},
+    {key:'exp',label:'Expiration',type:'date',value:r?r.exp:''},
+    {key:'status',label:'Status',type:'select',value:r?trkStatus(r):'Stocked',
+      options:TRACKER_STATUS.map(function(x){ return {v:x,t:x}; })},
+    {key:'order',label:'Order notes',type:'text',value:r?r.order:''},
     {key:'notes',label:'Notes',type:'text',value:r?r.notes:''},
     {key:'brand',label:'Brand or vendor',type:'text',value:r?r.brand:''},
     {key:'link',label:'Counts down when the After Duty form says one was used',type:'select',value:r?r.link||'':'',options:cons}
@@ -8535,23 +8616,28 @@ function trackerFields(v){
   var list = v.list==='__new' ? (v.newlist||'').trim() : v.list;
   var num=function(x){ return String(x).trim()==='' ? null : Math.max(0,Math.floor(Number(x)||0)); };
   return {item:v.item.trim(), list:list||TRACKER_LISTS[0], loc:(v.loc||'').trim(), stock:num(v.stock), par:num(v.par),
-          exp:v.exp||'', notes:(v.notes||'').trim(), brand:(v.brand||'').trim(), link:v.link||''};
+          exp:v.exp||'', status:v.status||'Stocked', order:(v.order||'').trim(), notes:(v.notes||'').trim(),
+          brand:(v.brand||'').trim(), link:v.link||''};
 }
-function trackerAdd(){
+function trackerAdd(list){
   if(!requireAuth('this item being added')) return;
+  trackerView.list=list||'';
   uiForm('Add to the tracker','',trackerForm(null),{okText:'Add'}).then(function(v){
     if(!v||!v.item) return;
-    trackerSet('t'+uid('').slice(1)+Date.now().toString(36).slice(-3), trackerFields(v), true);
+    trackerSet('t'+Math.random().toString(36).slice(2,10), trackerFields(v), true);
   });
 }
 function trackerEdit(id){
   var r=trkRow(id); if(!r) return;
   if(!requireAuth('this item being changed')) return;
-  uiForm('Change '+r.item,'',trackerForm(r),{okText:'Save'}).then(function(v){
+  uiForm(r.item,'',trackerForm(r),{okText:'Save'}).then(function(v){
     if(!v||!v.item) return;
     var f=trackerFields(v), diff={};
     Object.keys(f).forEach(function(k){ if(!trkSame(r[k],f[k])) diff[k]=f[k]; });
-    if(Object.keys(diff).length) trackerSet(id,diff);
+    if(!Object.keys(diff).length) return;
+    // A change of list or name can move the row; redraw rather than patch.
+    trackerSet(id,diff);
+    if(diff.list||diff.item||diff.loc) renderToGet();
   });
 }
 function trackerRemove(id){
@@ -8566,21 +8652,23 @@ function trackerRemove(id){
     });
 }
 
-/* DROPPING IN A WHOLE TRACKER. Rows copied straight out of a spreadsheet —
-   hers has Item, Location, Stock, Expiration, Par, Status, Notes, Brand — are
-   matched to columns by their headings, whatever order they come in. Pasting
-   the same tracker twice updates it rather than doubling it. */
+/* DROPPING IN HER TRACKER. Rows copied straight out of her spreadsheet — the
+   Medication Tracker (Medication / Supply, Expiration, Location, Stock, Target,
+   Status, Notes, Brand) or the General Equipment Inventory (Equipment, Current
+   Stock, Minimum Stock, Status, Purchased?) — are matched to fields by their
+   headings, whatever order and whatever blank columns they come with. */
 function parseTrackerPaste(text,list){
-  var lines=String(text||'').replace(/\r/g,'').split('\n').filter(function(l){ return l.trim(); });
+  var lines=String(text||'').replace(/\r/g,'').split('\n').filter(function(l){ return l.replace(/[\t,\s]/g,''); });
   if(!lines.length) return [];
   var split=function(l){ return l.indexOf('\t')>=0 ? l.split('\t') : l.split(','); };
   var head=split(lines[0]).map(function(h){ return h.trim().toLowerCase(); });
-  var col=function(re){ for(var i=0;i<head.length;i++) if(re.test(head[i])) return i; return -1; };
-  var ci={item:col(/item|medication|supply|equipment|name/), loc:col(/location|where/), stock:col(/stock|have|count|qty|quantity/),
-          par:col(/^par|par$|par /), exp:col(/expir/), notes:col(/note/), brand:col(/brand|vendor/), buy:col(/purchase/)};
+  var col=function(re,not){ for(var i=0;i<head.length;i++) if(re.test(head[i]) && !(not && not.test(head[i]))) return i; return -1; };
+  var ci={item:col(/medication|supply|equipment|item|name/), loc:col(/location|where/),
+          stock:col(/stock|have|count|qty|quantity/, /min|target|par/), par:col(/target|minimum|^min|\bmin\b|\bpar\b|^par/),
+          exp:col(/expir/), status:col(/status/), order:col(/purchas|order/), notes:col(/note/), brand:col(/brand|vendor/)};
   var hasHead=ci.item>=0;
-  if(!hasHead) ci={item:0, loc:1, stock:2, par:3, exp:4, notes:5, brand:6, buy:-1};
-  var num=function(v){ v=String(v==null?'':v).trim(); if(!v||isNaN(Number(v))) return null; return Math.max(0,Math.round(Number(v))); };
+  if(!hasHead) ci={item:0, loc:1, stock:2, par:3, exp:4, status:-1, order:-1, notes:5, brand:6};
+  var num=function(v){ v=String(v==null?'':v).trim().replace(/,/g,''); if(!v||isNaN(Number(v))) return null; return Math.max(0,Math.round(Number(v))); };
   var day=function(v){
     v=String(v==null?'':v).trim(); if(!v) return '';
     var m=/^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(v); if(m) return m[1]+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[3]).slice(-2);
@@ -8588,13 +8676,23 @@ function parseTrackerPaste(text,list){
     if(m){ var y=m[3].length===2?'20'+m[3]:m[3]; return y+'-'+('0'+m[1]).slice(-2)+'-'+('0'+m[2]).slice(-2); }
     var d=new Date(v); return isNaN(d)?'':isoDay(d);
   };
+  var status=function(v){
+    var t=String(v||'').trim().toLowerCase();
+    if(!t) return 'Stocked';
+    if(/more|coming|ordered|on order|incoming|arriv/.test(t)) return 'More coming';
+    if(/purchase|buy|need|order/.test(t)) return 'Purchase';
+    return 'Stocked';
+  };
   return lines.slice(hasHead?1:0).map(split).map(function(c){
     var g=function(k){ return ci[k]>=0 ? String(c[ci[k]]==null?'':c[ci[k]]).trim() : ''; };
-    var notes=g('notes'); if(g('buy')) notes=(notes?notes+' · ':'')+'Purchase: '+g('buy');
     return {list:list, item:g('item'), loc:g('loc'), stock:num(g('stock')), par:num(g('par')),
-            exp:day(g('exp')), notes:notes, brand:g('brand')};
+            exp:day(g('exp')), status:status(g('status')), order:g('order'), notes:g('notes'), brand:g('brand')};
   }).filter(function(r){ return r.item; });
 }
+// Loose enough to see the same item written a little differently.
+function trkNameKey(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'').replace(/s$/,''); }
+function trkKey(list,item,loc){ return [list,item,loc].map(function(x){ return String(x||'').trim().toLowerCase(); }).join('\u0001'); }
+
 function trackerImport(){
   if(!requireAuth('an import')) return;
   var lists=trackerLists(trackerAll());
@@ -8602,48 +8700,70 @@ function trackerImport(){
     {key:'list',label:'Into which list',type:'select',value:TRACKER_LISTS[0],
       options:lists.map(function(l){ return {v:l,t:l}; }).concat([{v:'__new',t:'A new list…'}])},
     {key:'newlist',label:'New list name',type:'text'},
+    {key:'mode',label:'What to do with what is already in that list',type:'select',value:'replace',options:[
+      {v:'replace',t:'Replace it with what I paste'},{v:'merge',t:'Keep it, update matches and add the rest'}]},
     {key:'text',label:'Rows copied from the spreadsheet, headings included',type:'textarea',rows:9,required:true}
-  ],{okText:'Bring it in'}).then(function(v){
+  ],{okText:'Next'}).then(function(v){
     if(!v||!v.text) return;
     var list=v.list==='__new'?(v.newlist||'').trim()||TRACKER_LISTS[0]:v.list;
     var rows=parseTrackerPaste(v.text,list);
     if(!rows.length){ uiAlert('No rows with an item name were found in that.','Nothing to bring in'); return; }
-    uiConfirm(rows.length+' item'+(rows.length===1?'':'s')+' into '+list+'. Any already there are updated, not doubled.',
+    var have=trackerAll().filter(function(r){ return (r.list||TRACKER_LISTS[0])===list; });
+    /* Each pasted row finds the row it is: the same name in the same place,
+       spelled however. Found, it updates THAT row under its own id — which is
+       what keeps a row's count-down link and its history. */
+    var used={}, ops=[];
+    rows.forEach(function(r){
+      var hit=have.filter(function(h){ return !used[h.id] && trkNameKey(h.item)===trkNameKey(r.item) &&
+        String(h.loc||'').trim().toLowerCase()===String(r.loc||'').trim().toLowerCase(); })[0];
+      var id=hit?hit.id:'t'+Math.random().toString(36).slice(2,10);
+      if(hit) used[hit.id]=1;
+      ops.push({op:'set', match:!hit, row:Object.assign({id:id}, r)});
+    });
+    var drop = v.mode==='replace' ? have.filter(function(h){ return !used[h.id]; }) : [];
+    var upd=ops.filter(function(o){ return !o.match; }).length;
+    uiConfirm(rows.length+' item'+(rows.length===1?'':'s')+' into '+list+': '+(ops.length-upd)+' new, '+upd+' updated'+
+              (drop.length?', and '+drop.length+' not in what you pasted will be removed':'')+'.',
               'Bring them in?',{okText:'Bring them in'}).then(function(ok){
       if(!ok) return;
-      var ops=rows.map(function(r){
-        var id='t'+Math.random().toString(36).slice(2,9);
-        trackerLocal[id]={f:r, isNew:true};
-        return {op:'set', match:true, row:Object.assign({id:id},r)};
-      });
+      drop.forEach(function(h){ ops.push({op:'del', id:h.id}); trackerGone[h.id]=true; });
+      ops.forEach(function(o){ if(o.op==='set') trackerLocal[o.row.id]={f:Object.assign({},o.row), isNew:!!o.match}; });
       renderToGet();
-      /* An import that matches an existing row updates that row under ITS id,
-         so the ids minted here never appear — cleared once the sheet answers,
-         rather than waited on. */
-      var tmp=ops.map(function(o){ return o.row.id; });
-      trackerSendImport(ops,tmp);
+      trackerSendImport(ops);
     });
   });
 }
-function trackerSendImport(ops,tmp){
+function trackerSendImport(ops){
   var url=(DB.api&&DB.api.url)||''; if(!url) return;
-  for(var i=0;i<ops.length;i+=200){
+  // Deletes ride in the LAST batch, so a batch that fails cannot take rows out
+  // without having put their replacements in.
+  var sets=ops.filter(function(o){ return o.op==='set'; }), dels=ops.filter(function(o){ return o.op==='del'; });
+  var batches=[];
+  for(var i=0;i<sets.length;i+=200) batches.push(sets.slice(i,i+200));
+  if(!batches.length) batches.push([]);
+  batches[batches.length-1]=batches[batches.length-1].concat(dels);
+  batches.forEach(function(b){
     try{
       fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},
-        body:JSON.stringify({form:'__tracker', site:'ops', ops:ops.slice(i,i+200), idToken:googleIdToken,
-                             key:(DB.api&&DB.api.key)||''})});
+        body:JSON.stringify({form:'__tracker', site:'ops', ops:b, idToken:googleIdToken, key:(DB.api&&DB.api.key)||''})});
     }catch(e){}
-  }
+  });
   dataChanged();
-  var before=(remoteTracker||[]).length;
-  setTimeout(function(){
-    fetchTracker().then(function(){
-      tmp.forEach(function(id){ delete trackerLocal[id]; });
-      var after=(remoteTracker||[]).length;
-      toast(after>=before ? 'Brought in. '+after+' items on the tracker.' : 'That did not save — sign in again.', after<before);
-      renderToGet();
-    });
-  }, 2500+Math.min(6000, ops.length*15));
+  var want=sets.length;
+  (function check(tries){
+    setTimeout(function(){
+      fetchTracker().then(function(){
+        var landed=sets.filter(function(o){ return (remoteTracker||[]).some(function(r){
+          return r.id===o.row.id || trkKey(r.list,r.item,r.loc)===trkKey(o.row.list,o.row.item,o.row.loc); }); }).length;
+        if(landed<want && tries<3){ check(tries+1); return; }
+        sets.forEach(function(o){ delete trackerLocal[o.row.id]; });
+        dels.forEach(function(o){ delete trackerGone[o.id]; });
+        toast(landed>=want ? 'Brought in. '+(remoteTracker||[]).length+' items on the tracker.'
+                           : 'Only '+landed+' of '+want+' saved — sign in again and paste again.', landed<want);
+        renderToGet();
+      });
+    }, tries?3500:2500+Math.min(6000, ops.length*12));
+  })(0);
 }
 
 /* ---- drawing ---- */
@@ -8652,54 +8772,80 @@ function trkSearch(v){
   trackerView.q=String(v||'');
   var host=document.getElementById('trkListHost'); if(host) host.innerHTML=trackerBody();
 }
-function trackerRowHtml(r){
-  var st=trackStatus(r), id=jsq(r.id);
+function trkStatusCell(r){
+  var st=trackStatus(r), s=trkStatus(r);
   var pct=(r.stock!=null && r.par) ? Math.min(100, r.stock/r.par*100) : 0;
   var tone={short:'crit',expired:'crit',expiring:'warn',ok:'ok',none:'mute'}[st.k];
-  var sub=[r.notes, r.brand].filter(Boolean).join(' · ');
-  return '<div class="trk-row s-'+st.k+'" role="row">'+
+  // Short but already ordered is not an alarm: said quietly.
+  if(st.k==='short' && s==='More coming') tone='mute';
+  return '<span class="gauge">'+(r.stock!=null&&r.par?'<i class="'+(st.k==='short'?'p-crit':'p-ok')+'" style="width:'+Math.max(4,pct)+'%"></i>':'')+
+    '</span><span class="tag '+tone+'">'+esc(st.label)+'</span>'+
+    (st.k==='short' && st.days!=null && st.days<=60
+      ? '<span class="tag '+(st.days<0?'crit':'warn')+'">'+(st.days<0?'Expired':'Expires in '+st.days+'d')+'</span>' : '');
+}
+function trkRowClass(r){
+  var st=trackStatus(r), s=trkStatus(r);
+  return 'trk-row s-'+(st.k==='short'&&s==='More coming'?'ordered':st.k)+(s==='Purchase'?' buy':'');
+}
+function trackerRowHtml(r,showExp){
+  var id=jsq(r.id), s=trkStatus(r);
+  var sub=[r.order, r.notes, r.brand].filter(Boolean).join(' · ');
+  return '<div class="'+trkRowClass(r)+'" role="row" data-id="'+esc(r.id)+'">'+
     '<div class="trk-item"><b>'+esc(r.item)+'</b>'+(sub?'<span>'+esc(sub)+'</span>':'')+'</div>'+
     '<div class="trk-stock"><div class="stepper">'+
       '<button type="button" aria-label="One fewer '+esc(r.item)+'" onclick="trackerStep(\''+id+'\',-1)">−</button>'+
-      '<input type="number" min="0" inputmode="numeric" aria-label="How many '+esc(r.item)+'" value="'+(r.stock==null?'':r.stock)+'" '+
+      '<input type="number" min="0" inputmode="numeric" aria-label="Stock of '+esc(r.item)+'" value="'+(r.stock==null?'':r.stock)+'" '+
         'placeholder="—" onchange="trackerNum(\''+id+'\',\'stock\',this.value)">'+
       '<button type="button" aria-label="One more '+esc(r.item)+'" onclick="trackerStep(\''+id+'\',1)">+</button></div></div>'+
-    '<div class="trk-par"><label class="trk-mini">Par</label><input type="number" min="0" inputmode="numeric" aria-label="Par for '+esc(r.item)+'" '+
-      'value="'+(r.par==null?'':r.par)+'" placeholder="—" onchange="trackerNum(\''+id+'\',\'par\',this.value)"></div>'+
-    '<div class="trk-st"><span class="gauge">'+(r.stock!=null&&r.par?'<i class="'+(st.k==='short'?'p-crit':'p-ok')+'" style="width:'+Math.max(4,pct)+'%"></i>':'')+
-      '</span><span class="tag '+tone+'">'+esc(st.label)+'</span>'+
-      // Short AND about to lapse: both are said, or the date hides behind the count.
-      (st.k==='short' && st.days!=null && st.days<=60
-        ? '<span class="tag '+(st.days<0?'crit':'warn')+'">'+(st.days<0?'Expired':'Expires in '+st.days+'d')+'</span>' : '')+'</div>'+
-    '<div class="trk-exp"><label class="trk-mini">Expires</label><input type="date" aria-label="Expiry date for '+esc(r.item)+'" value="'+esc(r.exp||'')+'" '+
-      'onchange="trackerDate(\''+id+'\',this.value)"></div>'+
+    '<div class="trk-par"><label class="trk-mini">'+parWord(r.list)+'</label><input type="number" min="0" inputmode="numeric" '+
+      'aria-label="'+parWord(r.list)+' for '+esc(r.item)+'" value="'+(r.par==null?'':r.par)+'" placeholder="—" '+
+      'onchange="trackerNum(\''+id+'\',\'par\',this.value)"></div>'+
+    '<div class="trk-status"><select aria-label="Status of '+esc(r.item)+'" class="s-'+s.replace(/\s/g,'-').toLowerCase()+'" '+
+      'onchange="trackerStatusSet(\''+id+'\',this.value)">'+
+      TRACKER_STATUS.map(function(x){ return '<option'+(x===s?' selected':'')+'>'+x+'</option>'; }).join('')+'</select></div>'+
+    '<div class="trk-st">'+trkStatusCell(r)+'</div>'+
+    (showExp?'<div class="trk-exp"><label class="trk-mini">Expires</label><input type="date" aria-label="Expiration of '+esc(r.item)+'" '+
+      'value="'+esc(r.exp||'')+'" onchange="trackerDate(\''+id+'\',this.value)"></div>':'<div class="trk-exp none"></div>')+
     '<div class="trk-act"><button type="button" class="btn xs" onclick="trackerEdit(\''+id+'\')">Edit</button>'+
       '<button type="button" class="rmbtn" onclick="trackerRemove(\''+id+'\')">Remove</button></div>'+
     '</div>';
 }
-function trackerTable(rows){
+function trackerTable(rows,list){
   if(!rows.length) return '<div class="panel"><p class="hint" style="margin:0">Nothing here.</p></div>';
+  // Expiration only where the list actually uses it, and place headings only
+  // where items have places — her general inventory has neither.
+  var showExp = list===TRACKER_LISTS[0] || rows.some(function(r){ return r.exp; });
+  var withLoc = rows.some(function(r){ return r.loc; });
   var byLoc={}, order=[];
-  rows.forEach(function(r){ var l=r.loc||'Unplaced'; if(!byLoc[l]){ byLoc[l]=[]; order.push(l); } byLoc[l].push(r); });
-  return '<div class="trk" role="table">'+
-    '<div class="trk-head" role="row"><span>Item</span><span>Stock</span><span>Par</span>'+
-    '<span>Status</span><span>Expires</span><span></span></div>'+
+  rows.forEach(function(r){ var l=withLoc?(r.loc||'No location'):''; if(!byLoc[l]){ byLoc[l]=[]; order.push(l); } byLoc[l].push(r); });
+  return '<div class="trk'+(showExp?'':' noexp')+'" role="table">'+
+    '<div class="trk-head" role="row"><span>Item</span><span>Stock</span><span>'+parWord(list)+'</span><span>Status</span>'+
+    '<span></span><span>'+(showExp?'Expires':'')+'</span><span></span></div>'+
     order.map(function(l){
-      return '<div class="trk-loch">'+esc(l)+'<span>'+byLoc[l].length+'</span></div>'+byLoc[l].map(trackerRowHtml).join('');
+      return (withLoc?'<div class="trk-loch">'+esc(l)+'<span>'+byLoc[l].length+'</span></div>':'')+
+        byLoc[l].map(function(r){ return trackerRowHtml(r,showExp); }).join('');
     }).join('')+'</div>';
 }
 function trackerBody(){
   var q=trackerView.q.trim().toLowerCase();
   var all=trackerAll().filter(function(r){
-    return !q || (r.item+' '+r.loc+' '+r.notes+' '+r.brand+' '+r.list).toLowerCase().indexOf(q)>=0; });
+    return !q || (r.item+' '+r.loc+' '+r.notes+' '+r.brand+' '+r.list+' '+r.order+' '+r.status).toLowerCase().indexOf(q)>=0; });
   var show=trackerView.show, h='';
-  if(show==='short'){
-    return trackerTable(all.filter(function(r){ return trackStatus(r).k==='short'; }));
-  }
+  var byList=function(filter){
+    var out='';
+    trackerLists(all).forEach(function(l){
+      var rows=all.filter(function(r){ return (r.list||TRACKER_LISTS[0])===l && filter(r); });
+      if(!rows.length && (show!=='all' || TRACKER_LISTS.indexOf(l)<0)) return;
+      out+='<div class="sec"><h3>'+esc(l)+'</h3><span class="sec-n">'+rows.length+'</span>'+
+        (show==='all'?'<span class="sec-r"><button type="button" class="btn xs" data-need="equipment" onclick="trackerAdd(\''+jsq(l)+'\')">Add to this list</button></span>':'')+
+        '</div>'+trackerTable(rows,l);
+    });
+    return out || '<div class="panel"><p class="hint" style="margin:0">Nothing here.</p></div>';
+  };
+  if(show==='buy') return trackerBuyHtml(all,q)+byList(trkNeedsBuying);
+  if(show==='order') return byList(trkOnOrder);
   if(show==='expiring'){
-    var soon=all.filter(function(r){ var d=r.exp?daysUntil(r.exp):null; return d!=null && d<=60; })
-      .sort(function(a,b){ return daysUntil(a.exp)-daysUntil(b.exp); });
-    h+=trackerTable(soon);
+    h+=byList(trkExpiring);
     var bag=expiringRows().filter(function(r){ return r.days<=60 &&
       (!q || (r.item+' '+r.place).toLowerCase().indexOf(q)>=0); });
     if(bag.length)
@@ -8713,20 +8859,13 @@ function trackerBody(){
         }).join('')+'</ul></div>';
     return h;
   }
-  if(show==='buy') return trackerBuyHtml(all,q);
-  trackerLists(all).forEach(function(l){
-    var rows=all.filter(function(r){ return (r.list||TRACKER_LISTS[0])===l; });
-    if(!rows.length && TRACKER_LISTS.indexOf(l)<0) return;
-    h+='<div class="sec"><h3>'+esc(l)+'</h3><span class="sec-n">'+rows.length+'</span></div>'+trackerTable(rows);
-  });
-  return h;
+  return byList(function(){ return true; });
 }
 function trackerBuyHtml(all,q){
   var buys=(Array.isArray(remoteRestock)?remoteRestock:[]).filter(function(r){
     return r && !r.got && (r.kind||'buy')!=='report' && (!q || (r.item+' '+r.where).toLowerCase().indexOf(q)>=0); });
   var reps=(Array.isArray(remoteRestock)?remoteRestock:[]).filter(function(r){ return r && !r.got && r.kind==='report'; });
-  var short=all.filter(function(r){ return trackStatus(r).k==='short'; });
-  var h='<div class="panel"><div class="row" style="margin-bottom:6px"><h4 style="margin:0">Buy these</h4>'+
+  var h='<div class="panel"><div class="row" style="margin-bottom:6px"><h4 style="margin:0">Used on calls and added by hand</h4>'+
     '<span style="margin-left:auto"></span><button type="button" class="btn sm" data-need="equipment" onclick="addToGet()">Add to the list</button>'+
     '<button type="button" class="btn ghost sm" onclick="copyToGet()">Copy list</button></div>';
   if(!buys.length) h+='<p class="hint" style="margin:0">Nothing on the list.</p>';
@@ -8738,11 +8877,9 @@ function trackerBuyHtml(all,q){
         '<button type="button" class="btn xs" onclick="toggleRestock(\''+jsq(r.item)+'\',true,\''+jsq(r.where||'')+'\')">Bought</button></li>';
     }).join('')+'</ul>';
   h+='</div>';
-  if(short.length)
-    h+='<div class="sec"><h3>Short on the shelf</h3><span class="sec-n">'+short.length+'</span></div>'+trackerTable(short);
   if(reps.length)
     h+='<div class="acc tight mt"><button type="button" class="acchead" onclick="toggleAcc(this)">'+
-       '<span class="num">'+reps.length+'</span><span>Reported missing from a bag</span><span class="chev">▾</span></button>'+
+       '<span class="num">'+reps.length+'</span><span>Reported on a form</span><span class="chev">▾</span></button>'+
        '<div class="accbody"><ul class="buylist">'+reps.map(function(r){
          return '<li><div class="kc-item"><b>'+esc(r.item)+'</b><span>'+esc(r.where||'')+'</span></div>'+
            '<button type="button" class="btn xs" onclick="toggleRestock(\''+jsq(r.item)+'\',true,\''+jsq(r.where||'')+'\')">Handled</button></li>';
@@ -8750,39 +8887,74 @@ function trackerBuyHtml(all,q){
   return h;
 }
 
+function trackerCounts(){
+  var all=trackerAll();
+  var buys=(Array.isArray(remoteRestock)?remoteRestock:[]).filter(function(r){ return r && !r.got && (r.kind||'buy')!=='report'; }).length;
+  var bagExp=expiringRows().filter(function(r){ return r.days<=60; }).length;
+  return {all:all, total:all.length,
+    ok:all.filter(function(r){ return trackStatus(r).k==='ok'; }).length,
+    short:all.filter(function(r){ return trackStatus(r).k==='short'; }).length,
+    expiringK:all.filter(function(r){ var k=trackStatus(r).k; return k==='expiring'||k==='expired'; }).length,
+    none:all.filter(function(r){ return r.stock==null; }).length,
+    buy:all.filter(trkNeedsBuying).length, lines:buys,
+    order:all.filter(trkOnOrder).length,
+    expiring:all.filter(trkExpiring).length+bagExp};
+}
+function trackerGlanceHtml(c){
+  return '<div class="glance">'+
+     '<div class="gl gl-hero">'+ringSVG([{v:c.ok,cls:'r-ok'},{v:c.short,cls:'r-crit'},{v:c.expiringK,cls:'r-warn'},
+          {v:c.total-c.ok-c.short-c.expiringK,cls:'r-mute'}], c.total?Math.round(c.ok/c.total*100)+'%':'—')+
+       '<div><div class="gl-n">'+c.ok+'<small>of '+c.total+'</small></div><div class="gl-l">stocked and in date</div>'+
+       '<ul class="key"><li><i class="p-ok"></i>OK</li><li><i class="p-crit"></i>Short</li><li><i class="p-warn"></i>Expiring</li>'+
+       '<li><i class="p-mute"></i>Not counted</li></ul></div></div>'+
+     glTile(c.buy+c.lines,'to buy',c.lines?c.lines+' from calls and by hand':'',(c.buy+c.lines)?'warn':'ok')+
+     glTile(c.order,'on order','','')+
+     glTile(c.expiring,'expiring within 2 months','',c.expiring?'warn':'ok')+
+     '</div>';
+}
+function trackerSegHtml(c){
+  return [['all','Everything',c.total],['buy','Needs buying',c.buy+c.lines],['order','On order',c.order],['expiring','Expiring',c.expiring]]
+    .map(function(o){
+      return '<button type="button" class="'+(trackerView.show===o[0]?'on':'')+'" aria-pressed="'+(trackerView.show===o[0])+'" '+
+             'onclick="trkShow(\''+o[0]+'\')">'+o[1]+'<span class="n">'+o[2]+'</span></button>';
+    }).join('');
+}
+/* A row changed: redraw that row's words and the counts above, and nothing
+   else — the box she is typing in, the list she is scrolled through, and what
+   has focus all stay exactly where they are. Returns false if the row is not
+   on screen, so the caller can draw the whole thing instead. */
+function trackerPatch(id){
+  var el=document.querySelector('#trkListHost .trk-row[data-id="'+(window.CSS&&CSS.escape?CSS.escape(id):id)+'"]');
+  var r=trkRow(id);
+  if(!el || !r) return false;
+  el.className=trkRowClass(r);
+  var st=el.querySelector('.trk-st'); if(st) st.innerHTML=trkStatusCell(r);
+  var inp=el.querySelector('.trk-stock input');
+  if(inp && document.activeElement!==inp) inp.value=(r.stock==null?'':r.stock);
+  var sel=el.querySelector('.trk-status select');
+  if(sel){ sel.value=trkStatus(r); sel.className='s-'+trkStatus(r).replace(/\s/g,'-').toLowerCase(); }
+  var sub=el.querySelector('.trk-item span'), text=[r.order, r.notes, r.brand].filter(Boolean).join(' · ');
+  if(sub) sub.textContent=text;
+  trackerRefreshSoft();
+  return true;
+}
+function trackerRefreshSoft(){
+  var c=trackerCounts();
+  var g=document.getElementById('trkGlance'); if(g) g.innerHTML=trackerGlanceHtml(c);
+  var sg=document.getElementById('trkSeg'); if(sg) sg.innerHTML=trackerSegHtml(c);
+}
+
 function renderToGet(){
   var host=document.getElementById('togetHost'); if(!host) return;
-  var all=trackerAll();
-  var st=all.map(trackStatus);
-  var short=st.filter(function(x){ return x.k==='short'; }).length;
-  var expiring=st.filter(function(x){ return x.days!=null && x.days<=60; }).length+
-               expiringRows().filter(function(r){ return r.days<=60; }).length;
-  var counted=all.filter(function(r){ return r.stock!=null; }).length;
-  var okN=st.filter(function(x){ return x.k==='ok'; }).length;
-  var buys=(Array.isArray(remoteRestock)?remoteRestock:[]).filter(function(r){ return r && !r.got && (r.kind||'buy')!=='report'; }).length;
-
   var h=liveNote(trackerState, !!remoteTracker, 'counted', 'counts', 'trackerFetchAll().then(renderToGet)');
   if(!remoteTracker && trackerState.error){
-    host.innerHTML=h+'<div class="panel"><p class="hint" style="margin:0">The tracker is read from the spreadsheet. '+
+    host.innerHTML=h+'<div class="panel"><p class="hint" style="margin:0">The tracker is read from the spreadsheet: '+
       esc(trackerState.error)+'.</p></div>';
     return;
   }
-  h+='<div class="glance">'+
-     '<div class="gl gl-hero">'+ringSVG([{v:okN,cls:'r-ok'},{v:short,cls:'r-crit'},
-          {v:st.filter(function(x){ return x.k==='expiring'||x.k==='expired'; }).length,cls:'r-warn'},
-          {v:all.length-counted,cls:'r-mute'}], all.length?Math.round(okN/all.length*100)+'%':'—')+
-       '<div><div class="gl-n">'+okN+'<small>of '+all.length+'</small></div><div class="gl-l">items stocked and in date</div>'+
-       '<ul class="key"><li><i class="p-ok"></i>OK</li><li><i class="p-crit"></i>Short</li><li><i class="p-warn"></i>Expiring</li>'+
-       '<li><i class="p-mute"></i>Not counted</li></ul></div></div>'+
-     glTile(short,'short on the shelf','',short?'crit':'ok')+
-     glTile(buys,'on the buy list','',buys?'warn':'ok')+
-     glTile(expiring,'expiring within 2 months','',expiring?'warn':'ok')+
-     '</div>';
-  h+='<div class="toolbar" style="margin-top:18px"><div class="seg" role="group" aria-label="What to show">'+
-     [['all','Everything',all.length],['short','Short',short],['buy','To buy',buys+short],['expiring','Expiring',expiring]].map(function(o){
-       return '<button type="button" class="'+(trackerView.show===o[0]?'on':'')+'" aria-pressed="'+(trackerView.show===o[0])+'" '+
-              'onclick="trkShow(\''+o[0]+'\')">'+o[1]+'<span class="n">'+o[2]+'</span></button>';
-     }).join('')+'</div>'+
+  var c=trackerCounts();
+  h+='<div id="trkGlance">'+trackerGlanceHtml(c)+'</div>';
+  h+='<div class="toolbar sticky"><div class="seg" id="trkSeg" role="group" aria-label="What to show">'+trackerSegHtml(c)+'</div>'+
      '<div class="search"><input type="search" placeholder="Search" aria-label="Search the tracker" value="'+esc(trackerView.q)+'" '+
        'oninput="trkSearch(this.value)"></div>'+
      '<button type="button" class="btn sm solid" data-need="equipment" onclick="trackerAdd()">Add item</button>'+
@@ -10905,7 +11077,9 @@ function kitFormHtml(r){
     });
     bag=names.join(', ')||'Nothing used';
   }else bag=r.bag||kitUnitName(r.unit);
-  var meta=kitTime(r.time)+(r.who?' · '+r.who:'')+(r.kind==='postcall'&&r.call?' · call '+r.call:'');
+  var calls=r.kind==='postcall'?(Number(r.calls)||0):0;
+  var meta=kitTime(r.time)+(r.who?' · '+r.who:'')+
+    (calls?' · '+calls+' call'+(calls===1?'':'s'):'')+(r.kind==='postcall'&&r.call?' · IN '+r.call:'');
   return '<li class="tl-row '+(found?'found':'clean')+'"><span class="tl-dot" aria-hidden="true"></span><div>'+
     '<div class="tl-top"><span class="tl-kind k-'+esc(r.kind)+'">'+kind+'</span><b>'+esc(bag)+'</b>'+
     '<span class="tl-meta">'+esc(meta)+'</span></div>'+
