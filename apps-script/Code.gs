@@ -2490,9 +2490,9 @@ function activitySpec(site) {
       iDate:0, iTime:1, iWho:2, iAndrew:3, iSubject:4, iResult:5, iMissing:6, iNotes:10 }
   ];
   return [
-    { form: 'Checkout',    conf: SHEETS['Checkouts'],   kind: 'check',
+    { form: 'Before duty', conf: SHEETS['Checkouts'],   kind: 'check',
       iDate:0, iTime:1, iWho:2, iAndrew:3, iSubject:5, iResult:6, iMissing:7, iNotes:10 },
-    { form: 'Contents check', conf: SHEETS['Bag Checks'], kind: 'check',
+    { form: 'Equipment check', conf: SHEETS['Bag Checks'], kind: 'check',
       iDate:0, iTime:1, iWho:2, iAndrew:3, iSubject:4, iResult:5, iMissing:6, iNotes:-1 },
     { form: 'Room check',  conf: SHEETS['Room Checks'], kind: 'check',
       iDate:0, iTime:1, iWho:2, iAndrew:3, iSubject:4, iResult:5, iMissing:6, iNotes:9 },
@@ -2502,7 +2502,7 @@ function activitySpec(site) {
        is the whole question this screen exists for; leaving it as a bare
        "on a call" would have made the usage rows the one thing you could not
        filter by kit. */
-    { form: 'Post-call',   conf: SHEETS['Post-Call'],   kind: 'usage',
+    { form: 'After duty',  conf: SHEETS['Post-Call'],   kind: 'usage',
       iDate:0, iTime:1, iWho:2, iAndrew:-1, iSubject:-1, iResult:4, iMissing:-1, iNotes:6,
       iUsage:8 },
     { form: 'Report',      conf: SHEETS['Reports'],     kind: 'report',

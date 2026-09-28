@@ -1275,6 +1275,68 @@
   .gauge i{display:block;height:100%;border-radius:999px}
   .stockin{max-width:96px}
 
+  .toast{position:fixed;left:50%;bottom:22px;transform:translate(-50%,20px);opacity:0;pointer-events:none;
+    background:var(--ink);color:#fff;font:600 14px var(--font-body);padding:11px 18px;border-radius:999px;
+    box-shadow:var(--shadow-lg);transition:opacity .2s,transform .2s;z-index:60;max-width:calc(100% - 32px);text-align:center}
+  .toast.on{opacity:1;transform:translate(-50%,0)}
+  .toast.bad{background:var(--oos)}
+  /* Out of service: greyed wherever a bag is shown, so nobody reaches for it. */
+  .bagtile.s-off,.kitcard.s-off{background:repeating-linear-gradient(135deg,#F3EFE9 0 8px,#ECE6DD 8px 16px);
+    border-left-color:#9A8F86;color:var(--ink-mute)}
+  .kitcard.s-off{border-top-color:#9A8F86}
+  .s-off .bt-state{color:var(--ink-mute)}
+  .rp-st{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;margin-top:4px;color:var(--ok)}
+  .rp-st::before{content:'';width:8px;height:8px;border-radius:50%;background:currentColor}
+  .rp-st.s-warn{color:var(--warn)} .rp-st.s-oos{color:var(--oos)} .rp-st.s-off{color:var(--ink-mute)}
+  .roompick.on .rp-st{color:#fff}
+  .roompick .rp-st + .rp-sub{text-transform:none;letter-spacing:0;font-size:12px}
+  .roompick.off{opacity:.75;background:repeating-linear-gradient(135deg,#F3EFE9 0 8px,#ECE6DD 8px 16px);cursor:not-allowed}
+
+  /* ---------- Equipment Tracker ------------------------------------------- */
+  .trk{border:1px solid var(--rule);border-radius:var(--r-md);background:var(--card);box-shadow:var(--shadow-sm);overflow:hidden}
+  .trk-head,.trk-row{display:grid;grid-template-columns:minmax(0,2.4fr) 128px 64px minmax(180px,1.4fr) 150px 120px;
+    gap:10px;align-items:center;padding:9px 14px}
+  .trk-head{background:var(--bg-2);font-size:12px;font-weight:700;color:var(--ink-mute)}
+  .trk-row{border-top:1px solid var(--rule-soft)}
+  .trk-row.s-short{background:linear-gradient(90deg,var(--oos-wash),transparent 45%)}
+  .trk-row.s-expired{background:linear-gradient(90deg,var(--oos-wash),transparent 45%)}
+  .trk-row.s-expiring{background:linear-gradient(90deg,var(--warn-wash),transparent 45%)}
+  .trk-loch{display:flex;gap:8px;align-items:baseline;padding:8px 14px 6px;border-top:1px solid var(--rule);
+    background:var(--card-2);font-size:12.5px;font-weight:800;color:var(--ink-soft)}
+  .trk-loch span{font-weight:600;color:var(--ink-faint)}
+  .trk-item{min-width:0}
+  .trk-item b{display:block;font-weight:600;font-size:14.5px;overflow-wrap:anywhere}
+  .trk-item span{display:block;font-size:12px;color:var(--ink-mute);margin-top:1px;overflow-wrap:anywhere}
+  .trk-loc{font-size:13px;color:var(--ink-soft);min-width:0;overflow-wrap:anywhere}
+  .trk-mini{display:none}
+  .trk-par input,.trk-exp input{padding:6px 8px;font-size:14px;border-radius:8px;height:36px}
+  .trk-par input{width:64px;text-align:center}
+  .trk-exp input{width:100%}
+  .trk-st{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .trk-st .gauge{width:40px;margin:0;flex:0 0 auto}
+  .trk-act{display:flex;gap:4px;justify-content:flex-end;align-items:center}
+  .stepper{display:inline-flex;align-items:center;border:1.5px solid var(--rule-strong);border-radius:999px;background:#fff;overflow:hidden}
+  .stepper button{width:34px;height:34px;border:0;background:none;font:700 18px/1 var(--font-body);color:var(--brand);cursor:pointer}
+  .stepper button:hover{background:var(--brand-tint)}
+  .stepper button:focus-visible{outline:2px solid var(--brand);outline-offset:-2px}
+  .stepper input{width:48px;height:34px;border:0;border-radius:0;text-align:center;padding:0;font:700 15px var(--font-body);
+    -moz-appearance:textfield}
+  .stepper input::-webkit-outer-spin-button,.stepper input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  .buylist{list-style:none;margin:0;padding:0}
+  .buylist li{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--rule-soft)}
+  .buylist li:last-child{border-bottom:0}
+  .bl-q{min-width:38px;text-align:center;font:800 16px var(--font-display);color:var(--brand);background:var(--brand-tint);
+    border-radius:8px;padding:4px 6px}
+  @media(max-width:860px){
+    .trk-head{display:none}
+    .trk-row{grid-template-columns:1fr auto;grid-template-areas:"item item" "st st" "stock par" "exp exp" "act act";row-gap:8px}
+    .trk-item{grid-area:item} .trk-st{grid-area:st}
+    .trk-stock{grid-area:stock} .trk-par{grid-area:par;display:flex;align-items:center;gap:6px}
+    .trk-exp{grid-area:exp;display:flex;align-items:center;gap:8px} .trk-act{grid-area:act;justify-content:flex-start}
+    .trk-mini{display:inline;margin:0;font-size:12px;text-transform:none;letter-spacing:0;color:var(--ink-mute)}
+    .trk-exp input{width:auto;flex:1}
+  }
+
   /* ---------- Jumpkits & Bags ---------------------------------------------- */
   .board{display:flex;flex-direction:column;gap:12px}
   .board-g{display:grid;grid-template-columns:104px 1fr;gap:10px;align-items:start}
@@ -1517,9 +1579,11 @@
          so applyGates() empties a whole group at once and nobody is left
          staring at a heading with nothing beneath it. -->
     <div class="sb-label">On duty</div>
-    <button type="button" class="sb-item active" data-need="mgr" data-view="checkout"><span class="ic">▸</span>Check Out a Bag</button>
-    <button type="button" class="sb-item" data-need="mgr" data-view="readiness"><span class="ic">◉</span>What's Ready</button>
-    <button type="button" class="sb-item" data-need="mgr" data-view="post-call"><span class="ic">↻</span>After a Call</button>
+    <!-- What's Ready is not listed. Which bag is ready is now shown where the
+         choice is made — on the Before Duty Form's bag picker — and in full on
+         All Form Results. The view still answers its old address. -->
+    <button type="button" class="sb-item active" data-need="mgr" data-view="checkout"><span class="ic">▸</span>Before Duty Form</button>
+    <button type="button" class="sb-item" data-need="mgr" data-view="post-call"><span class="ic">↻</span>After Duty Form</button>
     <button type="button" class="sb-item" data-view="report"><span class="ic">⚑</span>Report a Problem</button>
 
     <div class="sb-label">Reference</div>
@@ -1538,10 +1602,13 @@
          to ask. `data-grp` is what floats this group to the top of the menu for
          whoever holds the role — see the sidebar ordering rule. -->
     <div class="sb-label" data-need="equipment" data-grp="equipment">Equipment Manager</div>
-    <button type="button" class="sb-item" data-need="equipment" data-grp="equipment" data-view="kits"><span class="ic">▣</span>Jumpkits &amp; Bags</button>
-    <button type="button" class="sb-item" data-need="equipment" data-grp="equipment" data-view="toget"><span class="ic">▤</span>To Get</button>
-    <button type="button" class="sb-item" data-need="equipment" data-grp="equipment" data-view="bag-check"><span class="ic">✚</span>Full Contents Check</button>
-    <button type="button" class="sb-item" data-need="equipment" data-grp="equipment" data-view="inventory"><span class="ic">▦</span>Equipment Inventory</button>
+    <!-- Three places, named the way the Equipment Manager asked: every form and
+         what each bag needs; every piece of equipment and what to buy; and her
+         own check. The old inventory and expiring screens are folded into the
+         Equipment Tracker, and still answer their old addresses. -->
+    <button type="button" class="sb-item" data-need="equipment" data-grp="equipment" data-view="kits"><span class="ic">▣</span>All Form Results</button>
+    <button type="button" class="sb-item" data-need="equipment" data-grp="equipment" data-view="toget"><span class="ic">▤</span>Equipment Tracker</button>
+    <button type="button" class="sb-item" data-need="equipment" data-grp="equipment" data-view="bag-check"><span class="ic">✚</span>Equipment Check</button>
 
     <div class="sb-label" data-need="office" data-grp="office">Office Manager</div>
     <!-- No data-need. Room checks are MEMBER work — the call sign recorded
@@ -1618,13 +1685,13 @@
          restock list — a bag going out short is the thing managers need to hear
          about. -->
     <section class="view active" data-view="checkout">
-      <h2 class="view-title">Check out a <em>bag</em></h2>
+      <h2 class="view-title">Before duty <em>form</em></h2>
       <div id="checkoutHost"></div>
     </section>
 
     <!-- ===== FULL CONTENTS CHECK (Equipment Manager) ======================== -->
     <section class="view" data-view="bag-check">
-      <h2 class="view-title">Full contents <em>check</em></h2>
+      <h2 class="view-title">Equipment <em>check</em></h2>
       <!-- The squad car is in the picker for the Equipment Manager because the
            kit list is theirs to keep; going through it on duty is not. -->
       <p class="formnote">The squad car is checked by a supervisor.</p>
@@ -1633,7 +1700,7 @@
 
     <!-- ===== POST-CALL ======================================================= -->
     <section class="view" data-view="post-call">
-      <h2 class="view-title">After a <em>call</em></h2>
+      <h2 class="view-title">After duty <em>form</em></h2>
       <div id="postCallHost"></div>
     </section>
 
@@ -1688,7 +1755,7 @@
 
     <!-- ===== JUMPKITS & BAGS (Equipment Manager) ============================= -->
     <section class="view" data-view="kits">
-      <h2 class="view-title">Jumpkits &amp; <em>bags</em></h2>
+      <h2 class="view-title">All form <em>results</em></h2>
       <div id="kitsHost"></div>
     </section>
 
@@ -1704,7 +1771,7 @@
 
     <!-- ===== TO GET (shopping list) ========================================= -->
     <section class="view" data-view="toget">
-      <h2 class="view-title">To <em>get</em></h2>
+      <h2 class="view-title">Equipment <em>tracker</em></h2>
       <div id="togetHost"></div>
     </section>
 
@@ -3433,12 +3500,46 @@ function requireAuth(what){
 function signedOutNow(){
   setIdToken('');
   if(ROLE!=='member') setRole('member');
+  // One quiet attempt to get the same account back before anybody has to act.
+  silentRenew();
 }
 
 /* And notice it while the page is just sitting there, rather than only when
    somebody presses something. */
+/* RENEWED WITHOUT ASKING, WHERE GOOGLE ALLOWS IT.
+   The sign-in lasts an hour. A manager restocking bags for longer than that
+   used to hit "sign in again" halfway through, and anything done after the
+   hour sat on the phone unsent. Google will hand a returning, already-consented
+   account a fresh token without a click, so a few minutes before this one runs
+   out it is asked for one — for the same account only, never a different one.
+   Where Google will not do it silently it shows its own one-tap "Continue as",
+   which is still one tap instead of the whole sign-in. */
+var renewTried=0;
+function silentRenew(){
+  var email=''; try{ email=normEmail(localStorage.getItem(LS_EMAIL)||''); }catch(e){}
+  if(!email || !GOOGLE_CLIENT_ID) return;
+  if(Date.now()-renewTried < 8*60000) return;
+  renewTried=Date.now();
+  loadGis().then(function(ok){
+    if(!ok || !window.google || !google.accounts || !google.accounts.id) return;
+    try{
+      google.accounts.id.initialize({client_id:GOOGLE_CLIENT_ID, auto_select:true, cancel_on_tap_outside:false,
+        callback:function(resp){
+          var got=emailFromIdToken(resp&&resp.credential);
+          if(!got || normEmail(got)!==email) return;
+          setIdToken(resp.credential);
+          if(ROLE==='member') restoreRole();
+          toast('Still signed in.');
+          // Anything that could not go out while the sign-in was lapsing, now.
+          scheduleAutoPublish();
+        }});
+      google.accounts.id.prompt();
+    }catch(e){}
+  });
+}
 function watchAuth(){
   setInterval(function(){
+    if(googleIdToken && tokenExpiry(googleIdToken)*1000 - Date.now() < 5*60000) silentRenew();
     if(googleIdToken && !authIsLive()) signedOutNow();
   }, 60000);
   document.addEventListener('visibilitychange', function(){
@@ -4666,6 +4767,8 @@ function go(v,fromHash){
   var asked=v;
   // Enforced here, not just by hiding the nav item — every view is
   // hash-addressable, so hiding the button alone would gate nothing.
+  // Folded into the Equipment Tracker; old links and bookmarks land there.
+  if(v==='inventory' || v==='expiring') v='toget';
   if(v==='learn' && !canSeeLearn()) v=homeFor();
   else if(MANAGER_VIEWS[v] && !can(MANAGER_VIEWS[v])) v=homeFor();
   var target=document.querySelector('.view[data-view="'+v+'"]');
@@ -4697,14 +4800,15 @@ function go(v,fromHash){
   // the checkout form — nothing tells the readiness board its status changed, so
   // it kept showing every bag as ready until something else triggered a render.
   if(v==='reports'){ remoteReport[REPORT_PERIOD]=null; renderReports(); }
-  if(v==='activity'){ renderActivity(); if(!actRows.length) fetchActivity(false).then(renderActivity); }
+  // Always asked again on arrival: the point of these screens is that they show
+  // what somebody did a minute ago, including this device.
+  if(v==='activity'){ renderActivity(); fetchActivity(false).then(renderActivity); }
   if(v==='log'){ renderLog(); fetchSharedState().then(function(){ renderLog(); }); }
   if(v==='readiness'){ renderReadiness(); fetchSharedState().then(function(){ renderReadiness(); }); }
   // Paint what we have immediately, then replace it with the sheet's copy when
   // it lands — the list is the same shape either way, so nothing jumps about.
   // The buy-ahead card reads expiry dates, which come with the shared state.
-  if(v==='toget'){ renderToGet();
-    Promise.all([fetchRestock(), fetchSharedState()]).then(function(){ renderToGet(); }); }
+  if(v==='toget'){ renderToGet(); trackerFetchAll().then(function(){ renderToGet(); }); }
   // Derived from DB.expiry, which any contents check can have just written.
   if(v==='expiring'){ renderExpiring(); fetchSharedState().then(function(){ renderExpiring(); }); }
   /* Read from the SHEET, then repainted — the same shape either way, so nothing
@@ -4824,9 +4928,12 @@ function pickList(from){
   // their contents lists. A checkout picks a unit, a contents check picks a type.
   // A unit can carry its own `need`: the trailer and the equipment room shelf are
   // stock the Equipment Manager checks, not a bag anyone takes on a shift.
+  /* Each bag carries its state, so the picker IS the readiness board: whoever
+     is choosing a bag sees which ones are ready without a second screen, and a
+     bag out of service is greyed out and cannot be picked. */
   if(from==='units') return (DB.bagUnits||[])
     .filter(function(u){ return u.active && (!u.need || can(u.need)); })
-    .map(function(u){ return {id:u.id,name:u.name,sub:''}; });
+    .map(function(u){ return {id:u.id,name:u.name,sub:'',st:unitStatus(u.id)}; });
   return DB.bags.filter(function(b){return b.active;}).map(function(b){
     return {id:b.id,name:b.name,sub:b.where}; });
 }
@@ -4921,6 +5028,21 @@ function renderCheck(fid){
     }else{
       h+='<div class="roomgrid">';
       list.forEach(function(o){
+        var st=o.st;
+        if(st){
+          var off=st.manual;
+          var say = off ? 'Out of service'
+                  : st.cls==='oos' ? 'Do not take'
+                  : st.cls==='warn' ? 'Check first'
+                  : 'Ready';
+          var why = off ? (st.why||'') : (st.issues&&st.issues[0] ? prettyWhat(st.issues[0].what) : '');
+          h+='<button type="button" class="roompick'+(formPick[fid]===o.id?' on':'')+(off?' off':'')+'" '+
+             (off?'aria-disabled="true" onclick="pickOff(\''+jsq(o.id)+'\')"'
+                 :'onclick="setPick(\''+fid+'\',\''+esc(o.id)+'\')"')+'>'+esc(o.name)+
+             '<span class="rp-st s-'+(off?'off':st.cls)+'">'+esc(say)+'</span>'+
+             (why?'<span class="rp-sub">'+esc(why)+'</span>':'')+'</button>';
+          return;
+        }
         h+='<button type="button" class="roompick'+(formPick[fid]===o.id?' on':'')+'" '+
            'onclick="setPick(\''+fid+'\',\''+esc(o.id)+'\')">'+esc(o.name)+
            '<span class="rp-sub">'+esc(o.sub||'')+'</span></button>';
@@ -5345,6 +5467,11 @@ function checkBody(fid){
   return h;
 }
 
+function pickOff(id){
+  var u=(DB.bagUnits||[]).filter(function(x){return x.id===id;})[0]; if(!u) return;
+  var o=bagOOS(u);
+  uiAlert(u.name+' is out of service'+(o.why?': '+o.why:'')+'. Pick another bag.','Out of service');
+}
 function setPick(fid,id){
   formPick[fid]=id;
   var host=document.getElementById(fcfg(fid).host);
@@ -5900,6 +6027,12 @@ function doSubmit(fid,s){
   var c=fcfg(fid);
   var payload={
     form:c.tab, date:s.date, submitted:new Date().toISOString(),
+    /* The time on THIS phone as the form is sent. The spreadsheet used to stamp
+       its own clock on arrival, in whatever zone the script was set to — and a
+       phone with no signal can send hours after the check was done — so rows
+       did not line up with anybody's shift. */
+    time:(function(){ var d=new Date();
+      return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); })(),
     // A phone on patchy wifi can fire the same submission twice. The script
     // keeps the last hundred ids per tab and drops a repeat, so a double-tap or
     // a retry does not become two rows.
@@ -5928,8 +6061,9 @@ function doSubmit(fid,s){
   // the report sums. Writing only the prose version is how the existing
   // Equipment Exhausted sheet ended up unsummable.
   if(s.usage && s.usage.length){
+    // One thing per line, so the After Duty tab reads as a list.
     payload.usageText=s.usage.map(function(r){
-      return r.qty+'x '+r.itemName+' ('+r.fromName+')'; }).join(' | ');
+      return r.qty+' \u00d7 '+r.itemName+' \u2014 '+r.fromName+(r.refilled?' (put back)':''); }).join('\n');
     /* `r` marks what the member put back themselves. The spreadsheet builds the
        buy list too, and without this it ordered a replacement for the one item
        that is NOT missing — the exact mistake the refill tick exists to prevent,
@@ -6003,7 +6137,9 @@ function doSubmit(fid,s){
        A refill is not the shortage disappearing, it is the shortage moving:
        the bag is whole and the shelf is now N down, which is what the par
        sweep below then picks up. */
-    s.usage.forEach(function(r){ if(r.refilled) stockUse(r.item, r.qty||1); });
+    /* Shelf counts are counted down by the spreadsheet now, against the
+       Equipment Tracker every device reads — not here, on a copy only this
+       phone would ever see. */
     stockSweep((s.first+' '+s.last).trim()||s.callsign||'');
   }
 
@@ -6581,6 +6717,31 @@ function resolveConcernLocal(what,where){
    checked server-side. Fire-and-forget: the local tick has already happened and
    `resolvedKeys` still syncs between managers, so a failed post means the sheet
    catches up on the next tick rather than the click doing nothing. */
+/* Something shared just changed. The oversight screens hold what they last
+   read, so they are told to read again the next time they are opened — and
+   right away if one is open now. Without this, Reports went on showing the
+   week as it was before the restock that was just done. */
+function dataChanged(){
+  remoteReport={week:null,month:null,ytd:null};
+  actRows=[]; actState.at=0;
+  var cur=document.querySelector('.view.active');
+  var v=cur&&cur.getAttribute('data-view');
+  if(v==='reports') setTimeout(renderReports,2000);
+  if(v==='activity') setTimeout(function(){ fetchActivity(false).then(renderActivity); },2000);
+}
+
+/* One line at the foot of the screen for a moment: a save that went through,
+   or one that did not. Replaced, never stacked. */
+var toastTimer=null;
+function toast(msg,bad){
+  var t=document.getElementById('toast');
+  if(!t){ t=document.createElement('div'); t.id='toast'; t.className='toast';
+          t.setAttribute('role','status'); t.setAttribute('aria-live','polite'); document.body.appendChild(t); }
+  t.textContent=msg; t.classList.toggle('bad',!!bad); t.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(function(){ t.classList.remove('on'); }, bad?7000:2600);
+}
+
 function pushConcernResolved(sig, resolved){
   var url=(DB.api&&DB.api.url)||'';
   if(!url) return;
@@ -6590,6 +6751,7 @@ function pushConcernResolved(sig, resolved){
       headers:{'Content-Type':'text/plain;charset=utf-8'},
       body:JSON.stringify({form:'__resolve', site:'ops', sig:sig,
                            resolved:!!resolved, idToken:googleIdToken})});
+    dataChanged();
   }catch(e){}
 }
 
@@ -6885,6 +7047,10 @@ var remoteConcerns=null;     // [{sig,what,where,unit,area,urgency,times,first,l
 // checked anything" — those render very differently and mean opposite things.
 var remoteChecked=null;      // {bagId:{on:'YYYY-MM-DD', by}}
 var remoteExpiry=null;       // {"pick|item":{date,by,at}}
+/* In service or out, as the sheet has it. Null until the sheet answers with it
+   — an older script does not — and until then each bag's own flag stands. */
+var remoteBagStatus=null;    // {unitId:{oos,why,by,at}}
+var bagPending={};           // unitId -> {oos,why,at} changed here, awaiting the sheet
 var stateFetch={loading:false, error:'', at:0, sig:''};
 
 function fetchSharedState(){
@@ -6911,8 +7077,9 @@ function fetchSharedState(){
       // deployment, which is why it is adopted only when it actually arrives —
       // an empty object would read as "nobody has checked anything".
       if(j.lastChecked && typeof j.lastChecked==='object') remoteChecked=j.lastChecked;
+      if(j.bagStatus && typeof j.bagStatus==='object'){ remoteBagStatus=j.bagStatus; settleBagPending(); }
       stateFetch.error=''; stateFetch.at=Date.now();
-      stateFetch.sig=JSON.stringify([remoteConcerns,remoteExpiry]);
+      stateFetch.sig=JSON.stringify([remoteConcerns,remoteExpiry,remoteBagStatus]);
       // The only moment there is a trustworthy answer to "does this key still
       // hold anything down".
       pruneResolvedKeys();
@@ -6993,7 +7160,7 @@ var LIVE={
   log:        {get:fetchSharedState,  st:function(){return stateFetch;},   draw:function(){ renderLog(); }},
   readiness:  {get:fetchSharedState,  st:function(){return stateFetch;},   draw:function(){ renderReadiness(); }},
   expiring:   {get:fetchSharedState,  st:function(){return stateFetch;},   draw:function(){ renderExpiring(); }},
-  toget:      {get:fetchRestock,      st:function(){return restockState;}, draw:function(){ renderToGet(); }},
+  toget:      {get:trackerFetchAll,   st:trackerLiveState,                 draw:function(){ renderToGet(); }},
   tracker:    {get:fetchDutyPeriods,  st:function(){return dpState;},      draw:function(){ renderTracker(); }},
   chores:     {get:fetchDutyPeriods,  st:function(){return dpState;},      draw:function(){ renderChores(); }},
   kits:       {get:function(){ return kitsFetch(); }, st:kitsLiveState,    draw:function(){ renderKits(); }},
@@ -7568,6 +7735,24 @@ function renderRoles(){
    Status is derived, never hand-set: a bag is flagged the moment somebody says
    something is wrong with it at checkout or files a problem against it, and it
    clears when that problem is marked resolved. Nothing to keep up to date. */
+/* Whether a bag is out of service: what this device just changed, else what
+   the sheet says, else — only before the sheet has answered — the bag's own
+   old flag. One answer for every screen and every phone. */
+function bagOOS(u){
+  if(!u) return {oos:false, why:''};
+  if(bagPending[u.id]) return bagPending[u.id];
+  if(remoteBagStatus){
+    var r=remoteBagStatus[u.id];
+    return (r&&r.oos) ? {oos:true, why:r.why||'', by:r.by||'', at:r.at||''} : {oos:false, why:''};
+  }
+  return u.oos ? {oos:true, why:u.oosWhy||''} : {oos:false, why:''};
+}
+function settleBagPending(){
+  Object.keys(bagPending).forEach(function(id){
+    var want=bagPending[id], got=(remoteBagStatus||{})[id];
+    if(!!(got&&got.oos)===!!want.oos) delete bagPending[id];
+  });
+}
 function unitStatus(id){
   /* From the shared view, not from this device's issues. A bag flagged by
      somebody else's post-call has to show flagged here, or the next person
@@ -7580,8 +7765,8 @@ function unitStatus(id){
      invent a fake problem against it, and then somebody "fixed" the fake problem
      and the bag came back green while still sitting in a cupboard. */
   var u=(DB.bagUnits||[]).filter(function(x){return x.id===id;})[0];
-  if(u && u.oos) return {cls:'oos', label:'Out of service', issues:open, manual:true,
-                         why:u.oosWhy||''};
+  var o=bagOOS(u);
+  if(o.oos) return {cls:'oos', label:'Out of service', issues:open, manual:true, why:o.why||''};
   if(!open.length) return {cls:'ok', label:'Ready', issues:[]};
   var blocking=open.filter(function(i){return i.urgency==='Blocking';});
   return blocking.length
@@ -7675,25 +7860,61 @@ function renderReadiness(){
 function takeOutOfService(id){
   if(!can('equipment')) return;
   var u=(DB.bagUnits||[]).filter(function(x){return x.id===id;})[0]; if(!u) return;
-  uiPrompt('Why is '+u.name+' out of service? Whoever reads the board will see this.',
+  if(!requireAuth('this bag being taken out of service')) return;
+  uiPrompt('Why is '+u.name+' out of service? Whoever picks a bag will see this.',
            '', 'Take out of service', {okText:'Take it out'})
     .then(function(why){
       if(!why) return;
-      u.oos=true; u.oosWhy=String(why).trim();
-      saveDB(); renderReadiness(); renderAll();
+      setBagStatus(id, true, String(why).trim());
     });
 }
 
 function backInService(id){
   if(!can('equipment')) return;
   var u=(DB.bagUnits||[]).filter(function(x){return x.id===id;})[0]; if(!u) return;
-  uiConfirm(u.name+' goes back on the board as ready, unless something else is '+
-            'still open against it.','Put back in service',{okText:'Put it back'})
-    .then(function(y){
-      if(!y) return;
-      delete u.oos; delete u.oosWhy;
-      saveDB(); renderReadiness(); renderAll();
-    });
+  if(!requireAuth('this bag being put back in service')) return;
+  uiConfirm(u.name+' can be picked again, unless something else is still open '+
+            'against it.','Put back in service',{okText:'Put it back'})
+    .then(function(y){ if(y) setBagStatus(id, false, ''); });
+}
+
+/* Written to the Bag Status tab, then read back until the sheet agrees. It
+   shows at once on this device; a change the sheet never records goes back to
+   how it was and says so, rather than sitting on one phone looking done — which
+   is exactly how Jumpkit D came to be out of service on one phone and not on
+   the Equipment Manager's. */
+function setBagStatus(id, oos, why){
+  var u=(DB.bagUnits||[]).filter(function(x){return x.id===id;})[0]; if(!u) return;
+  var url=(DB.api&&DB.api.url)||'';
+  if(!url){ uiAlert('No spreadsheet is connected.','Not saved'); return; }
+  bagPending[id]={oos:!!oos, why:why||'', at:Date.now()};
+  kitNote[id]='';
+  // Kept in step on this device too, for a page that has not heard from the sheet.
+  if(oos){ u.oos=true; u.oosWhy=why||''; } else { delete u.oos; delete u.oosWhy; }
+  saveDB();
+  afterBagChange();
+  try{
+    fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({form:'__bagstatus', site:'ops', unit:id, name:u.name, oos:!!oos, why:why||'',
+                           idToken:googleIdToken, key:(DB.api&&DB.api.key)||''})});
+  }catch(e){}
+  dataChanged();
+  (function check(tries){
+    setTimeout(function(){
+      fetchSharedState().then(function(){
+        if(!bagPending[id]){ afterBagChange(); return; }
+        if(tries<2){ check(tries+1); return; }
+        delete bagPending[id];
+        kitNote[id]='<b>That did not save.</b> Sign in again and retry \u2014 or the spreadsheet '+
+                    'is running an older copy of the script.';
+        afterBagChange();
+      });
+    }, tries?3000:1800);
+  })(0);
+}
+function afterBagChange(){
+  renderReadiness(); renderKits();
+  if(typeof renderCheck==='function'){ renderCheck('checkout'); }
 }
 
 /* Closes what the CARD showed — every open concern against the bag, from the
@@ -7913,7 +8134,7 @@ function expiringRows(){
       place:ix.places[place]||place,
       // Same key wantItem() would mint, so the row can show what the list
       // already holds instead of silently adding a second time.
-      onList:onToGet('free:'+label.toLowerCase())});
+      onList:onSharedList(label, ix.places[place]||place)});
   });
   return rows.sort(function(a,b){ return a.days-b.days; });
 }
@@ -7950,6 +8171,11 @@ function recurNote(item,where,alreadyDone){
          (e.last?' \u00b7 last replaced '+esc(concernWhen(e.last)):'')+'</span>';
 }
 
+/* On the shared list, open, for this place — read from the sheet's list. */
+function onSharedList(item,where){
+  return (Array.isArray(remoteRestock)?remoteRestock:[]).some(function(r){
+    return r && !r.got && String(r.item)===String(item) && String(r.where||'')===String(where||''); });
+}
 function onToGet(key){
   return (DB.toGet||[]).some(function(t){ return t.key===key && !t.done; });
 }
@@ -8023,7 +8249,7 @@ function renderExpiring(){
                     'fetchSharedState().then(renderExpiring)');
   if(!rows.length){
     host.innerHTML=note+'<div class="card"><p class="hint" style="margin:0">No expiry dates '+
-      'recorded yet. They are entered on a Full Contents Check, beside any item '+
+      'recorded yet. They are entered on an Equipment Check, beside any item '+
       'marked with an expiry, and appear here once saved.</p></div>';
     return;
   }
@@ -8094,142 +8320,422 @@ function renderExpiring(){
    pressing it again takes the item back off. */
 function wantExpiring(key){
   var r=expiringRows().filter(function(x){return x.key===key;})[0];
-  if(!r) return;
-  var k='free:'+r.item.toLowerCase();
-  if(r.onList){
-    DB.toGet=(DB.toGet||[]).filter(function(t){ return t.key!==k; });
-  }else{
-    wantItem({kind:'report', name:r.item, cat:'Equipment', where:r.place,
-            by:(readMe()||{}).andrew||''});
-  }
-  saveDB();
-  renderExpiring();
+  if(!r || r.onList) return;
+  restockEdit({op:'add', item:r.item, qty:1, where:r.place, cat:'Equipment'});
+}
+
+/* ============================================================================
+   EQUIPMENT TRACKER — every piece of equipment, and what to buy
+   ============================================================================
+   What To Get, Equipment Inventory and Expiring each held a slice of: the
+   Equipment Manager's own tracker, in her own columns — item, where it lives,
+   how many, par, when it expires, notes, brand — with what is short, what to
+   buy and what is about to lapse as three ways of looking at that one list.
+
+   The list lives in the spreadsheet's Equipment Tracker tab and is read from
+   there by every device. Every change goes straight to it and is read back; a
+   change the sheet never records is put back and says so. */
+var remoteTracker=null, trackerSeeded=false;
+var trackerState={loading:false, error:'', at:0, sig:''};
+var trackerLocal={};       // id -> {f:{fields}, isNew} changed here, awaiting the sheet
+var trackerGone={};        // id -> true, removed here, awaiting the sheet
+var trackerQueue={}, trackerTimer=null;
+var trackerView={show:'all', q:''};
+var TRACKER_LISTS=['Medications & supplies','General equipment'];
+
+function fetchTracker(){
+  var url=(DB.api&&DB.api.url)||'';
+  if(!url){ trackerState.error='no spreadsheet is connected'; return Promise.resolve(false); }
+  trackerState.loading=true;
+  return fetchJSONTries(url+(url.indexOf('?')<0?'?':'&')+'tracker=1', 3, 15000).then(function(j){
+    trackerState.loading=false;
+    if(!j||!j.ok||!Array.isArray(j.rows)){
+      trackerState.error='the spreadsheet is running an older copy of the script (paste the current one and redeploy)';
+      return false;
+    }
+    remoteTracker=j.rows.filter(function(r){ return r && typeof r==='object' && r.id; });
+    trackerSeeded=!!j.fromContent;
+    trackerState.error=''; trackerState.at=Date.now(); trackerState.sig=JSON.stringify(remoteTracker);
+    settleTracker();
+    return true;
+  }).catch(function(e){
+    trackerState.loading=false;
+    trackerState.error='could not reach the spreadsheet ('+(e&&e.message==='timeout'?'timed out':'connection failed')+')';
+    return false;
+  });
+}
+function trackerFetchAll(){ return Promise.all([fetchTracker(), fetchRestock(), fetchSharedState()]); }
+function trackerLiveState(){
+  return {loading:trackerState.loading||restockState.loading, sig:trackerState.sig+'\u0001'+restockState.sig};
+}
+
+var TRK_FIELDS=['list','item','loc','stock','par','exp','notes','brand','link'];
+function trkSame(a,b){ return String(a==null?'':a)===String(b==null?'':b); }
+function settleTracker(){
+  var byId={}; (remoteTracker||[]).forEach(function(r){ byId[r.id]=r; });
+  Object.keys(trackerLocal).forEach(function(id){
+    var l=trackerLocal[id], r=byId[id];
+    if(r && Object.keys(l.f).every(function(k){ return trkSame(r[k],l.f[k]); })) delete trackerLocal[id];
+  });
+  Object.keys(trackerGone).forEach(function(id){ if(!byId[id]) delete trackerGone[id]; });
+}
+/* The sheet's rows with this device's unconfirmed edits laid over them. */
+function trackerAll(){
+  var rows=(remoteTracker||[]).filter(function(r){ return !trackerGone[r.id]; }).map(function(r){
+    return trackerLocal[r.id] ? Object.assign({},r,trackerLocal[r.id].f) : r; });
+  Object.keys(trackerLocal).forEach(function(id){
+    if(trackerLocal[id].isNew && !rows.some(function(r){ return r.id===id; }))
+      rows.push(Object.assign({id:id, list:TRACKER_LISTS[0], stock:null, par:null, exp:''}, trackerLocal[id].f));
+  });
+  return rows;
+}
+function trackerLists(rows){
+  var seen={}, out=[];
+  TRACKER_LISTS.concat(rows.map(function(r){ return r.list||TRACKER_LISTS[0]; })).forEach(function(l){
+    if(l && !seen[l]){ seen[l]=1; out.push(l); } });
+  return out;
+}
+/* One word for where a line stands. Short comes first: a shelf that is empty
+   now matters more than a date that is weeks off. */
+function trackStatus(r){
+  var days = r.exp ? daysUntil(r.exp) : null;
+  if(r.stock!=null && r.par!=null && r.stock<r.par) return {k:'short', label:'Short by '+(r.par-r.stock), days:days};
+  if(days!=null && days<0) return {k:'expired', label:'Expired', days:days};
+  if(days!=null && days<=60) return {k:'expiring', label:days===0?'Expires today':'Expires in '+days+' days', days:days};
+  if(r.stock==null) return {k:'none', label:'Not counted', days:days};
+  return {k:'ok', label:'OK', days:days};
+}
+
+/* ---- writing ---- */
+function trackerSend(ops, onFail){
+  var url=(DB.api&&DB.api.url)||'';
+  if(!url){ uiAlert('No spreadsheet is connected.','Not saved'); return; }
+  try{
+    fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({form:'__tracker', site:'ops', ops:ops, idToken:googleIdToken, key:(DB.api&&DB.api.key)||''})});
+  }catch(e){}
+  dataChanged();
+  var ids=ops.map(function(o){ return o.op==='del'?o.id:(o.row&&o.row.id); });
+  (function check(tries){
+    setTimeout(function(){
+      fetchTracker().then(function(){
+        var waiting=ids.filter(function(id){ return trackerLocal[id]||trackerGone[id]; });
+        if(!waiting.length){ toast('Saved for everyone.'); renderToGet(); return; }
+        if(tries<2){ check(tries+1); return; }
+        waiting.forEach(function(id){ delete trackerLocal[id]; delete trackerGone[id]; });
+        toast('That did not save — sign in again, or the spreadsheet needs the current script.', true);
+        renderToGet();
+        if(onFail) onFail();
+      });
+    }, tries?3000:1800);
+  })(0);
+}
+/* Edits settle for a moment before they go, so tapping + five times is one
+   request with the final number, not five racing each other. */
+function trackerSet(id, fields, isNew){
+  if(!requireAuth('this change')) return false;
+  var l=trackerLocal[id]||(trackerLocal[id]={f:{}, isNew:!!isNew});
+  Object.keys(fields).forEach(function(k){ l.f[k]=fields[k]; });
+  trackerQueue[id]=Object.assign(trackerQueue[id]||{id:id}, fields);
+  clearTimeout(trackerTimer);
+  trackerTimer=setTimeout(function(){
+    var ops=Object.keys(trackerQueue).map(function(k){ return {op:'set', row:trackerQueue[k]}; });
+    trackerQueue={};
+    if(ops.length) trackerSend(ops);
+  }, 1100);
   renderToGet();
+  return true;
+}
+function trkRow(id){ return trackerAll().filter(function(r){ return r.id===id; })[0]||null; }
+function trackerStep(id,d){
+  var r=trkRow(id); if(!r) return;
+  trackerSet(id,{stock:Math.max(0,(r.stock==null?0:r.stock)+d)});
+}
+function trackerNum(id,k,v){
+  var n = String(v).trim()==='' ? null : Math.max(0,Math.floor(Number(v)||0));
+  var r=trkRow(id); if(!r || trkSame(r[k],n)) return;
+  var f={}; f[k]=n; trackerSet(id,f);
+}
+function trackerDate(id,v){
+  var r=trkRow(id); if(!r || trkSame(r.exp,v)) return;
+  trackerSet(id,{exp:v||''});
+}
+function trackerForm(r){
+  var rows=trackerAll(), lists=trackerLists(rows);
+  var cons=[{v:'',t:'Nothing — counted by hand'}].concat((DB.consumables||[]).map(function(c){ return {v:c.id,t:c.name}; }));
+  return [
+    {key:'item',label:'Item',type:'text',required:true,value:r?r.item:''},
+    {key:'list',label:'List',type:'select',value:r?r.list:TRACKER_LISTS[0],
+      options:lists.map(function(l){ return {v:l,t:l}; }).concat([{v:'__new',t:'A new list…'}])},
+    {key:'newlist',label:'New list name',type:'text'},
+    {key:'loc',label:'Where it lives',type:'text',value:r?r.loc:''},
+    {key:'stock',label:'How many there are',type:'number',value:r&&r.stock!=null?r.stock:''},
+    {key:'par',label:'How many there should be',type:'number',value:r&&r.par!=null?r.par:''},
+    {key:'exp',label:'Expires',type:'date',value:r?r.exp:''},
+    {key:'notes',label:'Notes',type:'text',value:r?r.notes:''},
+    {key:'brand',label:'Brand or vendor',type:'text',value:r?r.brand:''},
+    {key:'link',label:'Counts down when the After Duty form says one was used',type:'select',value:r?r.link||'':'',options:cons}
+  ];
+}
+function trackerFields(v){
+  var list = v.list==='__new' ? (v.newlist||'').trim() : v.list;
+  var num=function(x){ return String(x).trim()==='' ? null : Math.max(0,Math.floor(Number(x)||0)); };
+  return {item:v.item.trim(), list:list||TRACKER_LISTS[0], loc:(v.loc||'').trim(), stock:num(v.stock), par:num(v.par),
+          exp:v.exp||'', notes:(v.notes||'').trim(), brand:(v.brand||'').trim(), link:v.link||''};
+}
+function trackerAdd(){
+  if(!requireAuth('this item being added')) return;
+  uiForm('Add to the tracker','',trackerForm(null),{okText:'Add'}).then(function(v){
+    if(!v||!v.item) return;
+    trackerSet('t'+uid('').slice(1)+Date.now().toString(36).slice(-3), trackerFields(v), true);
+  });
+}
+function trackerEdit(id){
+  var r=trkRow(id); if(!r) return;
+  if(!requireAuth('this item being changed')) return;
+  uiForm('Change '+r.item,'',trackerForm(r),{okText:'Save'}).then(function(v){
+    if(!v||!v.item) return;
+    var f=trackerFields(v), diff={};
+    Object.keys(f).forEach(function(k){ if(!trkSame(r[k],f[k])) diff[k]=f[k]; });
+    if(Object.keys(diff).length) trackerSet(id,diff);
+  });
+}
+function trackerRemove(id){
+  var r=trkRow(id); if(!r) return;
+  if(!requireAuth('this item being removed')) return;
+  uiConfirm('It comes off the tracker for everyone.','Remove '+r.item+'?',{okText:'Remove',cancelText:'Keep it'})
+    .then(function(ok){
+      if(!ok) return;
+      trackerGone[id]=true; delete trackerLocal[id];
+      renderToGet();
+      trackerSend([{op:'del', id:id}]);
+    });
+}
+
+/* DROPPING IN A WHOLE TRACKER. Rows copied straight out of a spreadsheet —
+   hers has Item, Location, Stock, Expiration, Par, Status, Notes, Brand — are
+   matched to columns by their headings, whatever order they come in. Pasting
+   the same tracker twice updates it rather than doubling it. */
+function parseTrackerPaste(text,list){
+  var lines=String(text||'').replace(/\r/g,'').split('\n').filter(function(l){ return l.trim(); });
+  if(!lines.length) return [];
+  var split=function(l){ return l.indexOf('\t')>=0 ? l.split('\t') : l.split(','); };
+  var head=split(lines[0]).map(function(h){ return h.trim().toLowerCase(); });
+  var col=function(re){ for(var i=0;i<head.length;i++) if(re.test(head[i])) return i; return -1; };
+  var ci={item:col(/item|medication|supply|equipment|name/), loc:col(/location|where/), stock:col(/stock|have|count|qty|quantity/),
+          par:col(/^par|par$|par /), exp:col(/expir/), notes:col(/note/), brand:col(/brand|vendor/), buy:col(/purchase/)};
+  var hasHead=ci.item>=0;
+  if(!hasHead) ci={item:0, loc:1, stock:2, par:3, exp:4, notes:5, brand:6, buy:-1};
+  var num=function(v){ v=String(v==null?'':v).trim(); if(!v||isNaN(Number(v))) return null; return Math.max(0,Math.round(Number(v))); };
+  var day=function(v){
+    v=String(v==null?'':v).trim(); if(!v) return '';
+    var m=/^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(v); if(m) return m[1]+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[3]).slice(-2);
+    m=/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/.exec(v);
+    if(m){ var y=m[3].length===2?'20'+m[3]:m[3]; return y+'-'+('0'+m[1]).slice(-2)+'-'+('0'+m[2]).slice(-2); }
+    var d=new Date(v); return isNaN(d)?'':isoDay(d);
+  };
+  return lines.slice(hasHead?1:0).map(split).map(function(c){
+    var g=function(k){ return ci[k]>=0 ? String(c[ci[k]]==null?'':c[ci[k]]).trim() : ''; };
+    var notes=g('notes'); if(g('buy')) notes=(notes?notes+' · ':'')+'Purchase: '+g('buy');
+    return {list:list, item:g('item'), loc:g('loc'), stock:num(g('stock')), par:num(g('par')),
+            exp:day(g('exp')), notes:notes, brand:g('brand')};
+  }).filter(function(r){ return r.item; });
+}
+function trackerImport(){
+  if(!requireAuth('an import')) return;
+  var lists=trackerLists(trackerAll());
+  uiForm('Paste in a tracker','',[
+    {key:'list',label:'Into which list',type:'select',value:TRACKER_LISTS[0],
+      options:lists.map(function(l){ return {v:l,t:l}; }).concat([{v:'__new',t:'A new list…'}])},
+    {key:'newlist',label:'New list name',type:'text'},
+    {key:'text',label:'Rows copied from the spreadsheet, headings included',type:'textarea',rows:9,required:true}
+  ],{okText:'Bring it in'}).then(function(v){
+    if(!v||!v.text) return;
+    var list=v.list==='__new'?(v.newlist||'').trim()||TRACKER_LISTS[0]:v.list;
+    var rows=parseTrackerPaste(v.text,list);
+    if(!rows.length){ uiAlert('No rows with an item name were found in that.','Nothing to bring in'); return; }
+    uiConfirm(rows.length+' item'+(rows.length===1?'':'s')+' into '+list+'. Any already there are updated, not doubled.',
+              'Bring them in?',{okText:'Bring them in'}).then(function(ok){
+      if(!ok) return;
+      var ops=rows.map(function(r){
+        var id='t'+Math.random().toString(36).slice(2,9);
+        trackerLocal[id]={f:r, isNew:true};
+        return {op:'set', match:true, row:Object.assign({id:id},r)};
+      });
+      renderToGet();
+      /* An import that matches an existing row updates that row under ITS id,
+         so the ids minted here never appear — cleared once the sheet answers,
+         rather than waited on. */
+      var tmp=ops.map(function(o){ return o.row.id; });
+      trackerSendImport(ops,tmp);
+    });
+  });
+}
+function trackerSendImport(ops,tmp){
+  var url=(DB.api&&DB.api.url)||''; if(!url) return;
+  for(var i=0;i<ops.length;i+=200){
+    try{
+      fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body:JSON.stringify({form:'__tracker', site:'ops', ops:ops.slice(i,i+200), idToken:googleIdToken,
+                             key:(DB.api&&DB.api.key)||''})});
+    }catch(e){}
+  }
+  dataChanged();
+  var before=(remoteTracker||[]).length;
+  setTimeout(function(){
+    fetchTracker().then(function(){
+      tmp.forEach(function(id){ delete trackerLocal[id]; });
+      var after=(remoteTracker||[]).length;
+      toast(after>=before ? 'Brought in. '+after+' items on the tracker.' : 'That did not save — sign in again.', after<before);
+      renderToGet();
+    });
+  }, 2500+Math.min(6000, ops.length*15));
+}
+
+/* ---- drawing ---- */
+function trkShow(v){ trackerView.show=v; renderToGet(); }
+function trkSearch(v){
+  trackerView.q=String(v||'');
+  var host=document.getElementById('trkListHost'); if(host) host.innerHTML=trackerBody();
+}
+function trackerRowHtml(r){
+  var st=trackStatus(r), id=jsq(r.id);
+  var pct=(r.stock!=null && r.par) ? Math.min(100, r.stock/r.par*100) : 0;
+  var tone={short:'crit',expired:'crit',expiring:'warn',ok:'ok',none:'mute'}[st.k];
+  var sub=[r.notes, r.brand].filter(Boolean).join(' · ');
+  return '<div class="trk-row s-'+st.k+'" role="row">'+
+    '<div class="trk-item"><b>'+esc(r.item)+'</b>'+(sub?'<span>'+esc(sub)+'</span>':'')+'</div>'+
+    '<div class="trk-stock"><div class="stepper">'+
+      '<button type="button" aria-label="One fewer '+esc(r.item)+'" onclick="trackerStep(\''+id+'\',-1)">−</button>'+
+      '<input type="number" min="0" inputmode="numeric" aria-label="How many '+esc(r.item)+'" value="'+(r.stock==null?'':r.stock)+'" '+
+        'placeholder="—" onchange="trackerNum(\''+id+'\',\'stock\',this.value)">'+
+      '<button type="button" aria-label="One more '+esc(r.item)+'" onclick="trackerStep(\''+id+'\',1)">+</button></div></div>'+
+    '<div class="trk-par"><label class="trk-mini">Par</label><input type="number" min="0" inputmode="numeric" aria-label="Par for '+esc(r.item)+'" '+
+      'value="'+(r.par==null?'':r.par)+'" placeholder="—" onchange="trackerNum(\''+id+'\',\'par\',this.value)"></div>'+
+    '<div class="trk-st"><span class="gauge">'+(r.stock!=null&&r.par?'<i class="'+(st.k==='short'?'p-crit':'p-ok')+'" style="width:'+Math.max(4,pct)+'%"></i>':'')+
+      '</span><span class="tag '+tone+'">'+esc(st.label)+'</span>'+
+      // Short AND about to lapse: both are said, or the date hides behind the count.
+      (st.k==='short' && st.days!=null && st.days<=60
+        ? '<span class="tag '+(st.days<0?'crit':'warn')+'">'+(st.days<0?'Expired':'Expires in '+st.days+'d')+'</span>' : '')+'</div>'+
+    '<div class="trk-exp"><label class="trk-mini">Expires</label><input type="date" aria-label="Expiry date for '+esc(r.item)+'" value="'+esc(r.exp||'')+'" '+
+      'onchange="trackerDate(\''+id+'\',this.value)"></div>'+
+    '<div class="trk-act"><button type="button" class="btn xs" onclick="trackerEdit(\''+id+'\')">Edit</button>'+
+      '<button type="button" class="rmbtn" onclick="trackerRemove(\''+id+'\')">Remove</button></div>'+
+    '</div>';
+}
+function trackerTable(rows){
+  if(!rows.length) return '<div class="panel"><p class="hint" style="margin:0">Nothing here.</p></div>';
+  var byLoc={}, order=[];
+  rows.forEach(function(r){ var l=r.loc||'Unplaced'; if(!byLoc[l]){ byLoc[l]=[]; order.push(l); } byLoc[l].push(r); });
+  return '<div class="trk" role="table">'+
+    '<div class="trk-head" role="row"><span>Item</span><span>Stock</span><span>Par</span>'+
+    '<span>Status</span><span>Expires</span><span></span></div>'+
+    order.map(function(l){
+      return '<div class="trk-loch">'+esc(l)+'<span>'+byLoc[l].length+'</span></div>'+byLoc[l].map(trackerRowHtml).join('');
+    }).join('')+'</div>';
+}
+function trackerBody(){
+  var q=trackerView.q.trim().toLowerCase();
+  var all=trackerAll().filter(function(r){
+    return !q || (r.item+' '+r.loc+' '+r.notes+' '+r.brand+' '+r.list).toLowerCase().indexOf(q)>=0; });
+  var show=trackerView.show, h='';
+  if(show==='short'){
+    return trackerTable(all.filter(function(r){ return trackStatus(r).k==='short'; }));
+  }
+  if(show==='expiring'){
+    var soon=all.filter(function(r){ var d=r.exp?daysUntil(r.exp):null; return d!=null && d<=60; })
+      .sort(function(a,b){ return daysUntil(a.exp)-daysUntil(b.exp); });
+    h+=trackerTable(soon);
+    var bag=expiringRows().filter(function(r){ return r.days<=60 &&
+      (!q || (r.item+' '+r.place).toLowerCase().indexOf(q)>=0); });
+    if(bag.length)
+      h+='<div class="sec"><h3>In the bags</h3><span class="sec-n">'+bag.length+'</span></div>'+
+        '<div class="panel"><ul class="exprows">'+bag.map(function(r){
+          var w = r.days<0 ? 'expired '+(-r.days)+'d ago' : r.days===0 ? 'today' : r.days+' days left';
+          return '<li><div class="kc-item"><b>'+esc(r.item)+'</b><span>'+esc(r.place)+' · '+esc(kitDay(r.iso))+'</span></div>'+
+            '<span class="daysleft '+(r.days<0?'bad':'soon')+'">'+w+'</span>'+
+            (r.onList ? '<span class="tag ok">On the list</span>'
+                      : '<button class="btn xs" onclick="wantExpiring(\''+jsq(r.key)+'\')">Add to buy</button>')+'</li>';
+        }).join('')+'</ul></div>';
+    return h;
+  }
+  if(show==='buy') return trackerBuyHtml(all,q);
+  trackerLists(all).forEach(function(l){
+    var rows=all.filter(function(r){ return (r.list||TRACKER_LISTS[0])===l; });
+    if(!rows.length && TRACKER_LISTS.indexOf(l)<0) return;
+    h+='<div class="sec"><h3>'+esc(l)+'</h3><span class="sec-n">'+rows.length+'</span></div>'+trackerTable(rows);
+  });
+  return h;
+}
+function trackerBuyHtml(all,q){
+  var buys=(Array.isArray(remoteRestock)?remoteRestock:[]).filter(function(r){
+    return r && !r.got && (r.kind||'buy')!=='report' && (!q || (r.item+' '+r.where).toLowerCase().indexOf(q)>=0); });
+  var reps=(Array.isArray(remoteRestock)?remoteRestock:[]).filter(function(r){ return r && !r.got && r.kind==='report'; });
+  var short=all.filter(function(r){ return trackStatus(r).k==='short'; });
+  var h='<div class="panel"><div class="row" style="margin-bottom:6px"><h4 style="margin:0">Buy these</h4>'+
+    '<span style="margin-left:auto"></span><button type="button" class="btn sm" data-need="equipment" onclick="addToGet()">Add to the list</button>'+
+    '<button type="button" class="btn ghost sm" onclick="copyToGet()">Copy list</button></div>';
+  if(!buys.length) h+='<p class="hint" style="margin:0">Nothing on the list.</p>';
+  else h+='<ul class="buylist">'+buys.map(function(r){
+      return '<li><span class="bl-q">'+esc(String(r.qty||1))+'</span>'+
+        '<div class="kc-item"><b>'+esc(r.item)+recurNote(r.item,r.where,false)+'</b><span>'+
+        esc([r.where||'anywhere', r.who, r.last?kitDay(String(r.last)):''].filter(Boolean).join(' · '))+'</span></div>'+
+        '<button type="button" class="rmbtn" onclick="editToGet(\''+jsq(r.item)+'\',\''+jsq(r.where||'')+'\','+(Number(r.qty)||1)+')">Edit</button>'+
+        '<button type="button" class="btn xs" onclick="toggleRestock(\''+jsq(r.item)+'\',true,\''+jsq(r.where||'')+'\')">Bought</button></li>';
+    }).join('')+'</ul>';
+  h+='</div>';
+  if(short.length)
+    h+='<div class="sec"><h3>Short on the shelf</h3><span class="sec-n">'+short.length+'</span></div>'+trackerTable(short);
+  if(reps.length)
+    h+='<div class="acc tight mt"><button type="button" class="acchead" onclick="toggleAcc(this)">'+
+       '<span class="num">'+reps.length+'</span><span>Reported missing from a bag</span><span class="chev">▾</span></button>'+
+       '<div class="accbody"><ul class="buylist">'+reps.map(function(r){
+         return '<li><div class="kc-item"><b>'+esc(r.item)+'</b><span>'+esc(r.where||'')+'</span></div>'+
+           '<button type="button" class="btn xs" onclick="toggleRestock(\''+jsq(r.item)+'\',true,\''+jsq(r.where||'')+'\')">Handled</button></li>';
+       }).join('')+'</ul></div></div>';
+  return h;
 }
 
 function renderToGet(){
   var host=document.getElementById('togetHost'); if(!host) return;
-  var remote=Array.isArray(remoteRestock);
-  // One shape either way, so the table below does not care which list it got.
-  var list=remote
-    ? remoteRestock.filter(function(r){ return r && typeof r==='object'; }).map(function(r){
-        // `kind` carried through from the sheet. Without it every shared row
-        // read as a purchase and the "Reported on a check" section was empty
-        // whenever the sheet answered — which is the normal case for a manager,
-        // so the split existed only on a device that had never synced.
-        return {name:r.item, cat:r.cat||'Equipment', qty:r.qty, times:r.times,
-                last:r.last, where:r.where, done:r.got, item:r.item, by:r.who||'',
-                kind:(r.kind==='report'?'report':'buy'), remote:true};
-      })
-    : (DB.toGet||[]);
-  var open=list.filter(function(t){return !t.done;});
-  var done=list.filter(function(t){return t.done;});
-  var h='';
-  if(remote||restockState.error){
-    h+='<p style="font-size:12px;color:var(--ink-faint);margin:0 0 10px">'+
-       (restockState.error
-         ? esc(restockState.error)
-         : 'From the spreadsheet — everyone’s checks, not just this device.')+
-       '</p>';
+  var all=trackerAll();
+  var st=all.map(trackStatus);
+  var short=st.filter(function(x){ return x.k==='short'; }).length;
+  var expiring=st.filter(function(x){ return x.days!=null && x.days<=60; }).length+
+               expiringRows().filter(function(r){ return r.days<=60; }).length;
+  var counted=all.filter(function(r){ return r.stock!=null; }).length;
+  var okN=st.filter(function(x){ return x.k==='ok'; }).length;
+  var buys=(Array.isArray(remoteRestock)?remoteRestock:[]).filter(function(r){ return r && !r.got && (r.kind||'buy')!=='report'; }).length;
+
+  var h=liveNote(trackerState, !!remoteTracker, 'counted', 'counts', 'trackerFetchAll().then(renderToGet)');
+  if(!remoteTracker && trackerState.error){
+    host.innerHTML=h+'<div class="panel"><p class="hint" style="margin:0">The tracker is read from the spreadsheet. '+
+      esc(trackerState.error)+'.</p></div>';
+    return;
   }
-  var hzCard=horizonCardHtml(expiringRows());
-  if(!list.length){
-    h='<div class="card"><p class="hint" style="margin:0">Nothing outstanding. '+
-      'Items land here when a post-call logs usage or a check finds something missing.</p></div>';
-    h+=hzCard;
-    h+='<div class="row mt"><button class="btn ghost sm" onclick="addToGet()">Add an item</button></div>';
-    host.innerHTML=h; return;
-  }
-  /* Two lists, two questions. "Buy these" is a shopping list: known item, known
-     quantity. "Reported on a check" is a to-look-at list: somebody could not
-     find something, or typed a note, and whether that becomes a purchase is a
-     judgment nobody can make from the wording. Mixing them is what put
-     "I was not able to find more medical tape." in a shopping list. */
-  var buys=open.filter(function(t){ return (t.kind||'buy')!=='report'; });
-  var reps=open.filter(function(t){ return (t.kind||'buy')==='report'; });
-
-  h+='<div class="repgrid">'+
-     '<div class="repstat"><div class="rs-n">'+buys.length+'</div>'+
-     '<div class="rs-l">to buy</div></div>'+
-     '<div class="repstat"><div class="rs-n">'+reps.length+'</div>'+
-     '<div class="rs-l">reported, not yet handled</div></div>'+
-     '<div class="repstat"><div class="rs-n">'+done.length+'</div>'+
-     '<div class="rs-l">handled</div></div></div>';
-
-  function rowsTable(rows, cols3){
-    /* WHO reported it, beside WHEN. Both lists knew — every entry has carried a
-       name since the beginning and the spreadsheet has a Who column — and
-       neither ever showed it, so the only question a manager actually asks of
-       this screen ("is the thing so-and-so told me about on here?") was the one
-       question it could not answer. You had to open the spreadsheet, find their
-       row, and match it up by hand. */
-    var t2='<div class="invwrap"><table class="invtable"><thead><tr>'+
-       '<th></th><th>Item</th>'+(cols3?'<th>Qty</th>':'')+
-       '<th>Where</th><th class="mob-hide">Asked</th>'+
-       '<th class="mob-hide">Reported by</th><th></th></tr></thead><tbody>';
-    rows.forEach(function(t){
-      var tick=t.remote
-        ? 'toggleRestock(\''+jsq(t.item)+'\',true,\''+jsq(t.where||'')+'\')'
-        : 'toggleToGet(\''+jsq(t.key)+'\')';
-      var w=toGetWhere(t);
-      var whoLine=(t.by?esc(t.by):'\u2014')+' \u00b7 '+esc(toGetDate(t));
-      t2+='<tr><td><input type="checkbox" onchange="'+tick+'" aria-label="Mark handled"></td>'+
-         '<td>'+esc(toGetName(t))+recurNote(t.item,t.where,!!t.got||!!t.done)+
-         '<br><span style="font-size:11px;color:var(--ink-faint)">'+
-         esc(t.cat)+'</span>'+
-         '<span class="mob-only" style="font-size:11px;color:var(--ink-faint)">'+whoLine+'</span></td>'+
-         (cols3?'<td class="num">'+esc(String(t.qty||1))+
-           (t.unit&&t.unit!=='each'?' '+esc(t.unit):'')+'</td>':'')+
-         // Every place that asked, not just the last one to ask.
-         '<td style="font-size:12px">'+(w?esc(w):'<span class="dim">anywhere</span>')+'</td>'+
-         '<td class="num mob-hide"'+((t.times||1)>1?' style="font-weight:700;color:var(--warn)"':'')+'>'+
-         (t.times||1)+'</td>'+
-         // The name is what gets matched against "so-and-so said the pod was
-         // short"; the date is what tells you whether it is still true.
-         '<td class="mob-hide" style="font-size:12px">'+(t.by?esc(t.by):'<span class="dim">—</span>')+
-         '<br><span style="font-size:11px;color:var(--ink-faint)">'+esc(toGetDate(t))+'</span></td>'+
-         '<td>'+(t.remote?'':'<button class="btn xs" onclick="delToGet(\''+jsq(t.key)+'\')">✕</button>')+
-         '</td></tr>';
-    });
-    return t2+'</tbody></table></div>';
-  }
-
-  h+='<h3 class="tgsec">Buy these</h3>';
-  h+= buys.length ? rowsTable(buys,true)
-     : '<p class="hint tgempty">Nothing to buy. Items land here when a post-call '+
-       'logs what was used, or a shelf count drops below its par.</p>';
-
-  h+=hzCard;
-
-  /* Folded away, not removed. Every one of these is also a line on the card of
-     the bag it came from, on Jumpkits & Bags — which is where it gets dealt
-     with now, and where ticking it off here also ticks it off. Open, this list
-     was the same work shown twice on two screens, and the bigger of the two
-     sections on the one screen meant for shopping. */
-  h+='<div class="acc tight mt"><button type="button" class="acchead" onclick="toggleAcc(this)">'+
-     '<span class="num">'+reps.length+'</span><span>Reported on a check</span>'+
-     '<span class="chev">▾</span></button><div class="accbody">'+
-     (reps.length ? rowsTable(reps,false)
-       : '<p class="hint tgempty">Nothing outstanding.</p>')+'</div></div>';
-
-  h+='<div class="row mt"><button class="btn ghost sm" onclick="addToGet()">Add an item</button>'+
-     '<button class="btn ghost sm" onclick="copyToGet()">Copy list</button>'+
-     '<button class="btn ghost sm" onclick="openSheet()">Open the spreadsheet</button>'+
-     '<span id="togetMsg" style="font-size:13px;color:var(--ink-faint)"></span></div>';
-
-  if(done.length){
-    h+='<div class="acc mt"><button type="button" class="acchead" onclick="toggleAcc(this)">'+
-       '<span class="num">'+done.length+'</span><span>Handled</span><span class="chev">▾</span></button>'+
-       '<div class="accbody"><ul class="isslist">'+done.slice(0,60).map(function(t){
-         var undo=t.remote
-           ? 'toggleRestock(\''+jsq(t.item)+'\',false,\''+jsq(t.where||'')+'\')'
-           : 'toggleToGet(\''+jsq(t.key)+'\')';
-         return '<li><b style="text-decoration:line-through;color:var(--ink-faint)">'+
-           esc(toGetName(t))+'</b>'+
-           '<button class="issx" onclick="'+undo+'">Undo</button></li>';
-       }).join('')+'</ul></div></div>';
-  }
+  h+='<div class="glance">'+
+     '<div class="gl gl-hero">'+ringSVG([{v:okN,cls:'r-ok'},{v:short,cls:'r-crit'},
+          {v:st.filter(function(x){ return x.k==='expiring'||x.k==='expired'; }).length,cls:'r-warn'},
+          {v:all.length-counted,cls:'r-mute'}], all.length?Math.round(okN/all.length*100)+'%':'—')+
+       '<div><div class="gl-n">'+okN+'<small>of '+all.length+'</small></div><div class="gl-l">items stocked and in date</div>'+
+       '<ul class="key"><li><i class="p-ok"></i>OK</li><li><i class="p-crit"></i>Short</li><li><i class="p-warn"></i>Expiring</li>'+
+       '<li><i class="p-mute"></i>Not counted</li></ul></div></div>'+
+     glTile(short,'short on the shelf','',short?'crit':'ok')+
+     glTile(buys,'on the buy list','',buys?'warn':'ok')+
+     glTile(expiring,'expiring within 2 months','',expiring?'warn':'ok')+
+     '</div>';
+  h+='<div class="toolbar" style="margin-top:18px"><div class="seg" role="group" aria-label="What to show">'+
+     [['all','Everything',all.length],['short','Short',short],['buy','To buy',buys+short],['expiring','Expiring',expiring]].map(function(o){
+       return '<button type="button" class="'+(trackerView.show===o[0]?'on':'')+'" aria-pressed="'+(trackerView.show===o[0])+'" '+
+              'onclick="trkShow(\''+o[0]+'\')">'+o[1]+'<span class="n">'+o[2]+'</span></button>';
+     }).join('')+'</div>'+
+     '<div class="search"><input type="search" placeholder="Search" aria-label="Search the tracker" value="'+esc(trackerView.q)+'" '+
+       'oninput="trkSearch(this.value)"></div>'+
+     '<button type="button" class="btn sm solid" data-need="equipment" onclick="trackerAdd()">Add item</button>'+
+     '<button type="button" class="btn sm" data-need="equipment" onclick="trackerImport()">Paste in a tracker</button></div>';
+  h+='<div id="trkListHost">'+trackerBody()+'</div>';
   host.innerHTML=h;
+  applyGates(host);
 }
 
 /* ---- the shopping list, read back from the sheet ----------------------------
@@ -8301,6 +8807,7 @@ function toggleToGet(key){
    Jumpkit D are two cupboards to open — so an item name on its own no longer
    names a row, and ticking by name alone would close whichever one came first. */
 function toggleRestock(item,got,where){
+  dataChanged();
   var url=(DB.api&&DB.api.url)||''; if(!url) return;
   /* Asked BEFORE the row is ticked on screen. Firing a write nobody is going to
      accept is what produced the whole complaint: the row ticked, the request was
@@ -8357,18 +8864,59 @@ function delToGet(key){
   DB.toGet=(DB.toGet||[]).filter(function(t){ return t.key!==key; });
   saveDB(); renderToGet();
 }
+/* Adding to the list goes to the SHEET's list, which is the one on screen. It
+   used to go into this phone's own copy, which nobody's screen showed — the
+   Equipment Manager added a line and it simply never appeared. */
 function addToGet(){
-  uiForm('Add an item','',
+  if(!requireAuth('this item being added')) return;
+  uiForm('Add to the list','',
     [{key:'name',label:'Item',type:'text',required:true},
-     {key:'qty',label:'How many',type:'number'},
+     {key:'qty',label:'How many',type:'number',value:1},
+     {key:'where',label:'For which bag or shelf',type:'text'},
      {key:'cat',label:'Category',type:'select',value:'Equipment',options:[
-       {v:'Equipment',t:'Equipment'},{v:'Office',t:'Office'}]}],{okText:'Add'})
+       {v:'Equipment',t:'Equipment'},{v:'Medication',t:'Medication'},{v:'Office',t:'Office'}]}],{okText:'Add'})
    .then(function(v){
      if(!v||!v.name) return;
-     wantItem({name:v.name.trim(), qty:Math.max(1,parseInt(v.qty,10)||1),
-               cat:v.cat||'Equipment', by:ROLE_LABEL[ROLE]});
-     saveDB(); renderToGet();
+     restockEdit({op:'add', item:v.name.trim(), qty:Math.max(1,parseInt(v.qty,10)||1),
+                  where:(v.where||'').trim(), cat:v.cat||'Equipment'});
    });
+}
+function editToGet(item,where,qty){
+  if(!requireAuth('this line being changed')) return;
+  uiForm('Change this line','',
+    [{key:'name',label:'Item',type:'text',required:true,value:item},
+     {key:'qty',label:'How many',type:'number',value:qty||1},
+     {key:'where',label:'For which bag or shelf',type:'text',value:where||''}],{okText:'Save'})
+   .then(function(v){
+     if(!v||!v.name) return;
+     restockEdit({op:'edit', item:item, where:where||'', newItem:v.name.trim(),
+                  qty:Math.max(1,parseInt(v.qty,10)||1), newWhere:(v.where||'').trim()});
+   });
+}
+/* Sent, then the list is read back and re-drawn from what the sheet says. */
+function restockEdit(o){
+  var url=(DB.api&&DB.api.url)||'';
+  if(!url){ uiAlert('No spreadsheet is connected.','Not saved'); return; }
+  if(!requireAuth('this change')) return;
+  toast('Saving\u2026');
+  try{
+    fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify(Object.assign({form:'__restockedit', site:'ops', idToken:googleIdToken,
+                                         key:(DB.api&&DB.api.key)||''}, o))});
+  }catch(e){}
+  dataChanged();
+  var want=o.op==='edit'?o.newItem:o.item, where=o.op==='edit'?(o.newWhere||''):(o.where||'');
+  (function check(tries){
+    setTimeout(function(){
+      fetchRestock().then(function(){
+        var hit=(remoteRestock||[]).some(function(r){ return r.item===want && String(r.where||'')===where && !r.got; });
+        if(hit){ toast('Saved for everyone.'); renderToGet(); renderExpiring(); return; }
+        if(tries<2){ check(tries+1); return; }
+        toast('That did not save \u2014 sign in again, or the spreadsheet needs the current script.', true);
+        renderToGet();
+      });
+    }, tries?3000:1800);
+  })(0);
 }
 function copyToGet(){
   // Copy what is on screen, which is the sheet's list whenever it loaded.
@@ -8665,9 +9213,9 @@ function delPerson(i){
    that has to be read at arm's length, every line that is not the title or the
    address is competing with the two that are. */
 var QR_TARGETS=[
-  {view:'checkout',   title:'Check Out a Bag'},
+  {view:'checkout',   title:'Before Duty Form'},
   {view:'room-check', title:'Room Check'},
-  {view:'post-call',  title:'After a Call'}
+  {view:'post-call',  title:'After Duty Form'}
 ];
 
 function renderQR(){
@@ -9195,6 +9743,7 @@ function choreUnexcuse(cs,n){
    change that is not there after three reads did not happen, and says so
    rather than sitting on screen as though it had. */
 function choreSend(cs,did,dp,why){
+  dataChanged();
   var url=(DB.api&&DB.api.url)||'';
   if(!url){ uiAlert('No spreadsheet is connected.','Not saved'); return; }
   if(!requireAuth('this change')) return;
@@ -9358,13 +9907,20 @@ function renderInventory(){
      '<button class="btn ghost sm" onclick="addInvItem()">Add an item</button></div>';
 
 
+  host.innerHTML=h;
+}
+
+/* The bags themselves — rename, retire, add. Moved here from the old inventory
+   screen so it lives beside the board of every bag, where the Equipment
+   Manager already is when she thinks about one. */
+function bagsAdminHtml(){
+  var h='';
   /* ---- the physical units ----
      This list is what members pick from when they check a bag out and when they
      say where something was used, so a wrong entry here produces wrong data
      everywhere downstream. It is seeded from names that appear in the existing
      Equipment Exhausted sheet, with the gaps in the lettering guessed. */
-  h+='<h3 class="mt-lg" style="font-family:var(--font-display);font-size:19px">Bags in service</h3>'+
-     '';
+
   h+='<div class="invwrap"><table class="invtable"><thead><tr>'+
      '<th>Name</th><th>Type</th><th>In service</th><th></th></tr></thead><tbody>';
   (DB.bagUnits||[]).forEach(function(u){
@@ -9376,7 +9932,7 @@ function renderInventory(){
   });
   h+='</tbody></table></div>'+
      '<div class="row mt"><button class="btn ghost sm" onclick="addUnit()">Add a bag</button></div>';
-  host.innerHTML=h;
+  return h;
 }
 
 function openSheet(){
@@ -10027,8 +10583,9 @@ function kitNeeds(u,exp){
   var things=used.length+lines.filter(function(l){ return l.k!=='note'; }).length;
   var notes=lines.length-lines.filter(function(l){ return l.k!=='note'; }).length;
   var any=!!(lines.length||used.length||flag||dates.length);
-  var state = (u.oos||blocking) ? 'crit' : any ? 'warn' : 'ok';
-  var say = u.oos ? 'Out of service'
+  var oo=bagOOS(u);
+  var state = oo.oos ? 'off' : blocking ? 'crit' : any ? 'warn' : 'ok';
+  var say = oo.oos ? 'Out of service'
           : blocking ? 'Expired stock'
           : things ? things+' to replace'
           : notes ? notes+' report'+(notes===1?'':'s')
@@ -10036,7 +10593,7 @@ function kitNeeds(u,exp){
           : dates.length ? 'Dates due'
           : 'Complete';
   return {u:u, lines:lines, used:used, calls:calls, flag:flag, dates:dates, blocking:blocking,
-          last:owed&&owed.last, things:things, notes:notes, state:state, say:say, any:any,
+          last:owed&&owed.last, things:things, notes:notes, state:state, say:say, any:any, oos:oo,
           restock:!!(used.length||flag||lines.some(function(l){ return l.k!=='note'; }))};
 }
 
@@ -10055,8 +10612,9 @@ function renderKits(){
   var host=document.getElementById('kitsHost'); if(!host) return;
   var exp=expiringRows();
   var needs=kitUnitsAll().map(function(u){ return kitNeeds(u,exp); });
-  var busy=needs.filter(function(n){ return n.any || n.u.oos; });
+  var busy=needs.filter(function(n){ return n.any || n.oos.oos; });
   var crit=needs.filter(function(n){ return n.state==='crit'; }).length;
+  var off=needs.filter(function(n){ return n.state==='off'; }).length;
   var ok=needs.length-busy.length;
   var things=0, notes=0;
   busy.forEach(function(n){ things+=n.things; notes+=n.notes; });
@@ -10068,12 +10626,13 @@ function renderKits(){
 
   // ---- the answer first
   h+='<div class="glance">'+
-     '<div class="gl gl-hero">'+ringSVG([{v:ok,cls:'r-ok'},{v:busy.length-crit,cls:'r-warn'},{v:crit,cls:'r-crit'}],
+     '<div class="gl gl-hero">'+ringSVG([{v:ok,cls:'r-ok'},{v:busy.length-crit-off,cls:'r-warn'},{v:crit,cls:'r-crit'},{v:off,cls:'r-mute'}],
                                         needs.length?Math.round(ok/needs.length*100)+'%':'—')+
        '<div><div class="gl-n">'+ok+'<small>of '+needs.length+'</small></div>'+
        '<div class="gl-l">bags complete</div>'+
        '<ul class="key"><li><i class="p-ok"></i>Complete</li><li><i class="p-warn"></i>Needs something</li>'+
-       (crit?'<li><i class="p-crit"></i>Expired or out</li>':'')+'</ul></div></div>'+
+       (crit?'<li><i class="p-crit"></i>Expired stock</li>':'')+
+       (off?'<li><i class="p-mute"></i>Out of service</li>':'')+'</ul></div></div>'+
      glTile(busy.length, 'bag'+(busy.length===1?' needs':'s need')+' something', '', busy.length?'warn':'ok')+
      glTile(things, 'thing'+(things===1?'':'s')+' to replace',
             notes?notes+' report'+(notes===1?'':'s')+' to look at':'', things?'warn':'ok')+
@@ -10091,6 +10650,11 @@ function renderKits(){
              '<span class="bt-name">'+esc(n.u.name)+'</span><span class="bt-state">'+esc(n.say)+'</span></button>';
          }).join('')+'</div></div>';
      }).join('')+'</div>';
+
+  if(can('equipment'))
+    h+='<div class="acc tight mt"><button type="button" class="acchead" onclick="toggleAcc(this)">'+
+       '<span class="num">'+(DB.bagUnits||[]).length+'</span><span>Add, rename or retire bags</span>'+
+       '<span class="chev">▾</span></button><div class="accbody">'+bagsAdminHtml()+'</div></div>';
 
   // ---- what needs doing
   h+='<div class="sec"><h3>Needs something</h3><span class="sec-n">'+busy.length+'</span></div>';
@@ -10127,8 +10691,8 @@ function renderKits(){
   h+='<div class="sec" id="kitFeedTop"><h3>'+(kitUnit?esc(kitUnitName(kitUnit)):'Every form')+'</h3>'+
      '<span class="sec-n">'+kitState.total+'</span></div>';
   h+='<div class="toolbar"><div class="seg" role="group" aria-label="Which forms">'+
-     [['','All',base.length],['found','Found something',nFound],['checkout','Checkouts',cnt('checkout')],
-      ['postcall','After a call',cnt('postcall')],['bagcheck','Full checks',cnt('bagcheck')]]
+     [['','All',base.length],['found','Found something',nFound],['checkout','Before duty',cnt('checkout')],
+      ['postcall','After duty',cnt('postcall')],['bagcheck','Equipment checks',cnt('bagcheck')]]
        .filter(function(o){ return !o[0] || o[0]==='found' || o[2] || kitView.kind===o[0]; })
        .map(function(o){
          return '<button type="button" class="'+(kitView.kind===o[0]?'on':'')+'" aria-pressed="'+(kitView.kind===o[0])+'" '+
@@ -10154,9 +10718,9 @@ function kitCardHtml(n){
     '<div class="kc-head"><div><h4><button type="button" onclick="kitPick(\''+id+'\')">'+esc(u.name)+'</button></h4>'+
     '<div class="kc-meta">'+(n.last?'Last out '+esc(kitDay(n.last.date)):'Not out recently')+
     (count?' · '+count+' thing'+(count===1?'':'s'):'')+'</div></div>'+
-    '<span class="tag '+(n.state==='crit'?'crit':'warn')+'">'+esc(n.say)+'</span></div>';
-  if(u.oos && u.oosWhy)
-    h+='<div class="kc-group"><div class="kc-quote">'+esc(u.oosWhy)+'</div></div>';
+    '<span class="tag '+(n.state==='crit'?'crit':n.state==='off'?'mute':'warn')+'">'+esc(n.say)+'</span></div>';
+  if(n.oos.oos && n.oos.why)
+    h+='<div class="kc-group"><div class="kc-quote">'+esc(n.oos.why)+'</div></div>';
   if(n.used.length || n.flag){
     var latest='';
     n.used.forEach(function(x){ if(x.last>latest) latest=x.last; });
@@ -10255,7 +10819,7 @@ function kitFeedHtml(){
 
 function kitFormHtml(r){
   var found=kitFound(r);
-  var kind={checkout:'Checkout', postcall:'After a call', bagcheck:'Full check'}[r.kind]||'Form';
+  var kind={checkout:'Before duty', postcall:'After duty', bagcheck:'Equipment check'}[r.kind]||'Form';
   var bag;
   if(r.kind==='postcall'){
     var seen={}, names=[];
@@ -10406,6 +10970,7 @@ function kitRestocked(id){
           body:JSON.stringify({form:'__bagdone', site:'ops', unit:id, name:u.name, sigs:sigs,
                                idToken:googleIdToken, key:(DB.api&&DB.api.key)||''})});
       }catch(e){}
+      dataChanged();
       kitVerify(id,0);
     });
 }
@@ -10613,7 +11178,7 @@ function renderActRows(){
        about what, what it said, who and when. */
     var byDay={}, order=[];
     rows.forEach(function(a){ if(!byDay[a.date]){ byDay[a.date]=[]; order.push(a.date); } byDay[a.date].push(a); });
-    var kindName={check:'Check', usage:'After a call', report:'Report'};
+    var kindName={check:'Check', usage:'After duty', report:'Report'};
     order.forEach(function(day){
       var list=byDay[day];
       h+='<div class="tl-day"><b>'+esc(kitDayLong(day))+'</b><span>'+list.length+' filed</span></div><ol class="tl">'+
