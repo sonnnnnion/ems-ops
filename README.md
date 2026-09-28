@@ -94,7 +94,7 @@ people, clutter to everyone else.
 | Role | Also gets |
 |---|---|
 | Office Manager | missed chores (who has not filed a room check each duty period, from DP 4), room standards, office restock list, reports, problem log |
-| Equipment Manager | jumpkits & bags (what each bag needs, and every bag form), to get (with the expiring buy-ahead list), full contents check, equipment inventory, reports, problem log |
+| Equipment Manager | all form results (every bag, what each needs, editable, and every form), equipment tracker (her full tracker — stock, par, expiry, what to buy — kept in the spreadsheet's Equipment Tracker tab), equipment check, reports, problem log |
 | Operations Officer | all of the above |
 
 The one thing members lose by moving the room gallery behind a role is the "what

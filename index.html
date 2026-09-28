@@ -965,6 +965,8 @@
   .exprow{display:flex;align-items:center;gap:10px;padding:6px 0 10px 30px;flex-wrap:wrap}
   .exprow label{margin:0;font-size:10.5px}
   .exprow input[type=date]{width:auto;min-width:150px;padding:7px 10px;font-size:14px}
+  .exprow.expnote .checkline{margin:0;background:var(--gold-wash);border-radius:10px;padding:8px 10px}
+  .exprow.expnote .lbl{font-size:13.5px;color:var(--ink-soft);text-transform:none;letter-spacing:0;font-weight:500}
   .expbadge{font-family:var(--font-mono);font-size:11px;padding:3px 8px;border-radius:999px;
     background:var(--bg-2);color:var(--ink-faint)}
   .expbadge.good{background:var(--ok-wash);color:var(--ok)}
@@ -1390,7 +1392,9 @@
   .tick:hover{background:var(--ok-wash);border-color:var(--ok)}
   .tick:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
   .kc-foot{margin-top:auto;padding-top:12px}
-  .kc-foot .btn{width:100%;justify-content:center}
+  .kc-foot .btn.solid{width:100%;justify-content:center}
+  .kc-acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+  .kc-acts .btn{flex:1 1 auto;justify-content:center}
   .kc-msg{font-size:12.5px;color:var(--oos);margin:8px 0 0}
   .daysleft{font-size:12px;font-weight:700;border-radius:999px;padding:2px 8px;white-space:nowrap}
   .daysleft.bad{background:var(--oos-wash);color:var(--oos)} .daysleft.soon{background:var(--warn-wash);color:var(--warn)}
@@ -1846,7 +1850,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260925165000';
+var BUILD='20260928190003';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -2379,6 +2383,10 @@ var DEFAULTS={
   /* How far ahead the "to have bought" list looks, in days. A term is roughly
      this, which is the rhythm an order actually follows. */
   horizonDays:90,
+  /* Who holds each manager role this year, by name, for the forms to say who
+     to tell. Empty here on purpose: names live in the shared content a manager
+     sets on Site Settings, never in this file. */
+  roleNames:{},
 
   /* ---------- rooms ------------------------------------------------------
      `slots` is how many members may claim the room in one duty period: three
@@ -2486,7 +2494,9 @@ var DEFAULTS={
        {name:'Right pocket', items:[
          {id:'jk-bp', label:'(1) adult BP cuff'},
          {id:'jk-pulseox', label:'(1) pulse ox'},
-         {id:'jk-tested', label:'Stethoscope, BP cuff and pulse ox all tested and working'}]}
+         {id:'jk-test-steth', label:'Stethoscope tested and working'},
+         {id:'jk-test-bp', label:'BP cuff tested and working'},
+         {id:'jk-test-pox', label:'Pulse ox tested and working'}]}
      ]},
 
     /* ---- CC Pod: Jumpkit Checkout Form, section 4 ----
@@ -3111,8 +3121,33 @@ var LABEL_FIXES={
   'sp-petro':'(4) 5x9 petroleum gauze'
 };
 
+/* One checklist line become several, by the old line's id. The Equipment
+   Manager asked for the stethoscope, BP cuff and pulse ox to be checked one at a
+   time: "all three tested and working" can only be ticked or not, and a single
+   dead pulse ox left it unticked with no way to say which one. Applied the same
+   way as the wording fixes above, for the same reason. */
+var ITEM_SPLITS={
+  'jk-tested':[{id:'jk-test-steth', label:'Stethoscope tested and working'},
+               {id:'jk-test-bp',    label:'BP cuff tested and working'},
+               {id:'jk-test-pox',   label:'Pulse ox tested and working'}]
+};
 function applyLabelFixes(){
   var n=0;
+  (DB.bags||[]).forEach(function(b){
+    (b.sections||[]).forEach(function(sec){
+      if(!Array.isArray(sec.items)) return;
+      var out=[], hit=false;
+      sec.items.forEach(function(it){
+        if(it && ITEM_SPLITS[it.id]){
+          hit=true;
+          ITEM_SPLITS[it.id].forEach(function(x){
+            if(!sec.items.some(function(y){ return y && y.id===x.id; })) out.push({id:x.id, label:x.label});
+          });
+        } else out.push(it);
+      });
+      if(hit){ sec.items=out; n++; }
+    });
+  });
   (DB.bags||[]).forEach(function(b){
     (b.sections||[]).forEach(function(sec){
       (sec.items||[]).forEach(function(it){
@@ -4895,7 +4930,7 @@ var FORMS={
     // not — and asking it the other way round still could not say WHICH of four
     // items went back, so nothing could act on the answer. It is a tick against
     // each item instead, on the usage row itself. See `refilled`.
-    extras:[{id:'callnum', label:'Call number',  short:true}]
+    extras:[{id:'callnum', label:'Incident number (IN)', short:true, hint:'The incident number assigned to this call.'}]
   },
   'report':{
     host:'reportHost', tab:'Reports',
@@ -5432,6 +5467,20 @@ function checkBody(fid){
          'data-label="'+esc(uniqLabel[it.id]||it.label)+'" onchange="onFormInput(\''+fid+'\')">'+
          '<span class="lbl">'+esc(it.label)+'</span>'+
          (it.qty?'<span class="qty">'+esc(it.qty)+'</span>':'')+'</label>';
+      /* On the Before Duty form the member is not asked for a date. The
+         Equipment Manager keeps the dates, on her own Equipment Check; what she
+         asked for here is to be told when something is getting close. Ticking
+         this tells her — it lands on that bag's card, on her screen. */
+      if(it.exp && fid==='checkout'){
+        var who=roleName('equipment');
+        // The thing that expires, named: "the glucose packet", not "this".
+        var expThing=it.expOf || String(it.label||'').replace(/^\(\d+\)\s*/,'');
+        h+='<div class="exprow expnote"><label class="checkline"><input type="checkbox" data-soon="'+esc(it.id)+'" '+
+           'data-expname="'+esc(it.expOf||it.label||it.id)+'" onchange="onFormInput(\''+fid+'\')">'+
+           '<span class="lbl">If the '+esc(expThing)+' '+(/s$/.test(expThing)?'are':'is')+
+           ' close to the expiration date (under 2 months), tick to notify the Equipment Manager'+
+           (who?' ('+esc(who)+')':'')+'.</span></label></div>';
+      } else
       if(it.exp){
         // Entered once and remembered, so a check is not 12 date pickers every
         // time — only the ones that changed since last time. Remembered against
@@ -5654,6 +5703,11 @@ function paintExpiry(fid){
     if(n<0){ badge.textContent='Expired'; badge.className='expbadge bad'; out.expired.push(lbl); }
     else if(n<=60){ badge.textContent=n+'d'; badge.className='expbadge soon'; out.soon.push(lbl); }
     else { badge.textContent='OK'; badge.className='expbadge good'; }
+  });
+  // Ticked "close to expiring" on the Before Duty form.
+  host.querySelectorAll('[data-soon]:checked').forEach(function(el){
+    var lbl=el.getAttribute('data-expname')||el.getAttribute('data-soon');
+    if(out.soon.indexOf(lbl)<0) out.soon.push(lbl);
   });
   return out;
 }
@@ -7837,7 +7891,7 @@ function renderReadiness(){
        confidence rather than equipment. */
     if(st.cls==='ok' && isStale(u.type)){
       var sn=daysSinceCheck(u.type);
-      h+='<p class="rc-stale">Due a full contents check'+
+      h+='<p class="rc-stale">Due an Equipment Check'+
          (sn===null?' \u2014 never done on the site':' \u2014 last done '+sn+' days ago')+'</p>';
     }
     // Taking a bag out of service, and putting it back. Equipment Manager and
@@ -10497,7 +10551,7 @@ function kitStamp(ms){
   return isoDay(d)+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
 }
 
-function kitsFetch(){ return Promise.all([fetchSharedState(), fetchBagForms(false)]); }
+function kitsFetch(){ return Promise.all([fetchSharedState(), fetchBagForms(false), fetchRestock()]); }
 function kitsLiveState(){
   return {loading:stateFetch.loading||kitState.loading, sig:stateFetch.sig+'\u0001'+kitState.sig};
 }
@@ -10578,10 +10632,18 @@ function kitNeeds(u,exp){
   var said={};
   lines.forEach(function(l){ if(l.k==='expired') said[l.label.toLowerCase()]=1; });
   var dates=(exp||[]).filter(function(r){
-    return r.key.indexOf(u.id+'|')===0 && r.days<=30 && !said[String(r.item).toLowerCase()];
+    return r.key.indexOf(u.id+'|')===0 && r.days<=60 && !said[String(r.item).toLowerCase()];
+  });
+  /* "Close to expiring" ticked on a Before Duty form: the member telling the
+     Equipment Manager, which is exactly what she asked the form to do. It
+     arrives as a line on the shared list; it is shown here, on the bag. */
+  (Array.isArray(remoteRestock)?remoteRestock:[]).forEach(function(r){
+    if(!r || r.got || r.kind!=='report' || String(r.where||'')!==u.name) return;
+    var m=/^(.*) \u2014 expiring soon$/.exec(String(r.item||''));
+    if(m) lines.push({k:'soon', label:m[1], row:r, c:{what:r.item, where:r.where, at:r.last}});
   });
   var things=used.length+lines.filter(function(l){ return l.k!=='note'; }).length;
-  var notes=lines.length-lines.filter(function(l){ return l.k!=='note'; }).length;
+  var notes=lines.filter(function(l){ return l.k==='note'; }).length;
   var any=!!(lines.length||used.length||flag||dates.length);
   var oo=bagOOS(u);
   var state = oo.oos ? 'off' : blocking ? 'crit' : any ? 'warn' : 'ok';
@@ -10594,7 +10656,7 @@ function kitNeeds(u,exp){
           : 'Complete';
   return {u:u, lines:lines, used:used, calls:calls, flag:flag, dates:dates, blocking:blocking,
           last:owed&&owed.last, things:things, notes:notes, state:state, say:say, any:any, oos:oo,
-          restock:!!(used.length||flag||lines.some(function(l){ return l.k!=='note'; }))};
+          restock:!!(used.length||flag||lines.some(function(l){ return l.k==='missing'||l.k==='expired'; }))};
 }
 
 function kitGroups(needs){
@@ -10658,8 +10720,10 @@ function renderKits(){
 
   // ---- what needs doing
   h+='<div class="sec"><h3>Needs something</h3><span class="sec-n">'+busy.length+'</span></div>';
-  h+= busy.length ? '<div class="kitgrid">'+busy.map(kitCardHtml).join('')+'</div>'
-                  : '<div class="panel"><p class="hint" style="margin:0">Every bag is complete.</p></div>';
+  var picked=needs.filter(function(n){ return n.u.id===kitUnit && busy.indexOf(n)<0; });
+  var cards=picked.concat(busy);
+  h+= cards.length ? '<div class="kitgrid">'+cards.map(kitCardHtml).join('')+'</div>'
+                   : '<div class="panel"><p class="hint" style="margin:0">Every bag is complete.</p></div>';
 
   // ---- the month in two charts
   if(kitStats){
@@ -10731,7 +10795,8 @@ function kitCardHtml(n){
          return '<span class="chip">'+esc(x.n)+(x.q>1?' <b>×'+x.q+'</b>':'')+'</span>'; }).join('')+'</div>':'')+
        '</div>';
   }
-  var groups=[['missing','Missing','i-miss','○'],['expired','Expired','i-exp','!'],['note','Reported','i-note','“']];
+  var groups=[['missing','Missing','i-miss','○'],['expired','Expired','i-exp','!'],
+              ['soon','Close to expiring','i-date','◷'],['note','Reported','i-note','“']];
   groups.forEach(function(g){
     var ls=n.lines.filter(function(l){ return l.k===g[0]; });
     if(!ls.length) return;
@@ -10742,10 +10807,16 @@ function kitCardHtml(n){
              '<span style="padding-left:13px">'+esc(kitWhen(l.c.at))+'</span></div>'
            : '<div class="kc-item"><b>'+esc(l.label)+'</b><span>'+
              (l.sec?esc(l.sec)+' · ':'')+'reported '+esc(kitWhen(l.c.at))+'</span></div>';
-         return '<li>'+body+'<button type="button" class="tick" data-need="equipment" '+
+         var done = g[0]==='soon'
+           ? 'toggleRestock(\''+jsq(l.row.item)+'\',true,\''+jsq(l.row.where||'')+'\');setTimeout(renderKits,1600)'
+           : 'kitLineDone(\''+jsq(l.c.what)+'\',\''+jsq(l.c.where)+'\')';
+         return '<li>'+body+
+           (g[0]!=='soon'?'<button type="button" class="rmbtn" data-need="equipment" '+
+             'onclick="kitEditLine(\''+jsq(l.c.what)+'\',\''+jsq(l.c.where)+'\',\''+jsq(u.id)+'\')">Edit</button>':'')+
+           '<button type="button" class="tick" data-need="equipment" '+
            'title="'+(g[0]==='note'?'Dealt with':'Replaced')+'" '+
            'aria-label="'+esc((g[0]==='note'?'Dealt with: ':'Replaced: ')+l.label)+'" '+
-           'onclick="kitLineDone(\''+jsq(l.c.what)+'\',\''+jsq(l.c.where)+'\')">✓</button></li>';
+           'onclick="'+done+'">✓</button></li>';
        }).join('')+'</ul></div>';
   });
   if(n.dates.length)
@@ -10756,9 +10827,15 @@ function kitCardHtml(n){
                 '<span class="daysleft '+(d.days<0?'bad':'soon')+'">'+w+'</span></li>';
        }).join('')+'</ul></div>';
   if(kitNote[u.id]) h+='<p class="kc-msg">'+kitNote[u.id]+'</p>';
-  if(n.restock)
-    h+='<div class="kc-foot" data-need="equipment"><button type="button" class="btn solid" '+
-       'onclick="kitRestocked(\''+id+'\')">Mark '+esc(u.name)+' restocked</button></div>';
+  if(!n.any && !n.oos.oos)
+    h+='<div class="kc-group"><p class="hint" style="margin:0">Nothing to replace.</p></div>';
+  h+='<div class="kc-foot" data-need="equipment">'+
+     (n.restock?'<button type="button" class="btn solid" onclick="kitRestocked(\''+id+'\')">Mark '+esc(u.name)+' restocked</button>':'')+
+     '<div class="kc-acts"><button type="button" class="btn sm" onclick="kitAddLine(\''+id+'\')">Add something it needs</button>'+
+     (n.oos.oos
+       ? '<button type="button" class="btn sm" onclick="backInService(\''+id+'\')">Put back in service</button>'
+       : '<button type="button" class="btn sm ghost" onclick="takeOutOfService(\''+id+'\')">Take out of service</button>')+
+     '</div></div>';
   return h+'</article>';
 }
 
@@ -10901,6 +10978,56 @@ function kitFormItems(r){
 }
 
 /* ---- acting on it ---- */
+/* The Equipment Manager adding a line to a bag herself. Filed as an ordinary
+   report — the same path every member uses, which needs no sign-in and goes
+   through the outbox, so it cannot be lost to a bad signal — and read back
+   onto the card like any other. */
+function kitAddLine(id,prefill,kind){
+  var u=kitUnitById(id); if(!u) return;
+  uiForm('Add to '+u.name,'',[
+    {key:'kind',label:'What kind',type:'select',value:kind||'missing',options:[
+      {v:'missing',t:'Something is missing'},{v:'note',t:'Something is wrong with it'},
+      {v:'expired',t:'Something has expired'}]},
+    {key:'what',label:'What',type:'text',required:true,value:prefill||''}
+  ],{okText:'Add'}).then(function(v){
+    if(!v||!v.what) return;
+    var t=v.what.trim();
+    var what = v.kind==='missing' ? t+' missing' : v.kind==='expired' ? t+' is expired' : t;
+    fileBagLine(u, what, v.kind==='expired'?'Blocking':'Soon');
+  });
+}
+function fileBagLine(u,what,urgency){
+  var me=readMe()||{};
+  var who=(me.first||me.last)?((me.first||'')+' '+(me.last||'')).trim():(ROLE_LABEL[ROLE]||'');
+  var d=new Date();
+  var payload={form:'Reports', date:todayISO(),
+    time:String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'),
+    sid:uid('s')+'-'+Date.now(), name:who, area:'Equipment', urgency:urgency||'Soon',
+    what:what, where:u.name, submitted:d.toISOString()};
+  addIssue({area:'Equipment', urgency:urgency||'Soon', what:what, where:u.name, unit:u.id, by:who});
+  var url=(DB.api&&DB.api.url)||'';
+  if(url){ outboxAdd(payload); drainOutbox(); }
+  dataChanged();
+  renderKits(); renderReadiness(); renderLog();
+  toast('Added to '+u.name+'.');
+  setTimeout(function(){ kitsFetch().then(renderKits); }, 2500);
+}
+/* Rewording a line: the old one is closed and the new one filed, so the record
+   of what was first reported stays where it was. */
+function kitEditLine(what,where,id){
+  var u=kitUnitById(id); if(!u) return;
+  if(!requireAuth('this line being changed')) return;
+  var m, kind='note', text=what;
+  if((m=/^(.*) missing$/.exec(what))){ kind='missing'; text=m[1]; }
+  else if((m=/^(.*) is expired$/.exec(what))){ kind='expired'; text=m[1]; }
+  uiForm('Change this line','',[
+    {key:'what',label:'What',type:'text',required:true,value:text}],{okText:'Save'}).then(function(v){
+    if(!v||!v.what||v.what.trim()===text) return;
+    resolveConcern(what,where);
+    var t=v.what.trim();
+    fileBagLine(u, kind==='missing'?t+' missing':kind==='expired'?t+' is expired':t, kind==='expired'?'Blocking':'Soon');
+  });
+}
 function kitShow(id,scrollTo){
   kitUnit=id||'';
   kitForms=[]; kitState.total=0; kitState.more=false; kitState.at=0;
@@ -10949,12 +11076,14 @@ function kitRestocked(id){
   var u=kitUnitById(id); if(!u) return;
   if(!requireAuth('this bag being marked restocked')) return;
   var n=kitNeeds(u,expiringRows());
-  var closing=n.lines.filter(function(l){ return l.k!=='note'; });
+  // Only lines that are open problems; "close to expiring" notes are lines on
+  // the shared list and have their own tick.
+  var closing=n.lines.filter(function(l){ return l.k==='missing'||l.k==='expired'; });
   var list=[];
   n.used.forEach(function(x){ list.push(x.n+(x.q>1?' ×'+x.q:'')); });
   closing.forEach(function(l){ list.push(l.label+(l.k==='expired'?' (expired)':'')); });
   if(!list.length && n.flag) list.push('Checked over after the call');
-  var notes=n.lines.length-closing.length;
+  var notes=n.lines.filter(function(l){ return l.k==='note'; }).length;
   uiConfirm(list.map(function(x){ return '• '+x; }).join('\n')+
             (notes?'\n\n'+(notes===1?'The report below stays open.':'The '+notes+' reports below stay open.'):''),
             u.name+' restocked?', {okText:'Restocked', cancelText:'Not yet'})
@@ -11288,10 +11417,24 @@ function logSearch(v){
   var host=document.getElementById('logListHost'); if(host) host.innerHTML=logListHtml();
 }
 
+function setRoleName(role,v){
+  DB.roleNames=DB.roleNames||{};
+  var t=String(v||'').trim().slice(0,60);
+  if(t) DB.roleNames[role]=t; else delete DB.roleNames[role];
+  saveDB(); renderAll(); toast('Saved.');
+}
+function roleName(role){ return String(((DB.roleNames||{})[role])||'').trim(); }
+
 /* ---- settings ---- */
 function renderSettings(){
   var host=document.getElementById('settingsHost'); if(!host) return;
   var h='';
+  var rn=DB.roleNames||{};
+  h+='<div class="card brandtop"><h3>Who to tell</h3>'+
+     '<div class="field"><label for="rnEquip">Equipment Manager\u2019s name</label>'+
+     '<input type="text" id="rnEquip" value="'+esc(rn.equipment||'')+'" onchange="setRoleName(\'equipment\',this.value)"></div>'+
+     '<div class="field"><label for="rnOffice">Office Manager\u2019s name</label>'+
+     '<input type="text" id="rnOffice" value="'+esc(rn.office||'')+'" onchange="setRoleName(\'office\',this.value)"></div></div>';
   // A temporary switch nobody can see is a permanent switch. This is the one
   // screen a manager reaches while setting the backend up, so the reminder to
   // turn it off again lives here.
@@ -11348,7 +11491,7 @@ function renderSettings(){
     '<div class="field"><label for="staleDays">Say a kit is due a check after</label>'+
     '<input type="number" id="staleDays" min="1" max="399" value="'+esc(staleAfterDays())+'" '+
     'onchange="setStaleDays(this.value)"></div>'+
-    '<p class="hint" style="margin:6px 0 0">Days since the last full contents check. '+
+    '<p class="hint" style="margin:6px 0 0">Days since the last Equipment Check. '+
     'The bag stays green on the readiness board \u2014 this only says nobody has '+
     'counted it lately.</p></div>';
 
