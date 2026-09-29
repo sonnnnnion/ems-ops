@@ -130,6 +130,20 @@
      responding, not as it moving. */
   .view.active{display:block;animation:viewIn .2s var(--ease-out)}
   @keyframes viewIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  /* Where a list will be, while the spreadsheet is asked for it. The empty
+     answers ("All clear", "Nothing filed yet", tiles of zeros) used to show for
+     that second instead, and then get replaced — a screen claiming there was
+     nothing and then changing its mind reads as the site being broken. */
+  .skel{display:grid;gap:10px;margin-top:6px}
+  .skel i{display:block;height:46px;border-radius:var(--radius);
+    background:linear-gradient(90deg,var(--bg-2) 0%,var(--rule-soft) 40%,var(--bg-2) 80%);
+    background-size:300% 100%;animation:skel 1.4s ease-in-out infinite}
+  .skel i:nth-child(3n+2){width:86%} .skel i:nth-child(3n){width:70%}
+  .skel.tiles{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+  .skel+.skel{margin-top:18px}
+  .skel.tiles i{height:92px;width:auto}
+  @keyframes skel{from{background-position:100% 0}to{background-position:0 0}}
+  @media(prefers-reduced-motion:reduce){.skel i{animation:none}}
   .btn{transition:transform .14s var(--ease),box-shadow .14s var(--ease)}
   .sb-item{transition:background .18s var(--ease),border-color .18s var(--ease),color .18s var(--ease)}
   /* ---------- polish ----------------------------------------------------
@@ -1323,6 +1337,11 @@
   @keyframes glin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
   @keyframes ringin{from{transform:rotate(-200deg) scale(.85);opacity:.3}to{transform:rotate(-90deg);opacity:1}}
   @keyframes dotin{from{transform:scale(0)}to{transform:scale(1)}}
+  /* Charts grow in once per visit. A screen draws from what the phone already
+     has and again when the spreadsheet answers, and live screens redraw on a
+     timer; replaying the entrance each time made every bar bounce twice. */
+  .view.noanim .cc-stack,.view.noanim .hb-t i,.view.noanim .glance.anim .gl,.view.noanim .glance.anim .ring svg,
+  .view.noanim .glance.anim .gl-track i,.view.noanim .glance.anim .segbar i,.view.noanim .glance.anim .gl-line i{animation:none}
   @media (prefers-reduced-motion:reduce){ .glance.anim .gl,.glance.anim .ring svg,.glance.anim .gl-track i,.glance.anim .segbar i,.glance.anim .gl-line i{animation:none} }
 
   /* The attention column: beside the list on a wide screen and stays put while
@@ -1944,7 +1963,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260928214808';
+var BUILD='20260929101922';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -4892,6 +4911,18 @@ function setNav(open){
 function toggleNav(){ setNav(!navIsOpen()); }
 function closeNav(){ if(navIsOpen()) setNav(false); }
 
+/* Arriving lets a screen's charts animate in; shortly after its first real
+   paint (not the placeholder) they are told to stay put for the rest of the
+   visit. */
+function settleView(el){
+  clearTimeout(el._settle);
+  el.classList.remove('noanim');
+  var t0=Date.now();
+  (function tick(){
+    if(el.querySelector('.skel') && Date.now()-t0<20000){ el._settle=setTimeout(tick,200); return; }
+    el._settle=setTimeout(function(){ el.classList.add('noanim'); },1000);
+  })();
+}
 function go(v,fromHash){
   var asked=v;
   // Enforced here, not just by hiding the nav item — every view is
@@ -4906,6 +4937,7 @@ function go(v,fromHash){
   var views=document.querySelectorAll('.view');
   for(var i=0;i<views.length;i++) views[i].classList.remove('active');
   target.classList.add('active');
+  settleView(target);
 
   var items=document.querySelectorAll('.sb-item');
   for(var j=0;j<items.length;j++){
@@ -4928,7 +4960,10 @@ function go(v,fromHash){
   // arrival. A checkout that reports a broken bag writes an issue and re-renders
   // the checkout form — nothing tells the readiness board its status changed, so
   // it kept showing every bag as ready until something else triggered a render.
-  if(v==='reports'){ remoteReport[REPORT_PERIOD]=null; renderReports(); }
+  /* The last answer stays on screen while the new one is asked for. Emptying
+     it first painted this device's own numbers for a second and then swapped
+     in everybody's — two different reports in a row, the second one right. */
+  if(v==='reports'){ renderReports(); fetchReport(REPORT_PERIOD).then(function(r){ if(r) renderReports(); }); }
   // Always asked again on arrival: the point of these screens is that they show
   // what somebody did a minute ago, including this device.
   if(v==='activity'){ renderActivity(); fetchActivity(false).then(renderActivity); }
@@ -7411,6 +7446,9 @@ function liveClock(ms){
   try{ return new Date(ms).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}); }
   catch(e){ return ''; }
 }
+function skelHtml(n, tiles){
+  return '<div class="skel'+(tiles?' tiles':'')+'" aria-hidden="true">'+new Array((n||5)+1).join('<i></i>')+'</div>';
+}
 function liveNote(st, have, mine, ours, retry){
   if(st.error){
     /* WHY it failed goes only to somebody who can act on it. A member standing
@@ -7619,7 +7657,35 @@ function unconfirmRoomTasks(id){
   saveDB(); renderRooms();
 }
 
-function toggleAcc(btn){ btn.parentNode.classList.toggle('open'); }
+/* An open section stays open. Screens that keep themselves current redraw on
+   a timer, and every redraw used to snap whatever somebody had opened shut
+   under their thumb. Remembered by screen and heading (numbers ignored, since
+   those are what changes), and put back on every redraw. */
+var ACC_OPEN={};
+function accKey(acc){
+  var v=acc.closest('.view'), hd=acc.querySelector('.acchead');
+  return (v?v.getAttribute('data-view'):'')+'|'+(acc.id ||
+    (hd?hd.textContent.replace(/[\d,.]+/g,'#').replace(/\s+/g,' ').trim().slice(0,60):''));
+}
+function toggleAcc(btn){
+  var acc=btn.parentNode;
+  acc.classList.toggle('open');
+  ACC_OPEN[accKey(acc)]=acc.classList.contains('open');
+}
+(function(){
+  if(!window.MutationObserver) return;
+  new MutationObserver(function(ms){
+    if(!Object.keys(ACC_OPEN).length) return;
+    for(var i=0;i<ms.length;i++) for(var j=0;j<ms[i].addedNodes.length;j++){
+      var n=ms[i].addedNodes[j]; if(n.nodeType!==1) continue;
+      var list=n.classList.contains('acc')?[n]:n.querySelectorAll('.acc');
+      for(var k=0;k<list.length;k++){
+        var o=ACC_OPEN[accKey(list[k])];
+        if(o!=null) list[k].classList.toggle('open',o);
+      }
+    }
+  }).observe(document.documentElement,{childList:true,subtree:true});
+})();
 
 function editRoomTasks(id){
   var r=DB.rooms.filter(function(x){return x.id===id;})[0]; if(!r) return;
@@ -8536,6 +8602,18 @@ function wantExpiring(key){
    reads it from there. Every change goes straight to it and is read back; one
    the sheet never records is put back, and says so. */
 var remoteTracker=null, trackerSeeded=false;
+/* The last list this device read, so opening the tracker paints the real
+   list at once and the spreadsheet's answer replaces it a moment later —
+   instead of a blank screen every time. The note above the list still says
+   when it was read, so an old copy never passes itself off as the latest. */
+var LS_TRKCACHE='emsops_trkcache_v1';
+(function(){
+  try{
+    var c=JSON.parse(localStorage.getItem(LS_TRKCACHE)||'null');
+    if(c && Array.isArray(c.rows) && c.at && Date.now()-c.at<30*864e5) remoteTracker=c.rows;
+    if(remoteTracker) setTimeout(function(){ if(!trackerState.sig) trackerState.at=c.at; },0);
+  }catch(e){}
+})();
 var trackerState={loading:false, error:'', at:0, sig:''};
 var trackerLocal={};       // id -> {f:{fields}, isNew} changed here, awaiting the sheet
 var trackerGone={};        // id -> true, removed here, awaiting the sheet
@@ -8557,6 +8635,7 @@ function fetchTracker(){
     remoteTracker=j.rows.filter(function(r){ return r && typeof r==='object' && r.id; });
     trackerSeeded=!!j.fromContent;
     trackerState.error=''; trackerState.at=Date.now(); trackerState.sig=JSON.stringify(remoteTracker);
+    try{ localStorage.setItem(LS_TRKCACHE, JSON.stringify({at:trackerState.at, rows:remoteTracker})); }catch(e){}
     settleTracker();
     return true;
   }).catch(function(e){
@@ -9122,6 +9201,12 @@ function renderToGet(){
   if(!remoteTracker && trackerState.error){
     host.innerHTML=h+'<div class="panel"><p class="hint" style="margin:0">The tracker is read from the spreadsheet: '+
       esc(trackerState.error)+'.</p></div>';
+    return;
+  }
+  /* Nothing from the sheet yet, on this device ever: the lists would read as
+     empty and the side column as "All clear" for the second it takes to ask. */
+  if(!remoteTracker){
+    host.innerHTML=h+skelHtml(4,true)+skelHtml(8);
     return;
   }
   var c=trackerCounts();
@@ -10446,9 +10531,11 @@ var remoteReport={week:null,month:null,ytd:null};
 // deployment. Says so rather than leaving the page reading "Reading…" forever.
 var reportStale=false;
 
+var reportErr=false;
 function fetchReport(p){
   var url=(DB.api&&DB.api.url)||'';
   if(!url) return Promise.resolve(null);
+  reportErr=false;
   return fetch(url+(url.indexOf('?')<0?'?':'&')+'report='+encodeURIComponent(p))
     .then(function(r){ return r.json(); })
     .then(function(j){
@@ -10469,7 +10556,13 @@ function fetchReport(p){
       remoteReport[p]=j.report;
       return j.report;
     })
-    .catch(function(){ return null; });
+    .catch(function(){
+      // Unreachable: say so and show this device's numbers, rather than hold
+      // the space for an answer that is not coming.
+      reportErr=true;
+      if(!remoteReport[p]) setTimeout(renderReports,0);
+      return null;
+    });
 }
 
 /* One decision about whether a concern is open, used by every list that shows
@@ -10578,7 +10671,7 @@ function renderReports(){
   var host=document.getElementById('reportsHost'); if(!host) return;
   var p=REPORT_PERIOD, d=reportData(p);
   var live=!!(DB.api&&DB.api.url);
-  if(live && !remoteReport[p]) fetchReport(p).then(function(r){ if(r) renderReports(); });
+  if(live && !remoteReport[p] && !reportErr) fetchReport(p).then(function(r){ if(r) renderReports(); });
 
   var h='<div class="toolbar"><div class="seg" role="group" aria-label="Period">'+
     [['week','This week'],['month','This month'],['ytd','Year to date']].map(function(o){
@@ -10592,8 +10685,12 @@ function renderReports(){
      (d.remote ? 'From the spreadsheet.'
       : reportStale ? '<span class="bad">The spreadsheet is running an older copy of the '+
         'script, so this covers this device only (paste the current one and redeploy).</span>'
+      : live && reportErr ? '<span class="bad">Could not reach the spreadsheet, so this covers this device only.</span>'
       : live ? 'Reading the spreadsheet…'
       : 'From this device.')+'</p>';
+  /* Not asked yet: this device's own numbers would show for a second and then
+     be replaced by everybody's. Hold the space instead. */
+  if(live && !d.remote && !reportStale && !reportErr){ host.innerHTML=h+skelHtml(4,true)+skelHtml(6); return; }
 
   /* Two questions, in this order: what came up, and what we did about it — the
      counts side by side, so the gap between them is the thing that reads. */
@@ -11218,11 +11315,11 @@ function kitFeedHtml(){
   if(q) rows=rows.filter(function(r){ return kitSearchText(r).indexOf(q)>=0; });
   var h='';
   if(!rows.length){
-    var msg = kitState.loading || (!kitState.at && !kitState.error) ? 'Reading the spreadsheet…'
+    var msg = kitState.loading || (!kitState.at && !kitState.error) ? ''
             : kitState.error ? 'The forms could not be read.'
             : (kitView.kind||q||kitView.day) && kitForms.length ? 'Nothing here matches.'
             : 'Nothing filed yet.';
-    h+='<div class="panel"><p class="hint" style="margin:0">'+msg+'</p></div>';
+    h+= msg ? '<div class="panel"><p class="hint" style="margin:0">'+msg+'</p></div>' : skelHtml(5);
   }else{
     var byDay={}, order=[];
     rows.forEach(function(r){ if(!byDay[r.date]){ byDay[r.date]=[]; order.push(r.date); } byDay[r.date].push(r); });
@@ -11641,13 +11738,14 @@ function renderActRows(){
        "nothing has been filed in this period" while a filter was quietly
        excluding everything was the worst of them: it reported an absence that
        was not true. */
-    var msg = actState.loading ? 'Reading the spreadsheet…'
+    var msg = actState.loading && !actState.at ? ''
+            : actState.loading ? 'Reading the spreadsheet…'
             : actFiltered()    ? (actRows.length
                                     ? 'Nothing in what has loaded matches those filters.'
                                     : 'Nothing loaded yet to match against.')
             : actState.at      ? 'Nothing has been filed in this period.'
-            : 'Reading the spreadsheet…';
-    h+='<div class="card"><p class="hint" style="margin:0">'+msg+'</p></div>';
+            : '';
+    h+= msg ? '<div class="card"><p class="hint" style="margin:0">'+msg+'</p></div>' : skelHtml(6);
   }else{
     /* A day at a time, like the bag forms: the date once as a heading instead
        of on every row, and each row reading as a sentence — what kind of form,
@@ -12024,6 +12122,28 @@ function restoreRole(){
   setRole(saved,true);
 }
 
+/* One request per question at a time. Arriving on a screen, the live timer
+   and a Refresh tap could each ask the sheet for the same thing within the same
+   second; every caller now waits on the one request already in the air, and
+   the answer is drawn once. */
+function shareInFlight(fn, keyOf){
+  var busy={};
+  return function(){
+    var k=keyOf?keyOf.apply(null,arguments):'_';
+    if(busy[k]) return busy[k];
+    var p=fn.apply(this,arguments);
+    busy[k]=p;
+    var done=function(){ if(busy[k]===p) delete busy[k]; };
+    if(p && p.then) p.then(done,done); else done();
+    return p;
+  };
+}
+fetchSharedState=shareInFlight(fetchSharedState);
+fetchTracker=shareInFlight(fetchTracker);
+fetchRestock=shareInFlight(fetchRestock);
+fetchDutyPeriods=shareInFlight(fetchDutyPeriods);
+fetchReport=shareInFlight(fetchReport, function(p){ return p; });
+
 function init(){
   loadDB();
   // Before restoreRole, so a manager who reloads is able to publish straight
@@ -12039,8 +12159,15 @@ function init(){
     if(b && b.getAttribute('data-view')) go(b.getAttribute('data-view'));
   });
 
+  /* go() writes the hash itself, and that write fires this straight back —
+     so every tap in the menu ran the whole arrival twice: each screen drew
+     four times and asked the spreadsheet twice, which is the flicker between
+     screens. A hash naming the screen already showing has nothing to do. */
   window.addEventListener('hashchange',function(){
-    go(location.hash.slice(1)||homeFor(),true);
+    var h=location.hash.slice(1);
+    var cur=document.querySelector('.view.active');
+    if(h && cur && cur.getAttribute('data-view')===h) return;
+    go(h||homeFor(),true);
   });
 
   document.addEventListener('keydown',function(e){
