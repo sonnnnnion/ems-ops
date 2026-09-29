@@ -1377,6 +1377,28 @@
     .aside-g li button{background:var(--bg-2)}
   }
   @media (prefers-reduced-motion:reduce){ .trk-row.flash{animation:none} }
+  /* The year ahead: a month per column, scrolled sideways. */
+  .cal-strip{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(178px,1fr);gap:10px;overflow-x:auto;
+    padding:2px 2px 12px;margin-bottom:18px;scroll-snap-type:x proximity;overscroll-behavior-x:contain;align-items:start}
+  .cal-col{background:var(--card);border:1px solid var(--rule);border-radius:var(--r-md);padding:12px;scroll-snap-align:start;min-height:120px}
+  .cal-col.empty{background:transparent;border-style:dashed}
+  .cal-col.soon{border-color:color-mix(in srgb,var(--warn) 45%,var(--rule));background:linear-gradient(180deg,var(--warn-wash),var(--card) 60%)}
+  .cal-col.past{border-color:color-mix(in srgb,var(--oos) 45%,var(--rule));background:linear-gradient(180deg,var(--oos-wash),var(--card) 60%)}
+  .cal-h{display:flex;align-items:baseline;gap:6px;margin-bottom:8px}
+  .cal-h b{font-family:var(--font-display);font-size:18px;font-weight:700}
+  .cal-h small{font-size:11.5px;color:var(--ink-mute)}
+  .cal-h span{margin-left:auto;font-weight:700;font-size:13px;color:var(--ink-soft)}
+  .cal-col ul{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+  .cal-col li button,.cal-bag{display:block;width:100%;text-align:left;background:var(--bg-2);border:0;border-left:3px solid var(--rule-strong);
+    border-radius:8px;padding:7px 9px;font:inherit;color:inherit;cursor:pointer}
+  .cal-bag{cursor:default}
+  .cal-col li button:hover{background:var(--rule-soft)}
+  .cal-col li.warn button,.cal-col li.warn .cal-bag{border-left-color:var(--warn)}
+  .cal-col li.bad button,.cal-col li.bad .cal-bag{border-left-color:var(--oos)}
+  .cal-col li b{display:block;font-size:13px;font-weight:600;line-height:1.3}
+  .cal-col li span{display:block;font-size:11.5px;color:var(--ink-mute);margin-top:1px}
+  .cal-bag em{display:inline-block;font-style:normal;font-size:10.5px;color:var(--ink-mute);background:var(--card);border-radius:999px;padding:1px 7px;margin-top:4px}
+  .cal-none{margin:0;font-size:12.5px;color:var(--ink-faint)}
 
   /* ---------- Equipment Tracker ------------------------------------------- */
   .trk{border:1px solid var(--rule);border-radius:var(--r-md);background:var(--card);box-shadow:var(--shadow-sm);overflow:hidden}
@@ -1963,7 +1985,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260929101958';
+var BUILD='20260929103716';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -8684,7 +8706,7 @@ function trackStatus(r){
   var days = r.exp ? daysUntil(r.exp) : null;
   if(r.stock!=null && r.par!=null && r.stock<r.par) return {k:'short', label:'Short by '+(r.par-r.stock), days:days};
   if(days!=null && days<0) return {k:'expired', label:'Expired', days:days};
-  if(days!=null && days<=60) return {k:'expiring', label:days===0?'Expires today':'Expires in '+days+' days', days:days};
+  if(days!=null && days<=60) return {k:'expiring', label:days===0?'Expires today':days===1?'Expires tomorrow':'Expires in '+days+' days', days:days};
   if(r.stock==null) return {k:'none', label:'Not counted', days:days};
   return {k:'ok', label:'OK', days:days};
 }
@@ -8943,7 +8965,7 @@ function trkStatusCell(r){
   return '<span class="gauge">'+(r.stock!=null&&r.par?'<i class="'+(st.k==='short'?'p-crit':'p-ok')+'" style="width:'+Math.max(4,pct)+'%"></i>':'')+
     '</span><span class="tag '+tone+'">'+esc(st.label)+'</span>'+
     (st.k==='short' && st.days!=null && st.days<=60
-      ? '<span class="tag '+(st.days<0?'crit':'warn')+'">'+(st.days<0?'Expired':'Expires in '+st.days+'d')+'</span>' : '');
+      ? '<span class="tag '+(st.days<0?'crit':'warn')+'">'+(st.days<0?'Expired':st.days===0?'Expires today':st.days===1?'Expires tomorrow':'Expires in '+st.days+'d')+'</span>' : '');
 }
 function trkRowClass(r){
   var st=trackStatus(r), s=trkStatus(r);
@@ -9013,6 +9035,7 @@ function trackerBody(){
   if(show==='buy') return trackerBuyHtml(all,q)+byList(trkNeedsBuying);
   if(show==='order') return byList(trkOnOrder);
   if(show==='expiring'){
+    h+=trkCalendarHtml(all,q);
     h+=byList(trkExpiring);
     var bag=expiringRows().filter(function(r){ return r.days<=60 &&
       (!q || (r.item+' '+r.place).toLowerCase().indexOf(q)>=0); });
@@ -9028,6 +9051,49 @@ function trackerBody(){
     return h;
   }
   return byList(function(){ return true; });
+}
+/* THE YEAR AHEAD, a month at a time: everything with a date on it — the
+   tracker's shelves and the bags — in the month it expires, so replacements
+   for the same month can go on one order. Anything already out of date sits
+   in its own column first. A tracker item opens its row. */
+function trkCalendarHtml(all,q){
+  var now=new Date(), y0=now.getFullYear(), m0=now.getMonth(), cols={}, keys=[];
+  var MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  keys.push('past'); cols.past={items:[]};
+  for(var i=0;i<12;i++){ var d=new Date(y0,m0+i,1); var k=d.getFullYear()+'-'+d.getMonth(); keys.push(k); cols[k]={y:d.getFullYear(), m:d.getMonth(), items:[]}; }
+  var put=function(iso,it){
+    var days=daysUntil(iso); if(days==null) return;
+    it.days=days; it.iso=iso;
+    if(days<0){ cols.past.items.push(it); return; }
+    var p=String(iso).split('-'), k=Number(p[0])+'-'+(Number(p[1])-1);
+    if(cols[k]) cols[k].items.push(it);
+  };
+  all.forEach(function(r){ if(r.exp) put(r.exp,{item:r.item, where:r.loc||'', id:r.id}); });
+  expiringRows().forEach(function(r){
+    if(q && (r.item+' '+r.place).toLowerCase().indexOf(q)<0) return;
+    put(r.iso,{item:r.item, where:r.place, bag:true});
+  });
+  var total=keys.reduce(function(n,k){ return n+cols[k].items.length; },0);
+  if(!total) return '';
+  var h='<div class="sec"><h3>The year ahead</h3><span class="sec-n">'+total+'</span></div><div class="cal-strip" role="list">';
+  keys.forEach(function(k){
+    var c=cols[k];
+    if(k==='past' && !c.items.length) return;
+    c.items.sort(function(a,b){ return a.days-b.days; });
+    var soon = k!=='past' && c.items.some(function(it){ return it.days<=60; });
+    h+='<div class="cal-col'+(k==='past'?' past':soon?' soon':'')+(c.items.length?'':' empty')+'" role="listitem">'+
+      '<div class="cal-h"><b>'+(k==='past'?'Expired':MON[c.m])+'</b><small>'+(k==='past'?'already':c.y)+'</small>'+
+      '<span>'+(c.items.length||'')+'</span></div>'+
+      (c.items.length ? '<ul>'+c.items.map(function(it){
+        var day=String(it.iso).split('-')[2];
+        var inner='<b>'+esc(it.item)+'</b><span>'+esc([it.where, k==='past'?kitDay(it.iso):MON[c.m]+' '+Number(day)].filter(Boolean).join(' · '))+'</span>';
+        return '<li class="'+(it.days<0?'bad':it.days<=60?'warn':'')+'">'+
+          (it.id ? '<button type="button" onclick="trkJump(\''+jsq(it.id)+'\')">'+inner+'</button>'
+                 : '<div class="cal-bag">'+inner+'<em>in a bag</em></div>')+'</li>';
+      }).join('')+'</ul>' : '<p class="cal-none">Nothing</p>')+
+      '</div>';
+  });
+  return h+'</div>';
 }
 function trackerBuyHtml(all,q){
   var buys=(Array.isArray(remoteRestock)?remoteRestock:[]).filter(function(r){
