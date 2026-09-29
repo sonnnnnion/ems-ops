@@ -1325,6 +1325,40 @@
   @keyframes dotin{from{transform:scale(0)}to{transform:scale(1)}}
   @media (prefers-reduced-motion:reduce){ .glance.anim .gl,.glance.anim .ring svg,.glance.anim .gl-track i,.glance.anim .segbar i,.glance.anim .gl-line i{animation:none} }
 
+  /* The attention column: beside the list on a wide screen and stays put while
+     it scrolls; above the list on a narrow one, where there is no beside. */
+  .trk-layout{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:18px;align-items:start}
+  .trk-aside{position:sticky;top:132px;max-height:calc(100vh - 150px);overflow:auto;border:1px solid var(--rule);
+    border-radius:var(--r-md);background:var(--card);box-shadow:var(--shadow-sm);padding:14px 14px 10px;margin-top:30px}
+  .aside-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+  .aside-h b{font-family:var(--font-display);font-size:18px}
+  .aside-h span{font-weight:800;font-size:13px;background:var(--oos);color:#fff;border-radius:999px;padding:2px 9px}
+  .aside-g{border-top:1px solid var(--rule-soft);padding:10px 0 4px}
+  .aside-gt{display:flex;justify-content:space-between;font-size:12.5px;font-weight:800;margin-bottom:4px}
+  .aside-gt span{font-weight:700;color:var(--ink-mute)}
+  .aside-gt.t-crit{color:var(--oos)} .aside-gt.t-warn{color:var(--warn)} .aside-gt.t-brand{color:#1a4f9c}
+  .aside-g ul{list-style:none;margin:0;padding:0}
+  .aside-g li button{display:block;width:100%;text-align:left;border:0;background:none;padding:6px 8px;border-radius:8px;cursor:pointer;font:inherit;color:inherit}
+  .aside-g li button:hover{background:var(--bg-2)}
+  .aside-g li button:focus-visible{outline:2px solid var(--brand)}
+  .aside-g li b{display:block;font-size:13px;font-weight:600;line-height:1.3}
+  .aside-g li span{display:block;font-size:11.5px;color:var(--ink-mute)}
+  .aside-more{border:0;background:none;color:var(--brand);font:700 12px var(--font-body);cursor:pointer;padding:2px 8px 6px}
+  .aside-ok{padding:6px 2px}.aside-ok b{display:block;color:var(--ok);font-size:15px}.aside-ok span{font-size:12.5px;color:var(--ink-mute)}
+  .trk-row.flash{animation:rowflash 1.6s var(--ease-out)}
+  @keyframes rowflash{0%,30%{box-shadow:inset 0 0 0 2px var(--brand);background:var(--brand-tint)}100%{box-shadow:none}}
+  /* The list lays itself out by ITS width, not the screen's: beside the
+     attention column on a laptop it is narrower than the window, and the wide
+     row would crush item names to one letter a line. */
+  @media(max-width:1100px){
+    .trk-layout{grid-template-columns:1fr}
+    .trk-aside{position:static;max-height:none;order:-1;margin-top:14px}
+    .aside-g ul{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}
+    .aside-g li{flex:0 0 auto;max-width:220px}
+    .aside-g li button{background:var(--bg-2)}
+  }
+  @media (prefers-reduced-motion:reduce){ .trk-row.flash{animation:none} }
+
   /* ---------- Equipment Tracker ------------------------------------------- */
   .trk{border:1px solid var(--rule);border-radius:var(--r-md);background:var(--card);box-shadow:var(--shadow-sm);overflow:hidden}
   .trk-head,.trk-row{display:grid;grid-template-columns:minmax(0,2.3fr) 124px 64px 132px minmax(150px,1.3fr) 142px 112px;
@@ -1380,6 +1414,24 @@
     .trk-mini{display:inline;margin:0;font-size:12px;text-transform:none;letter-spacing:0;color:var(--ink-mute)}
     .trk-exp input{width:auto;flex:1}
   }
+
+  /* Placed after the tracker's own rules so it wins over them. */
+  #trkListHost{container-type:inline-size;min-width:0}
+  @container (max-width:900px){
+    .trk-head{display:none}
+    .trk-row{grid-template-columns:1fr auto;grid-template-areas:"item item" "st status" "stock par" "exp exp" "act act";row-gap:8px}
+    .trk-item{grid-area:item} .trk-st{grid-area:st} .trk-status{grid-area:status}
+    .trk-status select{width:auto}
+    .trk-stock{grid-area:stock} .trk-par{grid-area:par;display:flex;align-items:center;gap:6px}
+    .trk-exp{grid-area:exp;display:flex;align-items:center;gap:8px} .trk-act{grid-area:act;justify-content:flex-start}
+    .trk-exp.none{display:none}
+    .trk-mini{display:inline;margin:0;font-size:12px;text-transform:none;letter-spacing:0;color:var(--ink-mute)}
+    .trk-exp input{width:auto;flex:1}
+  }
+  /* The tracker is the one screen that is a wide table plus a column beside
+     it, so it may use a wide screen instead of stopping at the page's usual
+     reading width. */
+  body:has(.view.active[data-view="toget"]) main{max-width:1500px}
 
   /* ---------- Jumpkits & Bags ---------------------------------------------- */
   .board{display:flex;flex-direction:column;gap:12px}
@@ -1892,7 +1944,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260928214204';
+var BUILD='20260928214808';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -9015,8 +9067,51 @@ function trackerPatch(id){
   trackerRefreshSoft();
   return true;
 }
+/* WHAT NEEDS HER NOW, beside the list. A short column of the things to act on,
+   most urgent first — expired, short with nothing ordered, expiring within a
+   month, marked to buy, then what is on its way — each a tap away from its row.
+   It stays in view while the list scrolls, so she never has to go looking. */
+function trackerAsideHtml(c){
+  var all=c.all, groups=[];
+  var push=function(key,title,tone,rows,sub){ if(rows.length) groups.push({key:key,title:title,tone:tone,rows:rows,sub:sub}); };
+  var days=function(r){ return r.exp?daysUntil(r.exp):null; };
+  push('exp','Expired','crit',all.filter(function(r){ var d=days(r); return d!=null&&d<0; }),
+       function(r){ return 'expired '+(-days(r))+'d ago'+(r.loc?' · '+r.loc:''); });
+  push('short','Short, nothing ordered','crit',all.filter(function(r){ return trkStatus(r)==='Stocked' && trackStatus(r).k==='short'; })
+       .sort(function(a,b){ return (a.stock/(a.par||1))-(b.stock/(b.par||1)); }),
+       function(r){ return r.stock+' of '+r.par+(r.loc?' · '+r.loc:''); });
+  push('soon','Expiring within 30 days','warn',all.filter(function(r){ var d=days(r); return d!=null&&d>=0&&d<=30; })
+       .sort(function(a,b){ return days(a)-days(b); }),
+       function(r){ var d=days(r); return (d===0?'today':d===1?'tomorrow':'in '+d+' days')+(r.loc?' · '+r.loc:''); });
+  push('buy','Marked to buy','warn',all.filter(function(r){ return trkStatus(r)==='Purchase'; }),
+       function(r){ return (r.order||(r.stock!=null&&r.par!=null?r.stock+' of '+r.par:''))+(r.loc?' · '+r.loc:''); });
+  push('order','On order','brand',all.filter(trkOnOrder),
+       function(r){ return r.order||(r.loc||''); });
+  if(!groups.length) return '<div class="aside-ok"><b>All clear</b><span>Nothing needs attention.</span></div>';
+  var total=groups.reduce(function(n,g){ return g.key==='order'?n:n+g.rows.length; },0);
+  return '<div class="aside-h"><b>Needs attention</b><span>'+total+'</span></div>'+groups.map(function(g){
+    var more=g.rows.length-6;
+    return '<div class="aside-g"><div class="aside-gt t-'+g.tone+'">'+esc(g.title)+'<span>'+g.rows.length+'</span></div><ul>'+
+      g.rows.slice(0,6).map(function(r){
+        return '<li><button type="button" onclick="trkJump(\''+jsq(r.id)+'\')"><b>'+esc(r.item)+'</b><span>'+esc(g.sub(r))+'</span></button></li>';
+      }).join('')+'</ul>'+
+      (more>0?'<button type="button" class="aside-more" onclick="trkShow(\''+(g.key==='order'?'order':g.key==='soon'||g.key==='exp'?'expiring':'buy')+'\')">'+more+' more</button>':'')+
+      '</div>';
+  }).join('');
+}
+/* Straight to the row: shown if hidden by a filter, scrolled to, and lit up. */
+function trkJump(id){
+  if(!document.querySelector('#trkListHost .trk-row[data-id="'+(window.CSS&&CSS.escape?CSS.escape(id):id)+'"]')){
+    trackerView.show='all'; trackerView.q=''; renderToGet();
+  }
+  var el=document.querySelector('#trkListHost .trk-row[data-id="'+(window.CSS&&CSS.escape?CSS.escape(id):id)+'"]');
+  if(!el) return;
+  el.scrollIntoView({block:'center',behavior:'smooth'});
+  el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+}
 function trackerRefreshSoft(){
   var c=trackerCounts();
+  var a=document.getElementById('trkAside'); if(a) a.innerHTML=trackerAsideHtml(c);
   var g=document.getElementById('trkGlance'); if(g) g.innerHTML=trackerGlanceHtml(c,false);
   var sg=document.getElementById('trkSeg'); if(sg) sg.innerHTML=trackerSegHtml(c);
 }
@@ -9036,7 +9131,8 @@ function renderToGet(){
        'oninput="trkSearch(this.value)"></div>'+
      '<button type="button" class="btn sm solid" data-need="equipment" onclick="trackerAdd()">Add item</button>'+
      '<button type="button" class="btn sm" data-need="equipment" onclick="trackerImport()">Paste in a tracker</button></div>';
-  h+='<div id="trkListHost">'+trackerBody()+'</div>';
+  h+='<div class="trk-layout"><div id="trkListHost">'+trackerBody()+'</div>'+
+     '<aside class="trk-aside" id="trkAside" aria-label="Needs attention">'+trackerAsideHtml(c)+'</aside></div>';
   host.innerHTML=h;
   applyGates(host);
 }
