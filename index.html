@@ -1426,6 +1426,61 @@
     .stk-body{flex:1;max-height:none}
     .stk-foot{border-radius:0;padding-bottom:max(18px,env(safe-area-inset-bottom));border-top:1px solid var(--rule-soft)}
   }
+  /* Cleaning tracker */
+  .card h3 .opt{font-family:var(--font-body);font-size:11px;font-weight:600;color:var(--ink-mute);background:var(--bg-2);
+    border-radius:999px;padding:2px 9px;vertical-align:3px;margin-left:6px;letter-spacing:0;text-transform:none}
+  .cl-sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:14px 0 6px}
+  .cl-tile{border:1px solid var(--rule);border-radius:var(--r-md);background:var(--card);box-shadow:var(--shadow-sm);padding:16px 18px}
+  .cl-tile.t-warn .gl-n{color:var(--warn)} .cl-tile.t-ok .gl-n{color:var(--ok)}
+  .cl-tile .gl-s{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .cl-ring{display:flex;align-items:center;gap:14px}
+  .cl-ring .ring{flex:none;width:72px;height:72px}
+  .cl-ring .ring svg{width:72px;height:72px}
+  .cj-group{margin-bottom:14px}
+  .cj-gt{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;letter-spacing:.03em;margin:4px 2px 8px;color:var(--ink-mute)}
+  .cj-gt span{font-weight:600;background:var(--bg-2);border-radius:999px;padding:1px 8px}
+  .g-need .cj-gt{color:var(--oos)} .g-soon .cj-gt{color:var(--warn)}
+  .cj-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+  .cj{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:14px;background:var(--card);
+    border:1px solid var(--rule);border-left:4px solid var(--rule-strong);border-radius:var(--r-md);padding:12px 14px}
+  .cj.t-crit{border-left-color:var(--oos)} .cj.t-warn{border-left-color:var(--warn)} .cj.t-soon{border-left-color:var(--gold)} .cj.t-ok{border-left-color:var(--ok)}
+  .cj-main b{display:block;font-size:15px;font-weight:700;line-height:1.3}
+  .cj-main span{display:block;font-size:12.5px;color:var(--ink-mute);margin-top:2px}
+  .cj-main .cj-note{color:var(--ink-faint);font-style:italic}
+  .cj-when{text-align:right;white-space:nowrap}
+  .cj-when b{display:block;font-size:13px}
+  .cj.t-crit .cj-when b{color:var(--oos)} .cj.t-warn .cj-when b{color:var(--warn)}
+  .cj-when span{display:block;font-size:11.5px;color:var(--ink-mute);margin-top:2px}
+  .cj-act{display:flex;align-items:center;gap:8px}
+  .cj-more{background:none;border:0;padding:4px;font:inherit;font-size:12px;color:var(--ink-mute);cursor:pointer;text-decoration:underline}
+  .cj-tick{width:30px;height:30px;border-radius:999px;background:var(--ok-wash);color:var(--ok);display:grid;place-items:center;font-weight:700}
+  .acc .cj-list{margin-top:4px}
+  .sk-list{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+  .sk-list li{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(80px,1fr) auto;gap:14px;align-items:center}
+  .sk-t b{display:block;font-size:14px;font-weight:600;line-height:1.3}
+  .sk-t span{font-size:12px;color:var(--ink-mute)}
+  .sk-bar{height:8px;background:var(--bg-2);border-radius:999px;overflow:hidden}
+  .sk-bar i{display:block;height:100%;background:var(--warn);border-radius:999px}
+  .sk-n{font-size:12.5px;color:var(--ink-soft);white-space:nowrap}
+  .cj-due{display:block;font-size:12px;color:var(--ink-mute);margin-top:1px}
+  .choicerow{display:flex;flex-wrap:wrap;gap:8px}
+  .choice{margin:0;cursor:pointer}
+  .choice input{position:absolute;opacity:0;pointer-events:none}
+  .choice span{display:inline-block;border:1.5px solid var(--rule);border-radius:999px;padding:10px 18px;font-size:14.5px;
+    text-transform:none;letter-spacing:0;font-weight:500;color:var(--ink);background:var(--card)}
+  .choice input:checked+span{border-color:var(--brand);background:var(--brand-wash);color:var(--brand-deep);font-weight:700}
+  .choice input:focus-visible+span{outline:2px solid var(--brand);outline-offset:2px}
+  @media (max-width:640px){
+    .cl-sum{grid-template-columns:1fr 1fr;gap:10px}
+    .cl-tile{padding:13px 14px}
+    .cl-tile .gl-n{font-size:26px}
+    .cl-ring{grid-column:1 / -1}
+    .cj{grid-template-columns:minmax(0,1fr) auto;gap:8px 12px}
+    .cj-when{text-align:left;grid-column:1}
+    .cj-act{grid-column:2;grid-row:1 / span 2;flex-direction:column;align-items:flex-end}
+    .sk-list li{grid-template-columns:minmax(0,1fr) auto}
+    .sk-bar{grid-column:1 / -1;grid-row:2}
+  }
   /* Order sheet: a card per supplier. */
   .ord-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-bottom:22px;align-items:start}
   .ord-card{background:var(--card);border:1px solid var(--rule);border-radius:var(--r-md);padding:14px;box-shadow:var(--shadow-sm)}
@@ -1826,6 +1881,7 @@
          is left in the duty period. -->
     <button type="button" class="sb-item" data-grp="office" data-view="tracker"><span class="ic">▤</span>Duty-Period Tracker</button>
     <button type="button" class="sb-item" data-need="office" data-grp="office" data-view="chores"><span class="ic">◷</span>Missed Chores</button>
+    <button type="button" class="sb-item" data-need="office" data-grp="office" data-view="cleaning"><span class="ic">✧</span>Cleaning Tracker</button>
     <button type="button" class="sb-item" data-need="office" data-grp="office" data-view="rooms"><span class="ic">▦</span>Rooms &amp; Standards</button>
     <button type="button" class="sb-item" data-need="office" data-grp="office" data-view="restock"><span class="ic">▤</span>Office Restock List</button>
 
@@ -1950,6 +2006,11 @@
       <div id="choresHost"></div>
     </section>
 
+    <section class="view" data-view="cleaning">
+      <h2 class="view-title">Cleaning <em>tracker</em></h2>
+      <div id="cleaningHost"></div>
+    </section>
+
     <!-- ===== OFFICE RESTOCK (Office Manager) ================================= -->
     <section class="view" data-view="restock">
       <h2 class="view-title">Office <em>restock</em></h2>
@@ -2049,7 +2110,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260929104357';
+var BUILD='20260929110029';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -3640,7 +3701,7 @@ var MANAGER_VIEWS={
      to see how much of it is left — it was gated to the Office Manager, who is
      the one person who does not need to be told. Deleting a period is still a
      manager's act; that button carries its own data-need. */
-  restock:'office', rooms:'office', chores:'office',
+  restock:'office', rooms:'office', chores:'office', cleaning:'office',
   inventory:'equipment', 'bag-check':'equipment', toget:'equipment',
   expiring:'equipment', kits:'equipment',
   reports:'mgr', activity:'mgr', roles:'mgr', qr:'mgr', settings:'mgr',
@@ -5069,6 +5130,8 @@ function go(v,fromHash){
   if(v==='tracker'){ renderTracker(); fetchDutyPeriods().then(function(){ renderTracker(); }); }
   if(v==='room-check'){ fetchDutyPeriods().then(function(){ renderDpState('room-check'); }); }
   if(v==='chores'){ renderChores(); fetchDutyPeriods().then(function(){ renderChores(); }); }
+  if(v==='cleaning'){ renderCleaning(); fetchCleaning().then(function(){ renderCleaning(); }); }
+  if(v==='room-check'){ fetchCleaning().then(function(){ paintJobsCard('room-check'); }); }
   if(v==='kits'){ renderKits(); kitsFetch().then(function(){ renderKits(); }); }
   /* Sheet-backed views keep asking while they are on screen; everything else
      stops the timer, so a form is never repainted under somebody's hands. */
@@ -5150,7 +5213,11 @@ var FORMS={
     /* The After Duty form covers a whole shift, not one call, so it asks how
        many calls the jumpkit went on and then offers one incident number box
        per call. All optional. */
-    extras:[{id:'callnum', label:'How many calls did this jumpkit go on?', calls:true}]
+    extras:[{id:'callnum', label:'How many calls did this jumpkit go on?', calls:true}],
+    /* Optional, one tap: whether what got used was wiped down afterwards.
+       The Office Manager's cleaning tracker counts the answers. */
+    choices:{cleaned:{label:'Did you wipe down the equipment you used?', options:[
+      {v:'Yes', t:'Yes'}, {v:'No', t:'No'}, {v:'Nothing used', t:'Nothing was used'}]}}
   },
   'report':{
     host:'reportHost', tab:'Reports',
@@ -5353,6 +5420,21 @@ function renderCheck(fid){
        '<span>'+esc(c.meds.label)+'</span>'+
        '<span class="opt">optional</span><span class="chev">▾</span></button>'+
        '<div class="accbody"><div id="'+fid+'-meds"></div></div></div>';
+  }
+
+  // Cleaning jobs due in the room just picked; filled in by paintJobsCard.
+  if(c.pick && c.pick.from==='rooms') h+='<div id="'+fid+'-jobs"></div>';
+
+  /* --- optional one-tap questions --- */
+  if(c.choices){
+    Object.keys(c.choices).forEach(function(k){
+      var f=c.choices[k];
+      h+='<div class="card mt"><h3>'+esc(f.label)+' <span class="opt">optional</span></h3><div class="choicerow">'+
+        f.options.map(function(o){
+          return '<label class="choice"><input type="radio" name="'+fid+'-'+k+'" data-radio="'+k+'" value="'+esc(o.v)+'" '+
+                 'onchange="onFormInput(\''+fid+'\')"><span>'+esc(o.t)+'</span></label>';
+        }).join('')+'</div></div>';
+    });
   }
 
   /* --- extras --- */
@@ -5781,6 +5863,7 @@ function setPick(fid,id){
   if(body) body.innerHTML=checkBody(fid);
   var er=document.getElementById(fid+'-editrow');
   if(er){ er.innerHTML=formEditRow(fid); applyGates(er); }
+  paintJobsCard(fid);
   var list=pickList(fcfg(fid).pick.from);
   for(var j=0;j<list.length;j++) if(list[j].id===id && picks[j]) picks[j].classList.add('on');
   saveDraft(fid); calcCheck(fid);
@@ -5808,6 +5891,7 @@ function readCheck(fid){
   }
   var radios=host.querySelectorAll('[data-radio]');
   for(var j=0;j<radios.length;j++) if(radios[j].checked) out.radios[radios[j].getAttribute('data-radio')]=radios[j].value;
+  out.jobs=[].slice.call(host.querySelectorAll('[data-job]:checked')).map(function(b){ return {id:b.getAttribute('data-job'), name:b.value}; });
   (c.extras||[]).forEach(function(x){
     if(x.calls){
       var n=document.getElementById(fid+'-x-calls');
@@ -6367,6 +6451,10 @@ function doSubmit(fid,s){
   };
   Object.keys(s.radios).forEach(function(k){ payload[k]=s.radios[k]; });
   Object.keys(s.extras).forEach(function(k){ payload[k]=s.extras[k]; });
+  if(s.jobs && s.jobs.length){
+    payload.jobIds=s.jobs.map(function(j){ return j.id; }).join(',');
+    payload.jobNames=s.jobs.map(function(j){ return j.name; }).join(' | ');
+  }
 
   // Usage goes to the sheet twice, deliberately. `usageText` is one readable
   // cell a human can skim on the Post-Call tab; `usageJson` is the machine copy
@@ -7475,6 +7563,7 @@ var LIVE={
   toget:      {get:trackerFetchAll,   st:trackerLiveState,                 draw:function(){ renderToGet(); }},
   tracker:    {get:fetchDutyPeriods,  st:function(){return dpState;},      draw:function(){ renderTracker(); }},
   chores:     {get:fetchDutyPeriods,  st:function(){return dpState;},      draw:function(){ renderChores(); }},
+  cleaning:   {get:fetchCleaning,     st:function(){return cleanState;},   draw:function(){ renderCleaning(); }},
   kits:       {get:function(){ return kitsFetch(); }, st:kitsLiveState,    draw:function(){ renderKits(); }},
   'room-check':{get:fetchDutyPeriods, st:function(){return dpState;},      draw:function(){ renderDpState('room-check'); }}
 };
@@ -10243,6 +10332,251 @@ function renderTracker(){
 }
 
 /* ============================================================================
+   CLEANING TRACKER — the Office Manager's
+   ============================================================================
+   Three things, in the order she would act on them: the cleaning jobs that
+   are due (each with one Done button), the everyday room-check tasks people
+   keep leaving undone, and whether equipment gets wiped down after duty.
+   Jobs live on the sheet's Cleaning Jobs tab; members tick them off on the
+   Room Check form, and she can tick, add, change or remove them here. */
+var remoteCleaning=null, cleanState={loading:false, error:'', at:0, sig:''};
+var cleanLocal={}, cleanGone={}, cleanUndo={};
+function fetchCleaning(){
+  var url=(DB.api&&DB.api.url)||'';
+  if(!url){ cleanState.error='no spreadsheet is connected'; return Promise.resolve(false); }
+  cleanState.loading=true;
+  return fetchJSONTries(url+(url.indexOf('?')<0?'?':'&')+'cleaning=1', 3, 15000).then(function(j){
+    cleanState.loading=false;
+    if(!j||!j.ok||!Array.isArray(j.jobs)){
+      cleanState.error='the spreadsheet is running an older copy of the script (paste the current one and redeploy)';
+      return false;
+    }
+    remoteCleaning=j; cleanState.error=''; cleanState.at=Date.now();
+    cleanState.sig=JSON.stringify([j.jobs,j.skipped,j.wiped]);
+    // Local changes the sheet now agrees with are no longer needed.
+    Object.keys(cleanLocal).forEach(function(id){
+      var r=j.jobs.filter(function(x){ return x.id===id; })[0];
+      if(r && Object.keys(cleanLocal[id]).every(function(k){ return trkSame(r[k],cleanLocal[id][k]); })) delete cleanLocal[id];
+    });
+    Object.keys(cleanGone).forEach(function(id){ if(!j.jobs.some(function(x){ return x.id===id; })) delete cleanGone[id]; });
+    return true;
+  }).catch(function(e){
+    cleanState.loading=false;
+    cleanState.error='could not reach the spreadsheet ('+(e&&e.message==='timeout'?'timed out':'connection failed')+')';
+    return false;
+  });
+}
+function cleanJobsAll(){
+  var rows=((remoteCleaning&&remoteCleaning.jobs)||[]).filter(function(j){ return !cleanGone[j.id]; })
+    .map(function(j){ return cleanLocal[j.id] ? Object.assign({},j,cleanLocal[j.id]) : j; });
+  Object.keys(cleanLocal).forEach(function(id){
+    if(cleanLocal[id]._new && !rows.some(function(r){ return r.id===id; })) rows.push(Object.assign({id:id},cleanLocal[id]));
+  });
+  return rows;
+}
+function everyWords(n){
+  n=Number(n)||7;
+  return n===1?'every day':n===7?'every week':n===14?'every 2 weeks':n===30||n===31?'every month':
+         n%7===0?'every '+(n/7)+' weeks':'every '+n+' days';
+}
+// How many days until a job is due: negative is overdue, null is never done.
+function jobDueIn(j){
+  if(!j.last) return null;
+  var since=-daysUntil(j.last);
+  return (Number(j.every)||7)-since;
+}
+function jobNeedsDoing(j){ var d=jobDueIn(j); return d===null || d<=0; }
+function jobWhen(j){
+  var d=jobDueIn(j);
+  if(d===null) return 'Never done';
+  if(d<0) return (-d)+' day'+(d===-1?'':'s')+' overdue';
+  if(d===0) return 'Due today';
+  if(d===1) return 'Due tomorrow';
+  return 'Due in '+d+' days';
+}
+function cleanSend(body, check){
+  var url=(DB.api&&DB.api.url)||'';
+  if(!url){ uiAlert('No spreadsheet is connected.','Not saved'); return; }
+  try{
+    fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify(Object.assign({form:'__cleanjob', site:'ops', idToken:googleIdToken, key:(DB.api&&DB.api.key)||''}, body))});
+  }catch(e){}
+  dataChanged();
+  (function again(tries){
+    setTimeout(function(){
+      fetchCleaning().then(function(){
+        if(check()){ toast('Saved for everyone.'); renderCleaning(); return; }
+        if(tries<2){ again(tries+1); return; }
+        delete cleanLocal[body.id]; delete cleanGone[body.id];
+        toast('That did not save \u2014 sign in again, or the spreadsheet needs the current script.', true);
+        renderCleaning();
+      });
+    }, tries?3000:1800);
+  })(0);
+}
+function cleanRemoteJob(id){ return ((remoteCleaning&&remoteCleaning.jobs)||[]).filter(function(x){ return x.id===id; })[0]; }
+function jobDone(id){
+  if(!requireAuth('this job being ticked off')) return;
+  var j=cleanJobsAll().filter(function(x){ return x.id===id; })[0]; if(!j) return;
+  var by=roleName('office')||'Office Manager', today=todayISO();
+  cleanUndo[id]={last:j.last||'', by:j.by||''};
+  cleanLocal[id]=Object.assign(cleanLocal[id]||{}, {last:today, by:by});
+  renderCleaning();
+  cleanSend({op:'done', id:id, by:by}, function(){ var r=cleanRemoteJob(id); return r && r.last===today; });
+}
+function jobUndo(id){
+  var u=cleanUndo[id]; if(!u || !requireAuth('this being undone')) return;
+  delete cleanUndo[id];
+  cleanLocal[id]={last:u.last, by:u.by};
+  renderCleaning();
+  cleanSend({op:'undone', id:id, last:u.last, lastBy:u.by}, function(){ var r=cleanRemoteJob(id); return r && r.last===u.last; });
+}
+function jobForm(j){
+  var rooms=[{v:'',t:'Anywhere'}].concat((DB.rooms||[]).map(function(r){ return {v:r.name,t:r.name}; }));
+  if(j && j.room && !rooms.some(function(r){ return r.v===j.room; })) rooms.push({v:j.room,t:j.room});
+  var often=[[1,'Every day'],[3,'Every 3 days'],[7,'Every week'],[14,'Every 2 weeks'],[30,'Every month'],[60,'Every 2 months'],[90,'Every 3 months']];
+  var ev=j?Number(j.every)||7:7;
+  if(!often.some(function(o){ return o[0]===ev; })) often.push([ev, everyWords(ev).replace(/^e/,'E')]);
+  return [
+    {key:'job',label:'What needs doing',type:'text',required:true,value:j?j.job:''},
+    {key:'room',label:'Where',type:'select',value:j?j.room:'',options:rooms},
+    {key:'every',label:'How often',type:'select',value:String(ev),options:often.map(function(o){ return {v:String(o[0]),t:o[1]}; })},
+    {key:'notes',label:'Notes',type:'text',value:j?j.notes:''}
+  ].concat(j?[{key:'keep',label:'Still needed?',type:'select',value:'yes',required:true,
+             options:[{v:'yes',t:'Yes, keep it on the list'},{v:'no',t:'No, take it off the list'}]}]:[]);
+}
+function jobAdd(){
+  if(!requireAuth('a job being added')) return;
+  uiForm('Add a cleaning job','',jobForm(null),{okText:'Add'}).then(function(v){
+    if(!v||!String(v.job||'').trim()) return;
+    var id='c'+Math.random().toString(36).slice(2,10);
+    var f={job:v.job.trim(), room:v.room||'', every:Number(v.every)||7, notes:(v.notes||'').trim(), last:'', by:''};
+    cleanLocal[id]=Object.assign({_new:true}, f);
+    renderCleaning();
+    cleanSend(Object.assign({op:'add', id:id}, f), function(){ return !!cleanRemoteJob(id); });
+  });
+}
+function jobEdit(id){
+  var j=cleanJobsAll().filter(function(x){ return x.id===id; })[0]; if(!j) return;
+  if(!requireAuth('this job being changed')) return;
+  uiForm(j.job,'',jobForm(j),{okText:'Save'}).then(function(v){
+    if(!v) return;
+    if(v.keep==='no'){ jobRemove(id); return; }
+    if(!String(v.job||'').trim()) return;
+    var f={job:v.job.trim(), room:v.room||'', every:Number(v.every)||7, notes:(v.notes||'').trim()};
+    cleanLocal[id]=Object.assign(cleanLocal[id]||{}, f);
+    renderCleaning();
+    cleanSend(Object.assign({op:'edit', id:id}, f), function(){ var r=cleanRemoteJob(id); return r && r.job===f.job && Number(r.every)===f.every && r.room===f.room; });
+  });
+}
+function jobRemove(id){
+  var j=cleanJobsAll().filter(function(x){ return x.id===id; })[0]; if(!j) return;
+  if(!requireAuth('this job being removed')) return;
+  uiConfirm('It comes off the list for everyone.','Remove \u201c'+j.job+'\u201d?',{okText:'Remove',cancelText:'Keep it'}).then(function(ok){
+    if(!ok) return;
+    cleanGone[id]=true; renderCleaning();
+    cleanSend({op:'del', id:id}, function(){ return !cleanRemoteJob(id); });
+  });
+}
+function jobRowHtml(j){
+  var d=jobDueIn(j), id=jsq(j.id), today=j.last===todayISO();
+  var tone = d===null||d<0 ? 'crit' : d===0 ? 'warn' : d<=3 ? 'soon' : 'ok';
+  return '<li class="cj t-'+tone+'">'+
+    '<div class="cj-main"><b>'+esc(j.job)+'</b><span>'+esc([j.room||'Anywhere', everyWords(j.every)].join(' \u00b7 '))+'</span>'+
+      (j.notes?'<span class="cj-note">'+esc(j.notes)+'</span>':'')+'</div>'+
+    '<div class="cj-when"><b>'+(today?'Done today':esc(jobWhen(j)))+'</b>'+
+      (j.last&&!today?'<span>Last '+esc(kitDay(j.last))+(j.by?' \u00b7 '+esc(j.by):'')+'</span>':j.by&&today?'<span>'+esc(j.by)+'</span>':'')+'</div>'+
+    '<div class="cj-act">'+
+      (today ? (cleanUndo[j.id]?'<button type="button" class="rmbtn" onclick="jobUndo(\''+id+'\')">Undo</button>':'<span class="cj-tick">\u2713</span>')
+             : '<button type="button" class="btn sm solid" data-need="office" onclick="jobDone(\''+id+'\')">Done</button>')+
+      '<button type="button" class="cj-more" data-need="office" aria-label="Change '+esc(j.job)+'" onclick="jobEdit(\''+id+'\')">Edit</button>'+
+    '</div></li>';
+}
+function renderCleaning(){
+  var host=document.getElementById('cleaningHost'); if(!host) return;
+  var h=liveNote(cleanState, !!remoteCleaning, 'filed', 'jobs', 'fetchCleaning().then(renderCleaning)');
+  if(!remoteCleaning){
+    host.innerHTML=h+(cleanState.error?'<div class="panel"><p class="hint" style="margin:0">'+esc(cleanState.error)+'.</p></div>':skelHtml(3,true)+skelHtml(6));
+    return;
+  }
+  var jobs=cleanJobsAll();
+  var sortKey=function(j){ var d=jobDueIn(j); return d===null?-9999:d; };
+  jobs.sort(function(a,b){ return sortKey(a)-sortKey(b) || a.job.localeCompare(b.job); });
+  var need=jobs.filter(jobNeedsDoing);
+  var soon=jobs.filter(function(j){ var d=jobDueIn(j); return d!==null && d>0 && d<=3; });
+  var fine=jobs.filter(function(j){ var d=jobDueIn(j); return d!==null && d>3; });
+  var roomName=function(x){ var r=(DB.rooms||[]).filter(function(y){ return y.id===x.roomId; })[0]; return r?r.name:x.room; };
+  var sk=(remoteCleaning.skipped||[]).filter(function(x){ return x.of>=2 && x.skipped>0; })
+    .map(function(x){ return Object.assign({},x,{room:roomName(x)}); });
+  var w=remoteCleaning.wiped||{asked:0,yes:0,no:0,none:0,misses:[]};
+  var used=w.yes+w.no, pct=used?Math.round(w.yes/used*100):null;
+
+  // Summary: three plain answers.
+  h+='<div class="cl-sum">'+
+    '<div class="cl-tile t-'+(need.length?'warn':'ok')+'"><div class="gl-n">'+need.length+'</div><div class="gl-l">'+
+      (need.length?'job'+(need.length===1?'':'s')+' need doing':'jobs need doing')+'</div>'+
+      '<div class="gl-s">'+(need.length?esc(need.slice(0,2).map(function(j){ return j.job; }).join(', '))+(need.length>2?' +'+(need.length-2):''):'All up to date')+'</div></div>'+
+    '<div class="cl-tile"><div class="gl-n">'+(sk.length?Math.round(sk[0].skipped/sk[0].of*100)+'%':'\u2014')+'</div><div class="gl-l">most-skipped room task</div>'+
+      '<div class="gl-s">'+(sk.length?esc(sk[0].task)+' \u00b7 '+esc(sk[0].room):'Nothing skipped yet')+'</div></div>'+
+    '<div class="cl-tile cl-ring">'+ringSVG([{v:w.yes,cls:'r-ok'},{v:w.no,cls:'r-crit'}], pct==null?'\u2014':pct+'%')+
+      '<div><div class="gl-l" style="margin-top:0">equipment wiped down after duty</div><div class="gl-s">'+
+      (w.asked?w.yes+' yes \u00b7 '+w.no+' no'+(w.none?' \u00b7 '+w.none+' nothing used':''):'No answers yet')+'</div></div></div>'+
+    '</div>';
+
+  // Jobs
+  h+='<div class="sec"><h3>Cleaning jobs</h3><span class="sec-n">'+jobs.length+'</span>'+
+     '<span class="sec-r"><button type="button" class="btn xs" data-need="office" onclick="jobAdd()">Add a job</button></span></div>';
+  if(!jobs.length) h+='<div class="panel"><p class="hint" style="margin:0">No cleaning jobs yet.</p></div>';
+  var group=function(title,rows,cls){
+    if(!rows.length) return '';
+    return '<div class="cj-group '+cls+'"><div class="cj-gt">'+title+'<span>'+rows.length+'</span></div><ul class="cj-list">'+rows.map(jobRowHtml).join('')+'</ul></div>';
+  };
+  h+=group('Needs doing',need,'g-need')+group('Coming up',soon,'g-soon');
+  if(fine.length)
+    h+='<div class="acc tight mt" id="cjFine"><button type="button" class="acchead" onclick="toggleAcc(this)">'+
+       '<span class="num">'+fine.length+'</span><span>Up to date</span><span class="chev">\u25be</span></button>'+
+       '<div class="accbody"><ul class="cj-list">'+fine.map(jobRowHtml).join('')+'</ul></div></div>';
+
+  // Skipped room tasks
+  h+='<div class="sec"><h3>Room tasks left undone most</h3></div>';
+  if(!sk.length) h+='<div class="panel"><p class="hint" style="margin:0">Nothing has been left undone on a room check this year.</p></div>';
+  else h+='<div class="panel"><ul class="sk-list">'+sk.slice(0,8).map(function(x){
+      var p=Math.round(x.skipped/x.of*100);
+      return '<li><div class="sk-t"><b>'+esc(x.task)+'</b><span>'+esc(x.room)+'</span></div>'+
+        '<div class="sk-bar"><i style="width:'+Math.max(4,p)+'%"></i></div>'+
+        '<div class="sk-n">'+x.skipped+' of '+x.of+'</div></li>';
+    }).join('')+'</ul></div>';
+
+  // Wiped down after duty: the misses
+  if(w.misses && w.misses.length)
+    h+='<div class="acc tight mt" id="cjMiss"><button type="button" class="acchead" onclick="toggleAcc(this)">'+
+       '<span class="num">'+w.no+'</span><span>After Duty forms that said No to wiping down</span><span class="chev">\u25be</span></button>'+
+       '<div class="accbody"><ul class="buylist">'+w.misses.map(function(m){
+         return '<li><div class="kc-item"><b>'+esc(m.name||'Someone')+'</b><span>'+esc(kitDay(m.date))+'</span></div></li>'; }).join('')+'</ul></div></div>';
+  host.innerHTML=h;
+  applyGates(host);
+}
+/* On the Room Check form: jobs due in the room just picked (or anywhere),
+   as optional ticks. Only what is due, so it is a nudge, not a second form. */
+function paintJobsCard(fid){
+  var el=document.getElementById(fid+'-jobs'); if(!el) return;
+  var room=(DB.rooms||[]).filter(function(r){ return r.id===formPick[fid]; })[0];
+  if(!room || !remoteCleaning){ el.innerHTML=''; return; }
+  var jobs=cleanJobsAll().filter(function(j){
+    var d=jobDueIn(j);
+    return (j.room===room.name || !j.room) && (d===null || d<=1);
+  });
+  if(!jobs.length){ el.innerHTML=''; return; }
+  var was={}; [].slice.call(el.querySelectorAll('[data-job]:checked')).forEach(function(b){ was[b.getAttribute('data-job')]=1; });
+  el.innerHTML='<div class="card mt"><h3>Did any of these too? <span class="opt">optional</span></h3>'+
+    jobs.map(function(j){
+      return '<label class="checkline"><input type="checkbox" data-job="'+esc(j.id)+'" value="'+esc(j.job)+'"'+(was[j.id]?' checked':'')+
+        ' onchange="onFormInput(\''+fid+'\')"><span class="lbl">'+esc(j.job)+
+        '<small class="cj-due">'+esc(jobWhen(j))+'</small></span></label>';
+    }).join('')+'</div>';
+}
+
+/* ============================================================================
    MISSED CHORES — who is not doing their room check each duty period
    ============================================================================
    Everybody owes one room check per duty period, and nobody keeps a roster, so
@@ -12430,7 +12764,7 @@ function renderAll(){
   renderRoles();
   renderQR();
   renderTracker();
-  renderChores();
+  renderChores(); renderCleaning();
   renderRestock();
   renderInventory();
   renderKits();
@@ -12490,6 +12824,7 @@ fetchTracker=shareInFlight(fetchTracker);
 fetchRestock=shareInFlight(fetchRestock);
 fetchDutyPeriods=shareInFlight(fetchDutyPeriods);
 fetchReport=shareInFlight(fetchReport, function(p){ return p; });
+fetchCleaning=shareInFlight(fetchCleaning);
 
 function init(){
   loadDB();

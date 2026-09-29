@@ -2322,8 +2322,11 @@ function cleaningReport() {
   var rc = read(SHEETS['Room Checks']), per = {};
   var iRoom = rc.col('Room'), iMiss = rc.col('What Was Missing'), iRid = rc.col('Room ID');
   rc.rows.forEach(function (r) {
-    var room = String(r[iRoom] || '').trim(); if (!room) return;
-    var e = per[room] || (per[room] = { room: room, roomId: iRid >= 0 ? String(r[iRid] || '') : '', checks: 0, tasks: {} });
+    var room = String(r[iRoom] || '').trim(), rid = iRid >= 0 ? String(r[iRid] || '').trim() : '';
+    if (!room && !rid) return;
+    // By room ID where there is one, so renaming a room keeps its history.
+    var key = rid || room;
+    var e = per[key] || (per[key] = { room: room, roomId: rid, checks: 0, tasks: {} });
     e.checks++;
     String(r[iMiss] || '').split(' | ').forEach(function (t) {
       t = t.trim(); if (t) e.tasks[t] = (e.tasks[t] || 0) + 1;
@@ -2347,7 +2350,7 @@ function cleaningReport() {
     else { wiped.no++; wiped.misses.push({ date: dayOf(r[iD]), name: String(r[iN] || '') }); }
   });
   wiped.misses = wiped.misses.slice(-12).reverse();
-  return { ok: true, since: since, jobs: cleanJobs().map(function (j) { delete j.row; return j; }),
+  return { ok: true, since: since, jobs: cleanJobs(ensureCleaning()).map(function (j) { delete j.row; return j; }),
            skipped: skipped.slice(0, 40), checks: checks, wiped: wiped };
 }
 
