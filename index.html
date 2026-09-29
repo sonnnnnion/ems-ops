@@ -1295,6 +1295,36 @@
   .roompick .rp-st + .rp-sub{text-transform:none;letter-spacing:0;font-size:12px}
   .roompick.off{opacity:.75;background:repeating-linear-gradient(135deg,#F3EFE9 0 8px,#ECE6DD 8px 16px);cursor:not-allowed}
 
+  /* Summary tiles that are buttons, with a picture of what they count. */
+  .gl-btn{font:inherit;color:inherit;text-align:left;cursor:pointer;transition:transform .15s var(--ease),box-shadow .15s var(--ease),border-color .15s}
+  .gl-btn:hover{transform:translateY(-2px);box-shadow:var(--shadow-md)}
+  .gl-btn:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+  .gl-btn.on{border-color:var(--brand);box-shadow:0 0 0 2px var(--brand-wash),var(--shadow-sm)}
+  .gl-btn:not(.gl-hero){display:flex;flex-direction:column;justify-content:flex-start;align-items:stretch}
+  .gl-btn .gl-s{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+  .gl-list{display:grid;grid-template-columns:1fr auto;gap:2px 8px;font-size:12px;color:var(--ink-mute);margin-top:8px}
+  .gl-list b{color:var(--ink);font-weight:700}
+  .gl-track{grid-column:1/-1;height:6px;border-radius:999px;background:var(--bg-2);overflow:hidden;display:block}
+  .gl-track i{display:block;height:100%;background:var(--ok);border-radius:999px}
+  .gl-key{margin-top:8px;font-size:11.5px;gap:4px 10px}
+  .gl-line{position:relative;height:10px;margin:12px 6px 22px;border-bottom:2px solid var(--rule-strong)}
+  .gl-line i{position:absolute;bottom:-6px;width:10px;height:10px;margin-left:-5px;border-radius:50%;background:var(--ok);
+    border:2px solid var(--card)}
+  .gl-line i.soon{background:var(--warn)} .gl-line i.bad{background:var(--oos)}
+  .gl-line i{z-index:1}
+  .gl-now,.gl-end{position:absolute;top:16px;font-size:10.5px;color:var(--ink-faint)}
+  .gl-now{left:0} .gl-end{right:0}
+  .glance.anim .gl{animation:glin .5s var(--ease-out) both}
+  .glance.anim .gl:nth-child(2){animation-delay:.06s} .glance.anim .gl:nth-child(3){animation-delay:.12s}
+  .glance.anim .gl:nth-child(4){animation-delay:.18s}
+  .glance.anim .ring svg{animation:ringin .8s var(--ease-out) both}
+  .glance.anim .gl-track i,.glance.anim .segbar i{animation:hbgrow .7s .2s var(--ease-out) both;transform-origin:left}
+  .glance.anim .gl-line i{animation:dotin .4s var(--ease-out) both;animation-delay:.35s}
+  @keyframes glin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  @keyframes ringin{from{transform:rotate(-200deg) scale(.85);opacity:.3}to{transform:rotate(-90deg);opacity:1}}
+  @keyframes dotin{from{transform:scale(0)}to{transform:scale(1)}}
+  @media (prefers-reduced-motion:reduce){ .glance.anim .gl,.glance.anim .ring svg,.glance.anim .gl-track i,.glance.anim .segbar i,.glance.anim .gl-line i{animation:none} }
+
   /* ---------- Equipment Tracker ------------------------------------------- */
   .trk{border:1px solid var(--rule);border-radius:var(--r-md);background:var(--card);box-shadow:var(--shadow-sm);overflow:hidden}
   .trk-head,.trk-row{display:grid;grid-template-columns:minmax(0,2.3fr) 124px 64px 132px minmax(150px,1.3fr) 142px 112px;
@@ -1862,7 +1892,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260928212830';
+var BUILD='20260928214204';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -8907,17 +8937,57 @@ function trackerCounts(){
     order:all.filter(trkOnOrder).length,
     expiring:all.filter(trkExpiring).length+bagExp};
 }
-function trackerGlanceHtml(c){
-  return '<div class="glance">'+
-     '<div class="gl gl-hero">'+ringSVG([{v:c.ok,cls:'r-ok'},{v:c.short,cls:'r-crit'},{v:c.expiringK,cls:'r-warn'},
-          {v:c.total-c.ok-c.short-c.expiringK,cls:'r-mute'}], c.total?Math.round(c.ok/c.total*100)+'%':'—')+
-       '<div><div class="gl-n">'+c.ok+'<small>of '+c.total+'</small></div><div class="gl-l">stocked and in date</div>'+
-       '<ul class="key"><li><i class="p-ok"></i>OK</li><li><i class="p-crit"></i>Short</li><li><i class="p-warn"></i>Expiring</li>'+
-       '<li><i class="p-mute"></i>Not counted</li></ul></div></div>'+
-     glTile(c.buy+c.lines,'to buy',c.lines?c.lines+' from calls and by hand':'',(c.buy+c.lines)?'warn':'ok')+
-     glTile(c.order,'on order','','')+
-     glTile(c.expiring,'expiring within 2 months','',c.expiring?'warn':'ok')+
-     '</div>';
+/* The summary is also the way in: each tile is a button for the view it
+   counts, names what is in it, and draws it — a bar per list, the buy list by
+   why, what is on order, and the next two months of expiry dates as dots on a
+   line. It animates in only when the screen is first drawn; an edit updates
+   the numbers in place, and nothing replays. */
+function trackerGlanceHtml(c,anim){
+  var all=c.all, names=function(rows,n){
+    var t=rows.slice(0,n).map(function(r){ return r.item; });
+    return t.length ? t.join(', ')+(rows.length>n?' +'+(rows.length-n):'') : '';
+  };
+  var lists=trackerLists(all).map(function(l){
+    var rows=all.filter(function(r){ return (r.list||TRACKER_LISTS[0])===l; });
+    var ok=rows.filter(function(r){ return trackStatus(r).k==='ok'; }).length;
+    return {l:l, n:rows.length, ok:ok};
+  }).filter(function(x){ return x.n; });
+  var buyRows=all.filter(trkNeedsBuying), ordRows=all.filter(trkOnOrder);
+  var shortN=buyRows.filter(function(r){ return trackStatus(r).k==='short'; }).length;
+  var markedN=buyRows.length-shortN;
+  var exp=all.filter(trkExpiring).map(function(r){ return {item:r.item, d:daysUntil(r.exp)}; })
+    .concat(expiringRows().filter(function(r){ return r.days<=60; }).map(function(r){ return {item:r.item, d:r.days}; }))
+    .sort(function(a,b){ return a.d-b.d; });
+  var tile=function(view,tone,n,label,body){
+    return '<button type="button" class="gl gl-btn'+(tone?' t-'+tone:'')+(trackerView.show===view?' on':'')+'" '+
+      'aria-pressed="'+(trackerView.show===view)+'" onclick="trkShow(\''+view+'\')">'+
+      '<div class="gl-n">'+n+'</div><div class="gl-l">'+label+'</div>'+body+'</button>';
+  };
+  var h='<div class="glance'+(anim?' anim':'')+'">'+
+    '<button type="button" class="gl gl-hero gl-btn'+(trackerView.show==='all'?' on':'')+'" onclick="trkShow(\'all\')">'+
+      ringSVG([{v:c.ok,cls:'r-ok'},{v:c.short,cls:'r-crit'},{v:c.expiringK,cls:'r-warn'},
+               {v:c.total-c.ok-c.short-c.expiringK,cls:'r-mute'}], c.total?Math.round(c.ok/c.total*100)+'%':'—')+
+      '<div style="min-width:0;flex:1"><div class="gl-n">'+c.ok+'<small>of '+c.total+'</small></div>'+
+      '<div class="gl-l">stocked and in date</div>'+
+      lists.map(function(x){
+        return '<div class="gl-list"><span>'+esc(x.l)+'</span><b>'+x.ok+'/'+x.n+'</b>'+
+          '<i class="gl-track"><i style="width:'+(x.n?Math.round(x.ok/x.n*100):0)+'%"></i></i></div>';
+      }).join('')+'</div></button>'+
+    tile('buy',(c.buy+c.lines)?'warn':'ok',c.buy+c.lines,'to buy',
+      ((c.buy+c.lines)?segBar([{v:shortN,cls:'p-crit'},{v:markedN,cls:'p-warn'},{v:c.lines,cls:'p-brand'}])+
+       '<ul class="key gl-key">'+(shortN?'<li><i class="p-crit"></i>'+shortN+' short</li>':'')+
+       (markedN?'<li><i class="p-warn"></i>'+markedN+' marked</li>':'')+
+       (c.lines?'<li><i class="p-brand"></i>'+c.lines+' from calls</li>':'')+'</ul>':'<div class="gl-s">Nothing to buy</div>'))+
+    tile('order','',c.order,'on order',
+      '<div class="gl-s">'+esc(names(ordRows,3)||'Nothing ordered')+'</div>')+
+    tile('expiring',c.expiring?'warn':'ok',c.expiring,'expiring within 2 months',
+      (exp.length?'<div class="gl-line" aria-hidden="true"><span class="gl-now">today</span><span class="gl-end">60 days</span>'+
+        exp.map(function(e){ var x=Math.max(0,Math.min(100,e.d/60*100));
+          return '<i class="'+(e.d<0?'bad':e.d<=30?'soon':'')+'" style="left:'+x+'%" title="'+esc(e.item)+'"></i>'; }).join('')+'</div>'+
+        '<div class="gl-s">Next: '+esc(exp[0].item)+' · '+(exp[0].d<0?'expired':exp[0].d===0?'today':exp[0].d+' days')+'</div>'
+       :'<div class="gl-s">Nothing close</div>'))+
+    '</div>';
+  return h;
 }
 function trackerSegHtml(c){
   return [['all','Everything',c.total],['buy','Needs buying',c.buy+c.lines],['order','On order',c.order],['expiring','Expiring',c.expiring]]
@@ -8947,7 +9017,7 @@ function trackerPatch(id){
 }
 function trackerRefreshSoft(){
   var c=trackerCounts();
-  var g=document.getElementById('trkGlance'); if(g) g.innerHTML=trackerGlanceHtml(c);
+  var g=document.getElementById('trkGlance'); if(g) g.innerHTML=trackerGlanceHtml(c,false);
   var sg=document.getElementById('trkSeg'); if(sg) sg.innerHTML=trackerSegHtml(c);
 }
 
@@ -8960,7 +9030,7 @@ function renderToGet(){
     return;
   }
   var c=trackerCounts();
-  h+='<div id="trkGlance">'+trackerGlanceHtml(c)+'</div>';
+  h+='<div id="trkGlance">'+trackerGlanceHtml(c,true)+'</div>';
   h+='<div class="toolbar sticky"><div class="seg" id="trkSeg" role="group" aria-label="What to show">'+trackerSegHtml(c)+'</div>'+
      '<div class="search"><input type="search" placeholder="Search" aria-label="Search the tracker" value="'+esc(trackerView.q)+'" '+
        'oninput="trkSearch(this.value)"></div>'+
