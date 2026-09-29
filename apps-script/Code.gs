@@ -2132,7 +2132,7 @@ function setTracker(p) {
     byId[o.id] = i;
     byKey[keyOf(o.list, o.item, o.loc)] = i;
   });
-  var fresh = [], dels = [], touched = {}, names = [];
+  var fresh = [], dels = [], touched = {}, names = [], moves = [];
   ops.forEach(function (op) {
     if (!op || typeof op !== 'object') return;
     if (op.op === 'del') {
@@ -2145,12 +2145,18 @@ function setTracker(p) {
     if (ix === undefined && op.match) ix = byKey[keyOf(row.list || TRACKER_LISTS[0], row.item, row.loc)];
     var base = ix !== undefined ? objs[ix] : { id: String(row.id || ('t' + Utilities.getUuid().slice(0, 8))), status: 'Stocked' };
     if (ix !== undefined && dels.indexOf(ix) >= 0) return;
+    var was = ix !== undefined ? base.stock : null;
     TRACKER_EDITABLE.forEach(function (k) {
       if (Object.prototype.hasOwnProperty.call(row, k)) base[k] = row[k];
     });
     if (!String(base.item || '').trim()) return;
     base.item = String(base.item).trim().slice(0, 200);
     var cells = trackerCells(base, c.name, at);
+    // A count that changed by hand, not a pasted-in tracker: an import
+    // replaces numbers wholesale and says nothing about how fast they fall.
+    if (ix !== undefined && p.src !== 'import' && typeof was === 'number' &&
+        typeof base.stock === 'number' && was !== base.stock)
+      moves.push([base.id, base.item, base.list, base.loc, was, base.stock, 'Counted']);
     if (ix !== undefined) { vals[ix] = cells; objs[ix] = base; touched[ix] = 1; }
     else {
       fresh.push(cells);
@@ -2163,6 +2169,7 @@ function setTracker(p) {
   });
   if (fresh.length) sh.getRange(sh.getLastRow() + 1, 1, fresh.length, n).setValues(fresh);
   dels.sort(function (a, b) { return b - a; }).forEach(function (d) { sh.deleteRow(d + 2); });
+  logStock(moves);
   paintTrackerStatus();
   logAction('ops', c.name, 'Updated the tracker',
             names.length > 4 ? names.length + ' changes' : names.join(', '), '', '');
@@ -2182,7 +2189,7 @@ function trackerUse(p) {
   if (!Array.isArray(list)) return;
   var n = TRACKER.headers.length, cs = tcol('stock') - 1, cl = tcol('link') - 1;
   var vals = sh.getRange(2, 1, sh.getLastRow() - 1, n).getValues();
-  var at = Utilities.formatDate(new Date(), sheetTZ(), 'yyyy-MM-dd HH:mm');
+  var at = Utilities.formatDate(new Date(), sheetTZ(), 'yyyy-MM-dd HH:mm'), moves = [];
   list.forEach(function (u) {
     if (!u || !u.r || !u.i) return;
     var best = -1;
@@ -2191,11 +2198,77 @@ function trackerUse(p) {
       if (best < 0 || r[cs] > vals[best][cs]) best = i;
     });
     if (best < 0) return;
+    var before = vals[best][cs];
     vals[best][cs] = Math.max(0, vals[best][cs] - (Number(u.q) || 1));
     sh.getRange(best + 2, cs + 1).setValue(vals[best][cs]);
+    var o = trackerObj(vals[best], best, sheetTZ());
+    moves.push([o.id, o.item, o.list, o.loc, before, vals[best][cs], 'After duty form']);
     sh.getRange(best + 2, tcol('updated')).setValue(at);
     sh.getRange(best + 2, tcol('by')).setValue('After duty form');
   });
+  logStock(moves);
+}
+
+/* STOCK HISTORY — every time a count goes up or down, one row: which item,
+   what it was, what it became, and why. Kept so the tracker can say how fast
+   something is being used and roughly when it runs out, from nothing but the
+   counts people were already keeping. Machinery, so the tab is hidden. */
+var STOCKLOG = {
+  name: 'Stock History',
+  headers: ['Date', 'Time', 'ID', 'Item', 'List', 'Location', 'Was', 'Now', 'Why'],
+  widths:  [95, 70, 90, 260, 180, 140, 60, 60, 130]
+};
+function ensureStockLog() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(STOCKLOG.name);
+  if (!sh) {
+    sh = ss.insertSheet(STOCKLOG.name);
+    sh.appendRow(STOCKLOG.headers);
+    sh.getRange(1, 1, 1, STOCKLOG.headers.length)
+      .setFontWeight('bold').setBackground(BRAND).setFontColor('#ffffff');
+    sh.setFrozenRows(1);
+    STOCKLOG.widths.forEach(function (w, i) { sh.setColumnWidth(i + 1, w); });
+    try { sh.hideSheet(); } catch (err) {}
+  }
+  return sh;
+}
+function logStock(moves) {
+  if (!moves || !moves.length) return;
+  try {
+    var sh = ensureStockLog(), d = new Date(), tz = sheetTZ();
+    var day = Utilities.formatDate(d, tz, 'yyyy-MM-dd'), t = Utilities.formatDate(d, tz, 'HH:mm');
+    var rows = moves.map(function (m) { return [day, t].concat(m); });
+    sh.getRange(sh.getLastRow() + 1, 1, rows.length, STOCKLOG.headers.length).setValues(rows);
+  } catch (err) { logError('Stock history not written: ' + err, ''); }
+}
+/* How fast each item goes down: everything taken off it in the last four
+   months, over the days since it was first recorded (never fewer than two
+   weeks, so one busy afternoon does not read as a trend). Only items that
+   have gone down at least twice — one drop is an event, not a rate. */
+function stockRates() {
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(STOCKLOG.name);
+  if (!sh || sh.getLastRow() < 2) return {};
+  var tz = sheetTZ(), now = new Date(), cutoff = new Date(now.getTime() - 120 * 864e5);
+  var rows = sh.getRange(2, 1, sh.getLastRow() - 1, STOCKLOG.headers.length).getValues();
+  var by = {};
+  rows.forEach(function (r) {
+    var d = r[0] instanceof Date ? r[0] : new Date(String(r[0]) + 'T12:00:00');
+    if (isNaN(d) || d < cutoff) return;
+    var id = String(r[2] || ''), was = Number(r[6]), nowN = Number(r[7]);
+    if (!id || isNaN(was) || isNaN(nowN)) return;
+    var e = by[id] || (by[id] = { first: d, dec: 0, n: 0 });
+    if (d < e.first) e.first = d;
+    if (nowN < was) { e.dec += was - nowN; e.n++; }
+  });
+  var out = {};
+  Object.keys(by).forEach(function (id) {
+    var e = by[id];
+    if (e.n < 2 || e.dec <= 0) return;
+    var days = Math.max(14, (now - e.first) / 864e5);
+    out[id] = { perWeek: Math.round(e.dec / days * 7 * 10) / 10,
+                since: Utilities.formatDate(e.first, tz, 'yyyy-MM-dd') };
+  });
+  return out;
 }
 
 /* The shopping list, edited from the site. Adding used to write to one phone's
@@ -2999,7 +3072,7 @@ function doGet(e) {
   }
   if (p.tracker) {
     var tr = trackerRows();
-    return json({ ok: true, rows: tr.rows, fromContent: tr.fromContent, lists: TRACKER_LISTS });
+    return json({ ok: true, rows: tr.rows, fromContent: tr.fromContent, lists: TRACKER_LISTS, use: stockRates() });
   }
   if (p.bagforms) {
     return json(bagFormRows(String(p.unit || ''), String(p.type || ''), p.offset, p.limit));

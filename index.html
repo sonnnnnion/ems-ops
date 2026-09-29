@@ -2049,7 +2049,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260929104044';
+var BUILD='20260929104357';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -8703,6 +8703,15 @@ var LS_TRKCACHE='emsops_trkcache_v1';
   }catch(e){}
 })();
 var trackerState={loading:false, error:'', at:0, sig:''};
+/* How fast each item is going down, from the sheet's stock history: {id:
+   {perWeek, since}}. Empty until something has gone down more than once. */
+var remoteUse={};
+function trkWeeksLeft(r){
+  var u=remoteUse[r.id];
+  if(!u || !(u.perWeek>0) || r.stock==null) return null;
+  return r.stock/u.perWeek;
+}
+function trkLeftWords(w){ return w<1 ? 'under a week left' : '~'+Math.round(w)+' wk left'; }
 var trackerLocal={};       // id -> {f:{fields}, isNew} changed here, awaiting the sheet
 var trackerGone={};        // id -> true, removed here, awaiting the sheet
 var trackerQueue={}, trackerTimer=null;
@@ -8721,6 +8730,7 @@ function fetchTracker(){
       return false;
     }
     remoteTracker=j.rows.filter(function(r){ return r && typeof r==='object' && r.id; });
+    remoteUse=(j.use && typeof j.use==='object' && !Array.isArray(j.use)) ? j.use : {};
     trackerSeeded=!!j.fromContent;
     trackerState.error=''; trackerState.at=Date.now(); trackerState.sig=JSON.stringify(remoteTracker);
     try{ localStorage.setItem(LS_TRKCACHE, JSON.stringify({at:trackerState.at, rows:remoteTracker})); }catch(e){}
@@ -8995,7 +9005,7 @@ function trackerSendImport(ops){
   batches.forEach(function(b){
     try{
       fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},
-        body:JSON.stringify({form:'__tracker', site:'ops', ops:b, idToken:googleIdToken, key:(DB.api&&DB.api.key)||''})});
+        body:JSON.stringify({form:'__tracker', site:'ops', src:'import', ops:b, idToken:googleIdToken, key:(DB.api&&DB.api.key)||''})});
     }catch(e){}
   });
   dataChanged();
@@ -9030,6 +9040,9 @@ function trkStatusCell(r){
   if(st.k==='short' && s==='More coming') tone='mute';
   return '<span class="gauge">'+(r.stock!=null&&r.par?'<i class="'+(st.k==='short'?'p-crit':'p-ok')+'" style="width:'+Math.max(4,pct)+'%"></i>':'')+
     '</span><span class="tag '+tone+'">'+esc(st.label)+'</span>'+
+    (function(){ var w=trkWeeksLeft(r);
+      return (w!=null && w<=8 && st.k!=='short') ? '<span class="tag '+(w<=3&&s==='Stocked'?'warn':'mute')+'" title="At the rate it has gone down since '+
+        esc(kitDay(remoteUse[r.id].since))+'">'+trkLeftWords(w)+'</span>' : ''; })()+
     (st.k==='short' && st.days!=null && st.days<=60
       ? '<span class="tag '+(st.days<0?'crit':'warn')+'">'+(st.days<0?'Expired':st.days===0?'Expires today':st.days===1?'Expires tomorrow':'Expires in '+st.days+'d')+'</span>' : '');
 }
@@ -9488,6 +9501,10 @@ function trackerAsideHtml(c){
   push('short','Short, nothing ordered','crit',all.filter(function(r){ return trkStatus(r)==='Stocked' && trackStatus(r).k==='short'; })
        .sort(function(a,b){ return (a.stock/(a.par||1))-(b.stock/(b.par||1)); }),
        function(r){ return r.stock+' of '+r.par+(r.loc?' · '+r.loc:''); });
+  push('runout','Running out within 3 weeks','warn',all.filter(function(r){ var w=trkWeeksLeft(r);
+         return w!=null && w<=3 && trkStatus(r)==='Stocked' && trackStatus(r).k!=='short'; })
+       .sort(function(a,b){ return trkWeeksLeft(a)-trkWeeksLeft(b); }),
+       function(r){ return trkLeftWords(trkWeeksLeft(r))+(r.loc?' \u00b7 '+r.loc:''); });
   push('soon','Expiring within 2 months','warn',all.filter(function(r){ var d=days(r); return d!=null&&d>=0&&d<=60; })
        .sort(function(a,b){ return days(a)-days(b); }),
        function(r){ var d=days(r); return (d===0?'today':d===1?'tomorrow':'in '+d+' days')+(r.loc?' · '+r.loc:''); });
@@ -9503,7 +9520,7 @@ function trackerAsideHtml(c){
       g.rows.slice(0,6).map(function(r){
         return '<li><button type="button" onclick="trkJump(\''+jsq(r.id)+'\')"><b>'+esc(r.item)+'</b><span>'+esc(g.sub(r))+'</span></button></li>';
       }).join('')+'</ul>'+
-      (more>0?'<button type="button" class="aside-more" onclick="trkShow(\''+(g.key==='order'?'order':g.key==='soon'||g.key==='exp'?'expiring':'buy')+'\')">'+more+' more</button>':'')+
+      (more>0?'<button type="button" class="aside-more" onclick="trkShow(\''+(g.key==='order'?'order':g.key==='soon'||g.key==='exp'?'expiring':g.key==='runout'?'all':'buy')+'\')">'+more+' more</button>':'')+
       '</div>';
   }).join('');
 }
