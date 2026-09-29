@@ -1305,6 +1305,7 @@
   .trk-row.s-expired{background:linear-gradient(90deg,var(--oos-wash),transparent 45%)}
   .trk-row.s-expiring{background:linear-gradient(90deg,var(--warn-wash),transparent 45%)}
   .trk-row.s-ordered{background:linear-gradient(90deg,#EAF0FA,transparent 45%)}
+  .trk-empty p{margin:0 0 12px;font-size:14px;color:var(--ink-soft)}
   .trk-status select{padding:6px 8px;font-size:13px;font-weight:700;border-radius:8px;height:36px;width:100%}
   .trk-status select.s-purchase{background:var(--warn-wash);color:var(--warn);border-color:#E5C79F}
   .trk-status select.s-more-coming{background:#EAF0FA;color:#1a4f9c;border-color:#C5D5EE}
@@ -1861,7 +1862,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260928192645';
+var BUILD='20260928212830';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -8693,11 +8694,11 @@ function parseTrackerPaste(text,list){
 function trkNameKey(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'').replace(/s$/,''); }
 function trkKey(list,item,loc){ return [list,item,loc].map(function(x){ return String(x||'').trim().toLowerCase(); }).join('\u0001'); }
 
-function trackerImport(){
+function trackerImport(into){
   if(!requireAuth('an import')) return;
   var lists=trackerLists(trackerAll());
   uiForm('Paste in a tracker','',[
-    {key:'list',label:'Into which list',type:'select',value:TRACKER_LISTS[0],
+    {key:'list',label:'Into which list',type:'select',value:(typeof into==='string'&&into)||TRACKER_LISTS[0],
       options:lists.map(function(l){ return {v:l,t:l}; }).concat([{v:'__new',t:'A new list…'}])},
     {key:'newlist',label:'New list name',type:'text'},
     {key:'mode',label:'What to do with what is already in that list',type:'select',value:'replace',options:[
@@ -8811,7 +8812,13 @@ function trackerRowHtml(r,showExp){
     '</div>';
 }
 function trackerTable(rows,list){
-  if(!rows.length) return '<div class="panel"><p class="hint" style="margin:0">Nothing here.</p></div>';
+  if(!rows.length){
+    if(trackerView.show==='all' && !trackerView.q.trim() && list)
+      return '<div class="panel trk-empty"><p>Nothing in '+esc(list)+' yet.</p>'+
+        '<div class="row" data-need="equipment"><button type="button" class="btn sm solid" onclick="trackerImport(\''+jsq(list)+'\')">'+
+        'Paste in the '+esc(list)+'</button><button type="button" class="btn sm" onclick="trackerAdd(\''+jsq(list)+'\')">Add one item</button></div></div>';
+    return '<div class="panel"><p class="hint" style="margin:0">Nothing here.</p></div>';
+  }
   // Expiration only where the list actually uses it, and place headings only
   // where items have places — her general inventory has neither.
   var showExp = list===TRACKER_LISTS[0] || rows.some(function(r){ return r.exp; });
