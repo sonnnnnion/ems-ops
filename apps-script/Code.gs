@@ -58,9 +58,10 @@ var SHEETS = {
        whoever is looking at the sheet; matching on those would break the moment
        a room is renamed, which is the failure this file has hit more than once.
     */
-    keys:    ['date','time','name','andrew','subject','result','missingCount','missing','restock','maint','sid','dp','callsign','roomId','dpKey'],
-    headers: ['Date','Time','Name','Andrew ID','Room','Result','Missing','What Was Missing','Restock Needed','Maintenance','Submission ID','Duty Period','Call Sign','Room ID','DP Key'],
-    widths:  [95, 70, 150, 100, 150, 150, 80, 320, 260, 260, 120, 120, 90, 110, 90]
+    // `Also Cleaned` appended last: cleaning jobs done on the same visit.
+    keys:    ['date','time','name','andrew','subject','result','missingCount','missing','restock','maint','sid','dp','callsign','roomId','dpKey','jobNames'],
+    headers: ['Date','Time','Name','Andrew ID','Room','Result','Missing','What Was Missing','Restock Needed','Maintenance','Submission ID','Duty Period','Call Sign','Room ID','DP Key','Also Cleaned'],
+    widths:  [95, 70, 150, 100, 150, 150, 80, 320, 260, 260, 120, 120, 90, 110, 90, 240]
   },
   /* Keyed by the name the site sends, which never changes; `name` is what the
      tab is called, which now matches what the site calls the form. `was` is how
@@ -116,9 +117,10 @@ var SHEETS = {
     /* `Calls` appended last: the After Duty form covers a whole shift, so it
        says how many calls the jumpkit went on, and Incident Number now holds
        one IN per call, comma-separated, any of them optional. */
-    keys:    ['date','time','name','callnum','result','usageCount','usageText','short','usageJson','sid','replaced','meds','calls'],
-    headers: ['Date','Time','Name','Incident Numbers','Result','Units Used','What Was Used','Could Not Replace (no longer used)','Used (data)','Submission ID','Replaced By Member','Medications Given','Calls'],
-    widths:  [95, 70, 150, 150, 150, 90, 380, 200, 200, 120, 260, 260, 70]
+    // `Equipment Cleaned` appended last: whether what was used got wiped down.
+    keys:    ['date','time','name','callnum','result','usageCount','usageText','short','usageJson','sid','replaced','meds','calls','cleaned'],
+    headers: ['Date','Time','Name','Incident Numbers','Result','Units Used','What Was Used','Could Not Replace (no longer used)','Used (data)','Submission ID','Replaced By Member','Medications Given','Calls','Equipment Cleaned'],
+    widths:  [95, 70, 150, 150, 150, 90, 380, 200, 200, 120, 260, 260, 70, 130]
   },
   'Reports': {
     name: 'Reports', freeze: 3,
@@ -1034,6 +1036,7 @@ function doPost(e) {
     if (p.form === '__resolve') return setConcernResolved(p);
     if (p.form === '__bagdone') return setBagDone(p);
     if (p.form === '__chore') return setChore(p);
+    if (p.form === '__cleanjob') return setCleanJob(p);
     if (p.form === '__bagstatus') return setBagStatus(p);
     if (p.form === '__tracker') return setTracker(p);
     if (p.form === '__restockedit') return editRestock(p);
@@ -1097,6 +1100,7 @@ function doPost(e) {
     noteUsedOnCall(p);
     saveExpiry(p);
     try { trackerUse(p); } catch (err) { logError('tracker count-down failed: ' + err, ''); }
+    try { jobsDoneFrom(p); } catch (err) { logError('cleaning jobs not ticked: ' + err, ''); }
     return json({ result: 'saved' });
   } catch (err) {
     // Never throw: the site cannot read the response anyway, and throwing just
@@ -2209,6 +2213,144 @@ function trackerUse(p) {
   logStock(moves);
 }
 
+/* CLEANING JOBS — the jobs that are not part of an everyday room check:
+   clean out the fridge weekly, wash the bedding every fortnight. One row per
+   job with how often it wants doing and when it was last done. A member ticks
+   one off on the Room Check form; the Office Manager can tick, add, change or
+   remove them from the site. Starts with a few ordinary ones so the screen is
+   not empty on the first day; every one of them can be changed or removed. */
+var CLEAN = {
+  name: 'Cleaning Jobs',
+  headers: ['Job', 'Room', 'Every (days)', 'Last Done', 'Done By', 'Notes', 'ID'],
+  widths:  [280, 170, 100, 100, 140, 240, 90],
+  hide: ['ID']
+};
+var CLEAN_START = [
+  ['Clean out the fridge', 'Kitchen', 7],
+  ['Wipe inside the microwave', 'Kitchen', 14],
+  ['Scrub the shower', 'Bathroom 2 (back)', 7],
+  ['Wash the bedding', 'Laundry', 14],
+  ['Wipe down the shelves and bins', 'Equipment Room', 30],
+  ['Dust the radio desk and chargers', 'Radio Room', 14],
+  ['Wipe door handles and light switches', '', 7]
+];
+function ensureCleaning() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(CLEAN.name);
+  if (!sh) {
+    sh = ss.insertSheet(CLEAN.name);
+    sh.appendRow(CLEAN.headers);
+    var rows = CLEAN_START.map(function (j) { return [j[0], j[1], j[2], '', '', '', 'c' + Utilities.getUuid().slice(0, 8)]; });
+    sh.getRange(2, 1, rows.length, CLEAN.headers.length).setValues(rows);
+    sh.getRange(1, 1, 1, CLEAN.headers.length)
+      .setFontWeight('bold').setBackground(BRAND).setFontColor('#ffffff');
+    sh.setFrozenRows(1);
+    CLEAN.widths.forEach(function (w, i) { sh.setColumnWidth(i + 1, w); });
+  }
+  return sh;
+}
+function cleanJobs(sh) {
+  sh = sh || SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CLEAN.name);
+  if (!sh || sh.getLastRow() < 2) return [];
+  var tz = sheetTZ();
+  return sh.getRange(2, 1, sh.getLastRow() - 1, CLEAN.headers.length).getValues().map(function (r, i) {
+    var last = r[3] instanceof Date ? Utilities.formatDate(r[3], tz, 'yyyy-MM-dd') : String(r[3] || '').trim();
+    return { id: String(r[6] || '').trim() || ('row' + (i + 2)), job: String(r[0] || '').trim(), room: String(r[1] || '').trim(),
+             every: Math.max(1, Number(r[2]) || 7), last: /^\d{4}-\d{2}-\d{2}$/.test(last) ? last : '',
+             by: String(r[4] || ''), notes: String(r[5] || ''), row: i + 2 };
+  }).filter(function (j) { return j.job; });
+}
+// Ticked on a room check. Ids come from the form; nothing else is touched.
+function jobsDoneFrom(p) {
+  var ids = String(p.jobIds || '').split(',').map(function (x) { return x.trim(); }).filter(Boolean);
+  if (!ids.length) return;
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CLEAN.name);
+  if (!sh) return;
+  var who = String(p.callsign || p.name || '').slice(0, 60);
+  cleanJobs(sh).forEach(function (j) {
+    if (ids.indexOf(j.id) < 0) return;
+    sh.getRange(j.row, 4, 1, 2).setValues([[String(p.date || ''), who]]);
+    if (j.id.indexOf('row') === 0) sh.getRange(j.row, 7).setValue('c' + Utilities.getUuid().slice(0, 8));
+  });
+}
+function setCleanJob(p) {
+  var c = writerCheck(p);
+  if (!c.name) {
+    logError('Cleaning job change REFUSED: ' + c.why, String(p.job || ''));
+    return json({ ok: false, error: 'not allowed: ' + c.why });
+  }
+  var sh = ensureCleaning(), jobs = cleanJobs(sh);
+  var j = jobs.filter(function (x) { return x.id === String(p.id || ''); })[0];
+  var today = Utilities.formatDate(new Date(), sheetTZ(), 'yyyy-MM-dd');
+  var every = Math.max(1, Math.min(365, Math.round(Number(p.every) || 7)));
+  var text = function (v, n) { return String(v || '').trim().slice(0, n); };
+  if (p.op === 'add') {
+    if (!text(p.job, 200)) return json({ ok: false, error: 'bad request' });
+    sh.appendRow([text(p.job, 200), text(p.room, 80), every, '', '', text(p.notes, 300), String(p.id || ('c' + Utilities.getUuid().slice(0, 8)))]);
+  } else if (!j) {
+    return json({ ok: false, error: 'not found' });
+  } else if (p.op === 'edit') {
+    sh.getRange(j.row, 1, 1, 3).setValues([[text(p.job, 200) || j.job, text(p.room, 80), every]]);
+    sh.getRange(j.row, 6).setValue(text(p.notes, 300));
+  } else if (p.op === 'done') {
+    sh.getRange(j.row, 4, 1, 2).setValues([[today, text(p.by, 60) || c.name]]);
+  } else if (p.op === 'undone') {
+    sh.getRange(j.row, 4, 1, 2).setValues([[text(p.last, 10), text(p.lastBy, 60)]]);
+  } else if (p.op === 'del') {
+    sh.deleteRow(j.row);
+  } else return json({ ok: false, error: 'bad request' });
+  if (j && j.id.indexOf('row') === 0 && p.op !== 'del') sh.getRange(j.row, 7).setValue(j.id);
+  return json({ ok: true });
+}
+/* Everything the Cleaning screen shows, from this academic year only:
+   the jobs; which everyday room-check tasks get left unticked most; and
+   whether equipment got wiped down after duty. */
+function cleaningReport() {
+  var tz = sheetTZ(), now = new Date();
+  var y = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1;
+  var since = y + '-08-01';
+  var dayOf = function (v) { return v instanceof Date ? Utilities.formatDate(v, tz, 'yyyy-MM-dd') : String(v || '').trim(); };
+  var read = function (conf) {
+    var sh = sheetOf(conf);
+    if (!sh || sh.getLastRow() < 2) return { rows: [], col: function () { return -1; } };
+    var head = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
+    var rows = sh.getRange(2, 1, sh.getLastRow() - 1, head.length).getValues()
+      .filter(function (r) { var d = dayOf(r[head.indexOf('Date')]); return !d || d >= since; });
+    return { rows: rows, col: function (h) { return head.indexOf(h); } };
+  };
+  // Room tasks left unticked, per room.
+  var rc = read(SHEETS['Room Checks']), per = {};
+  var iRoom = rc.col('Room'), iMiss = rc.col('What Was Missing'), iRid = rc.col('Room ID');
+  rc.rows.forEach(function (r) {
+    var room = String(r[iRoom] || '').trim(); if (!room) return;
+    var e = per[room] || (per[room] = { room: room, roomId: iRid >= 0 ? String(r[iRid] || '') : '', checks: 0, tasks: {} });
+    e.checks++;
+    String(r[iMiss] || '').split(' | ').forEach(function (t) {
+      t = t.trim(); if (t) e.tasks[t] = (e.tasks[t] || 0) + 1;
+    });
+  });
+  var skipped = [];
+  Object.keys(per).forEach(function (k) {
+    var e = per[k];
+    Object.keys(e.tasks).forEach(function (t) { skipped.push({ room: e.room, roomId: e.roomId, task: t, skipped: e.tasks[t], of: e.checks }); });
+  });
+  skipped.sort(function (a, b) { return (b.skipped / b.of) - (a.skipped / a.of) || b.skipped - a.skipped; });
+  var checks = Object.keys(per).map(function (k) { return { room: per[k].room, roomId: per[k].roomId, checks: per[k].checks }; });
+  // Equipment wiped after duty.
+  var ad = read(SHEETS['Post-Call']), wiped = { asked: 0, yes: 0, none: 0, no: 0, misses: [] };
+  var iC = ad.col('Equipment Cleaned'), iD = ad.col('Date'), iN = ad.col('Name');
+  if (iC >= 0) ad.rows.forEach(function (r) {
+    var v = String(r[iC] || '').trim(); if (!v) return;
+    wiped.asked++;
+    if (v === 'Yes') wiped.yes++;
+    else if (v === 'Nothing used') wiped.none++;
+    else { wiped.no++; wiped.misses.push({ date: dayOf(r[iD]), name: String(r[iN] || '') }); }
+  });
+  wiped.misses = wiped.misses.slice(-12).reverse();
+  return { ok: true, since: since, jobs: cleanJobs().map(function (j) { delete j.row; return j; }),
+           skipped: skipped.slice(0, 40), checks: checks, wiped: wiped };
+}
+
 /* STOCK HISTORY — every time a count goes up or down, one row: which item,
    what it was, what it became, and why. Kept so the tracker can say how fast
    something is being used and roughly when it runs out, from nothing but the
@@ -3070,6 +3212,9 @@ function doGet(e) {
   if (p.dp) {
     return json({ ok: true, dp: dutyPeriodRows(), chores: choreRows() });
   }
+  if (p.cleaning) {
+    return json(cleaningReport());
+  }
   if (p.tracker) {
     var tr = trackerRows();
     return json({ ok: true, rows: tr.rows, fromContent: tr.fromContent, lists: TRACKER_LISTS, use: stockRates() });
@@ -3172,7 +3317,7 @@ function checkTabShapes() {
 var TAB_ORDER = ['Before Duty', 'After Duty', 'Equipment Tracker', 'Restock', 'Bag Status',
                  'Equipment Checks', 'Concerns', 'Room Checks', 'Reports', 'Expiry',
                  'Bike Jumpkit Checks', 'Bike Safety Checks',
-                 'Bike Restock', 'Actions', 'Chore Log', 'Items'];
+                 'Bike Restock', 'Cleaning Jobs', 'Actions', 'Chore Log', 'Stock History', 'Items'];
 
 /* Run by hand (Run ▸ tidyUp) after pasting an updated script.
 
@@ -3217,7 +3362,8 @@ function tidyUp() {
   paintBikeRestock(ensureBikeRestock());
   [ [ensureExpiry(), EXPIRY], [ensureConcerns(), CONCERNS],
     [ensureActions(), ACTIONS], [ensureChores(), CHORES],
-    [ensureBagStatus(), BAG_STATUS], [ensureTracker(), TRACKER] ].forEach(function (pair) {
+    [ensureBagStatus(), BAG_STATUS], [ensureTracker(), TRACKER],
+    [ensureCleaning(), CLEAN], [ensureStockLog(), STOCKLOG] ].forEach(function (pair) {
     var sh = pair[0], conf = pair[1];
     sh.setFrozenRows(1);
     sh.getRange(1, 1, 1, conf.headers.length)
@@ -3233,6 +3379,8 @@ function tidyUp() {
   // The per-item log is machinery the site reads nobody's way; tucked away.
   var items = ss.getSheetByName(ITEMS.name);
   if (items) items.hideSheet();
+  var hist = ss.getSheetByName(STOCKLOG.name);
+  if (hist) hist.hideSheet();
 
   orderTabs();
   var zones = sheetTZ() === Session.getScriptTimeZone() ? '' :
