@@ -2114,7 +2114,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20261030134456';
+var BUILD='20261030134951';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -10218,7 +10218,7 @@ function dpDelete(key){
       saveDB();
       dpRemoveSend({dp:key}, function(){ return !(remoteDP && remoteDP[key]); });
       if(remoteDP) delete remoteDP[key];
-      if(trackerDP===key) trackerDP=null;
+      if(trackerDP===key){ trackerDP=null; trackerPicked=false; }
       renderTracker(); renderCheck('room-check');
     });
 }
@@ -10266,7 +10266,11 @@ function dpRemoveSend(body, gone){
    shows the duty period that is actually running, because that is the one
    anybody opening this screen is asking about. */
 var trackerDP=null;
-function setTrackerDP(k){ trackerDP=k||''; renderTracker(); }
+/* Until somebody picks one from the list, the tracker follows the newest duty
+   period — it used to latch onto whatever it saw first (often this phone's own
+   older copy, before the sheet answered) and stay there. */
+var trackerPicked=false;
+function setTrackerDP(k){ trackerDP=k||''; trackerPicked=true; renderTracker(); }
 /* Newest first is how dpKeysThisYear already sorts, so the current period is
    the head of the list. */
 function currentDP(){ var k=dpKeysThisYear(); return k.length?k[0]:''; }
@@ -10300,7 +10304,7 @@ function renderTracker(){
      has no keys at all — and latching then set the choice to "a blank sheet"
      permanently, so the answer that arrived a second later was never shown. It
      stays unchosen until there is a real period to choose. */
-  if(trackerDP===null && keys.length) trackerDP=currentDP();
+  if(!trackerPicked && keys.length) trackerDP=currentDP();
   if(trackerDP && keys.indexOf(trackerDP)<0) trackerDP='';
   /* `null` is "not chosen yet", `''` is "blank sheet, chosen". They render the
      same; only the first is still waiting on the sheet to answer. Declared here

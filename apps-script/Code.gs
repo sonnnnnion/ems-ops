@@ -1856,7 +1856,8 @@ function dutyPeriodRows() {
   rows.forEach(function (r) {
     var dp = String(r[cDp] || '').trim();
     var room = String(r[cRoom] || '').trim();
-    if (!dp || !room) return;
+    // Only real keys ("2026:5"); a stray time typed into the column is not one.
+    if (!/^\d{4}:\d{1,3}$/.test(dp) || !room) return;
     if (!out[dp]) out[dp] = {};
     if (!out[dp][room]) out[dp][room] = [];
     out[dp][room].push({
