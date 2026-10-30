@@ -1037,6 +1037,7 @@ function doPost(e) {
     if (p.form === '__bagdone') return setBagDone(p);
     if (p.form === '__chore') return setChore(p);
     if (p.form === '__cleanjob') return setCleanJob(p);
+    if (p.form === '__dpremove') return removeFromDP(p);
     if (p.form === '__bagstatus') return setBagStatus(p);
     if (p.form === '__tracker') return setTracker(p);
     if (p.form === '__restockedit') return editRestock(p);
@@ -1868,6 +1869,36 @@ function dutyPeriodRows() {
     });
   });
   return out;
+}
+
+/* Taking a room check OUT of a duty period it was filed against by mistake —
+   one entry by its submission id, or every entry in a duty period that has
+   not really started. The row is never deleted: its DP Key is cleared and the
+   Duty Period cell says what it was removed from, so the record of the check
+   stays readable and nothing is lost. */
+function removeFromDP(p) {
+  var c = writerCheck(p);
+  if (!c.name) {
+    logError('Duty period removal REFUSED: ' + c.why, String(p.dp || '') + ' ' + String(p.sid || ''));
+    return json({ ok: false, error: 'not allowed: ' + c.why });
+  }
+  var dp = String(p.dp || '').trim(), sid = String(p.sid || '').trim();
+  if (!/^\d{4}:\d{1,3}$/.test(dp)) return json({ ok: false, error: 'bad request' });
+  var sh = sheetOf(SHEETS['Room Checks']);
+  if (!sh || sh.getLastRow() < 2) return json({ ok: true, removed: 0 });
+  var head = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  var cDp = head.indexOf('DP Key'), cSid = head.indexOf('Submission ID'), cLbl = head.indexOf('Duty Period');
+  if (cDp < 0) return json({ ok: false, error: 'sheet has no DP Key column' });
+  var vals = sh.getRange(2, 1, sh.getLastRow() - 1, head.length).getValues(), n = 0;
+  vals.forEach(function (r, i) {
+    if (String(r[cDp] || '').trim() !== dp) return;
+    if (sid && (cSid < 0 || String(r[cSid] || '').trim() !== sid)) return;
+    sh.getRange(i + 2, cDp + 1).setValue('');
+    if (cLbl >= 0) sh.getRange(i + 2, cLbl + 1).setValue('Removed from ' + (String(r[cLbl] || '') || dp));
+    n++;
+  });
+  logAction('ops', c.name, 'Removed from a duty period', n + ' room check' + (n === 1 ? '' : 's'), dp, sid);
+  return json({ ok: true, removed: n });
 }
 
 /* ============================================================================

@@ -933,6 +933,10 @@
   .trackpick label{margin:0}
   .trackpick select{width:auto;min-width:190px}
   .trackhead{margin-top:26px}
+  .tracker td.slot{position:relative}
+  .slot-x{position:absolute;top:3px;right:3px;width:20px;height:20px;border-radius:999px;border:0;background:var(--card);
+    color:var(--ink-mute);font-size:14px;line-height:1;cursor:pointer;opacity:.55}
+  .slot-x:hover,.slot-x:focus-visible{opacity:1;color:var(--oos)}
   /* Written to out-rank `.tracker tr.high td.slot`, which sets its own
      background and is the more specific selector of the two — so on a PRIORITY
      room a filled slot stayed the plain card colour while the same slot on an
@@ -2110,7 +2114,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20260929110029';
+var BUILD='20261030134456';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -10194,19 +10198,64 @@ function renderQR(){
    real work is about to go with it, because by the time somebody notices the
    typo there may be checks filed against it. */
 function dpDelete(key){
-  var d=dpGet(key); if(!d) return;
+  // Not `dpGet`: that is this device's copy only, and a duty period somebody
+  // else started is not in it — which made this button do nothing at all.
+  if(dpKeysKnown().indexOf(key)<0) return;
   var t=dpTotals(key);
   uiConfirm(t.done
       ? dpLabel(key)+' has '+t.done+' check'+(t.done===1?'':'s')+' filed against it. '+
-        'Deleting it here removes that record from the site. The rows already in '+
-        'the spreadsheet are not touched.'
+        'Deleting it takes them off the tracker for everyone. They stay in the '+
+        'spreadsheet, marked as removed, and the duty period can be started again later.'
       : 'Nothing has been filed against '+dpLabel(key)+'.',
     'Delete '+dpLabel(key)+'?',{okText:'Delete',cancelText:'Keep it'})
     .then(function(ok){
       if(!ok) return;
-      delete DB.dutyPeriods[key];
-      saveDB(); renderTracker(); renderCheck('room-check');
+      if(!requireAuth('this duty period being deleted')) return;
+      /* The checks are rows in the spreadsheet, so deleting only this
+         device's copy did nothing anybody could see: the sheet answered with
+         them again on the next read. They are taken out there too. */
+      if(DB.dutyPeriods) delete DB.dutyPeriods[key];
+      saveDB();
+      dpRemoveSend({dp:key}, function(){ return !(remoteDP && remoteDP[key]); });
+      if(remoteDP) delete remoteDP[key];
+      if(trackerDP===key) trackerDP=null;
+      renderTracker(); renderCheck('room-check');
     });
+}
+/* One check filed against the wrong duty period. */
+function dpRemoveEntry(key,roomId,sid){
+  var room=(DB.rooms||[]).filter(function(r){ return r.id===roomId; })[0];
+  var e=dpEntries(key,roomId).filter(function(x){ return x.sid===sid; })[0];
+  if(!e) return;
+  uiConfirm((e.cs?e.cs+'\u2019s':'This')+' check of '+(room?room.name:'this room')+' comes off '+dpLabel(key)+
+            '. It stays in the spreadsheet, marked as removed.','Remove this entry?',{okText:'Remove',cancelText:'Keep it'})
+    .then(function(ok){
+      if(!ok || !requireAuth('this entry being removed')) return;
+      var d=dpGet(key);
+      if(d && d.rooms && d.rooms[roomId]){ d.rooms[roomId]=d.rooms[roomId].filter(function(x){ return x.sid!==sid; }); saveDB(); }
+      if(sid) dpRemoveSend({dp:key, sid:sid}, function(){
+        return !(((remoteDP||{})[key]||{})[roomId]||[]).some(function(x){ return x && x.sid===sid; }); });
+      if(remoteDP && remoteDP[key] && remoteDP[key][roomId])
+        remoteDP[key][roomId]=remoteDP[key][roomId].filter(function(x){ return !x || x.sid!==sid; });
+      renderTracker(); renderChores();
+    });
+}
+function dpRemoveSend(body, gone){
+  var url=(DB.api&&DB.api.url)||''; if(!url) return;
+  try{
+    fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify(Object.assign({form:'__dpremove', site:'ops', idToken:googleIdToken, key:(DB.api&&DB.api.key)||''}, body))});
+  }catch(e){}
+  (function again(tries){
+    setTimeout(function(){
+      fetchDutyPeriods().then(function(){
+        if(gone()){ toast('Removed for everyone.'); renderTracker(); renderChores(); return; }
+        if(tries<2){ again(tries+1); return; }
+        toast('That did not save \u2014 sign in again, or the spreadsheet needs the current script.', true);
+        renderTracker(); renderChores();
+      });
+    }, tries?3000:1800);
+  })(0);
 }
 
 /* Which duty period the printable grid is filled in from. Deliberately NOT in
@@ -10316,7 +10365,9 @@ function renderTracker(){
       // shown here — the grid has as many boxes as the room has slots, and an
       // override is visible on the card above rather than by growing the table.
       var e=got[k-1];
-      h+='<td class="slot'+(e?' done':'')+'">'+(e?esc(e.cs||'✓'):'')+'</td>';
+      h+='<td class="slot'+(e?' done':'')+'">'+(e?esc(e.cs||'✓')+
+        (e.sid?'<button type="button" class="slot-x noprint" data-need="office" aria-label="Remove this entry" '+
+          'onclick="dpRemoveEntry(\''+jsq(trackerDP)+'\',\''+jsq(r.id)+'\',\''+jsq(e.sid)+'\')">&times;</button>':''):'')+'</td>';
     }
     h+='</tr>';
   });
