@@ -1680,6 +1680,38 @@
   .tl-items li{font-size:13.5px;color:var(--ink);display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;line-height:1.4}
   .tl-w{font-size:12px;font-weight:700;color:var(--ink-mute);min-width:74px}
   .tl-items .dim{font-size:12.5px}
+  /* Every row opens its full entry. */
+  .tl-row.tl-open{cursor:pointer;transition:background .12s}
+  .tl-row.tl-open:hover{background:var(--bg-2)}
+  .tl-row.tl-open:focus-visible{outline:2px solid var(--brand);outline-offset:-2px}
+  .tl-review{margin-top:7px;font-size:13px;color:var(--ink-soft);display:flex;gap:8px;align-items:baseline}
+  .tl-rv{font-size:11.5px;font-weight:700;color:var(--brand);white-space:nowrap}
+  .ent-top{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px;color:var(--ink-mute);margin-bottom:12px}
+  .ent-dl{display:grid;grid-template-columns:max-content 1fr;gap:6px 14px;margin:0 0 14px;font-size:13.5px}
+  .ent-dl dt{color:var(--ink-mute);font-weight:600}
+  .ent-dl dd{margin:0;color:var(--ink);word-break:break-word}
+  .ent-sec{margin:0 0 14px}
+  .ent-sec h4{margin:0 0 8px;font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-mute)}
+  .ent-ck{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:13.5px}
+  .ent-ck li::before{content:'\2713';color:var(--ok);font-weight:700;margin-right:8px}
+  .ent-ck li.no::before{content:'\25CB';color:var(--warn)}
+  .ent-ck li.no{color:var(--warn);font-weight:600}
+  .ent-more summary{cursor:pointer;font-size:13px;color:var(--ink-soft);margin:6px 0}
+  .ent-used{border:1px solid var(--rule-soft);border-radius:10px;padding:8px 12px;margin-bottom:8px}
+  .ent-ub{font-weight:700;font-size:13.5px;margin-bottom:6px}
+  .ent-used ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:5px}
+  .ent-used li{display:flex;align-items:center;gap:10px;font-size:13.5px}
+  .ent-used li .tag{margin-left:auto}
+  .ent-q{min-width:22px;text-align:right;font-variant-numeric:tabular-nums}
+  .ent-note textarea{width:100%;box-sizing:border-box;font:inherit;font-size:14px;padding:9px 11px;border:1px solid var(--rule);border-radius:10px;background:var(--card);color:var(--ink);resize:vertical}
+  .ent-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .use-panel{padding:0;overflow-x:auto}
+  .use-t{width:100%;border-collapse:collapse;font-size:13.5px}
+  .use-t th{text-align:left;font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-mute);font-weight:700;padding:10px 14px;border-bottom:1px solid var(--rule)}
+  .use-t td{padding:9px 14px;border-top:1px solid var(--rule-soft);vertical-align:top}
+  .use-t tr:first-child td{border-top:0}
+  .use-t .n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .use-sub{color:var(--ink-soft);font-size:12.5px}
   .tl-more{display:flex;gap:10px;align-items:center;margin-top:12px}
 
   /* ---------- Missed chores ------------------------------------------------ */
@@ -1844,8 +1876,8 @@
     <!-- What's Ready is not listed. Which bag is ready is now shown where the
          choice is made — on the Before Duty Form's bag picker — and in full on
          All Form Results. The view still answers its old address. -->
-    <button type="button" class="sb-item active" data-need="mgr" data-view="checkout"><span class="ic">▸</span>Before Duty Form</button>
-    <button type="button" class="sb-item" data-need="mgr" data-view="post-call"><span class="ic">↻</span>After Duty Form</button>
+    <button type="button" class="sb-item active" data-view="checkout"><span class="ic">▸</span>Before Duty Form</button>
+    <button type="button" class="sb-item" data-view="post-call"><span class="ic">↻</span>After Duty Form</button>
     <button type="button" class="sb-item" data-view="report"><span class="ic">⚑</span>Report a Problem</button>
 
     <div class="sb-label">Reference</div>
@@ -2114,7 +2146,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20261103191357';
+var BUILD='20261104170905';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -3690,16 +3722,9 @@ function setStaleDays(v){
    Now they can read the list. Ticking something off is still a manager's call,
    and the buttons that do it are gated inside renderLog. */
 var MANAGER_VIEWS={
-  /* TEMPORARY. Checking a bag out and filing an after-a-call are being handled
-     by another system for now, so a member opening this site should not be
-     offered two forms nobody is reading. They are gated rather than deleted:
-     everything they write still works, and a manager who signs in gets both
-     back. To hand them to members again, delete these two lines and the
-     matching data-need on their sidebar buttons — homeFor() and the QR sheet
-     read this object, so they follow on their own. What's Ready is here for the
-     same reason: it is a board about bags you check out, and it reads as broken
-     next to no way to check one out. */
-  checkout:'mgr', 'post-call':'mgr', readiness:'mgr',
+  /* Before Duty and After Duty are members' forms again: the Equipment
+     Manager's Google Forms were retired in November 2026 and their responses
+     imported. What's Ready came back with them. */
   /* The tracker is a board, and a board is for the people doing the work.
      Everybody files room checks into a duty period, so everybody has a reason
      to see how much of it is left — it was gated to the Office Manager, who is
@@ -5198,6 +5223,9 @@ var FORMS={
   'post-call':{
     host:'postCallHost', tab:'Post-Call',
     who:{callsign:true,name:true,andrew:false},
+    // Which bag came back. The Equipment Manager reads After Duty by bag, and
+    // a shift where nothing was used still has to say which kit it was.
+    pick:{key:'unit', label:'Which bag are you returning?', from:'units'},
     fixed:'postCall',
     // The structured bit. Item, how many, which unit it came out of — all
     // picked, none typed, so the buy-list can actually be summed.
@@ -5217,11 +5245,21 @@ var FORMS={
     /* The After Duty form covers a whole shift, not one call, so it asks how
        many calls the jumpkit went on and then offers one incident number box
        per call. All optional. */
-    extras:[{id:'callnum', label:'How many calls did this jumpkit go on?', calls:true}],
+    extras:[{id:'callnum', label:'How many calls did this jumpkit go on?', calls:true},
+            {id:'issue', label:'Any issue with the bag?', hint:'Anything broken, running low, or not where it should be.'}],
     /* Optional, one tap: whether what got used was wiped down afterwards.
        The Office Manager's cleaning tracker counts the answers. */
-    choices:{cleaned:{label:'Did you wipe down the equipment you used?', options:[
-      {v:'Yes', t:'Yes'}, {v:'No', t:'No'}, {v:'Nothing used', t:'Nothing was used'}]}}
+    /* The Equipment Manager's own three questions from her Google Form, kept
+       word for word so the answers line up with the responses imported from it. */
+    choices:{
+      restocked:{label:'Is the jumpkit restocked and returned?', required:true, options:[
+        {v:'Yes', t:'Yes'}, {v:'No', t:'No'}]},
+      bedding:{label:'Bedding returned to the living room?', required:true, options:[
+        {v:'Yes', t:'Yes'}, {v:'No', t:'No'}, {v:"Didn't use", t:"Didn't use any"}]},
+      radioBack:{label:'Radio returned to the radio room?', required:true, options:[
+        {v:'Yes', t:'Yes'}, {v:'No', t:'No'}]},
+      cleaned:{label:'Did you wipe down the equipment you used?', options:[
+        {v:'Yes', t:'Yes'}, {v:'No', t:'No'}, {v:'Nothing used', t:'Nothing was used'}]}}
   },
   'report':{
     host:'reportHost', tab:'Reports',
@@ -5433,7 +5471,7 @@ function renderCheck(fid){
   if(c.choices){
     Object.keys(c.choices).forEach(function(k){
       var f=c.choices[k];
-      h+='<div class="card mt"><h3>'+esc(f.label)+' <span class="opt">optional</span></h3><div class="choicerow">'+
+      h+='<div class="card mt"><h3>'+esc(f.label)+(f.required?'':' <span class="opt">optional</span>')+'</h3><div class="choicerow">'+
         f.options.map(function(o){
           return '<label class="choice"><input type="radio" name="'+fid+'-'+k+'" data-radio="'+k+'" value="'+esc(o.v)+'" '+
                  'onchange="onFormInput(\''+fid+'\')"><span>'+esc(o.t)+'</span></label>';
@@ -5570,6 +5608,10 @@ function renderUsage(fid){
   var host=document.getElementById(fid+'-usage'); if(!host) return;
   var rows=usageState(fid);
   var items=DB.consumables||[], units=usageSources();
+  // A row nobody has pointed anywhere yet comes from the bag being returned.
+  var dflt=formPick[fid]||'';
+  if(dflt && units.some(function(u){ return u.id===dflt; }))
+    rows.forEach(function(r){ if(!r.from) r.from=dflt; });
   host.innerHTML=rows.map(function(r,i){
     var itemOpts='<option value="">— pick an item —</option>'+items.map(function(c){
       return '<option value="'+esc(c.id)+'"'+(r.item===c.id?' selected':'')+'>'+esc(c.name)+'</option>';
@@ -5868,6 +5910,7 @@ function setPick(fid,id){
   var er=document.getElementById(fid+'-editrow');
   if(er){ er.innerHTML=formEditRow(fid); applyGates(er); }
   paintJobsCard(fid);
+  if(fcfg(fid).usage) renderUsage(fid);
   var list=pickList(fcfg(fid).pick.from);
   for(var j=0;j<list.length;j++) if(list[j].id===id && picks[j]) picks[j].classList.add('on');
   saveDraft(fid); calcCheck(fid);
@@ -6322,9 +6365,11 @@ function submitCheck(fid){
   if(c.who.radio && !s.radio) missing.push('which radio you have');
   if(c.pick && !s.pick) missing.push(
     c.pick.from==='rooms' ? 'which room you took'
-    : c.pick.from==='units' ? 'which bag you are taking'
+    : c.pick.from==='units' ? (c.tab==='Post-Call' ? 'which bag you are returning' : 'which bag you are taking')
     : 'which bag you checked');
   (c.extras||[]).forEach(function(x){ if(x.required && !s.extras[x.id]) missing.push(x.label.toLowerCase()); });
+  if(c.choices) Object.keys(c.choices).forEach(function(k){
+    if(c.choices[k].required && !s.radios[k]) missing.push(c.choices[k].label.replace(/\?$/,'').toLowerCase()); });
   if(c.freeform) Object.keys(c.freeform).forEach(function(k){
     if(!s.radios[k]) missing.push(c.freeform[k].label.toLowerCase()); });
 
@@ -6725,7 +6770,8 @@ function doSubmit(fid,s){
        exactly that. */
     [{k:'restock', buys:true},
      {k:'maint',   buys:false},
-     {k:'detail',  buys:false}].forEach(function(f){
+     {k:'detail',  buys:false},
+     {k:'issue',   buys:false}].forEach(function(f){
       var v=s.extras[f.k];
       if(!v) return;
       // One rule, stated once, and the same one the Apps Script applies: a
@@ -11944,6 +11990,9 @@ function renderKits(){
        '</div></div>';
   }
 
+  // ---- what was used, added up
+  h+='<div class="sec"><h3>What was used</h3></div><div id="kitUseHost">'+kitUseHtml()+'</div>';
+
   // ---- every form
   var base=kitBaseRows();
   var nFound=base.filter(kitFound).length;
@@ -11951,9 +12000,11 @@ function renderKits(){
   h+='<div class="sec" id="kitFeedTop"><h3>'+(kitUnit?esc(kitUnitName(kitUnit)):'Every form')+'</h3>'+
      '<span class="sec-n">'+kitState.total+'</span></div>';
   h+='<div class="toolbar"><div class="seg" role="group" aria-label="Which forms">'+
-     [['','All',base.length],['found','Found something',nFound],['checkout','Before duty',cnt('checkout')],
+     [['','All',base.length],['review','To review',base.filter(kitToReview).length],
+      ['found','Found something',nFound],['checkout','Before duty',cnt('checkout')],
       ['postcall','After duty',cnt('postcall')],['bagcheck','Equipment checks',cnt('bagcheck')]]
        .filter(function(o){ return !o[0] || o[0]==='found' || o[2] || kitView.kind===o[0]; })
+       .filter(function(o){ return o[0]!=='review' || can('equipment') || kitView.kind==='review'; })
        .map(function(o){
          return '<button type="button" class="'+(kitView.kind===o[0]?'on':'')+'" aria-pressed="'+(kitView.kind===o[0])+'" '+
                 'onclick="kitSetKind(\''+o[0]+'\')">'+o[1]+'<span class="n">'+o[2]+'</span></button>';
@@ -12039,7 +12090,8 @@ function kitCardHtml(n){
 function kitFormFound(r){
   if(!r) return false;
   if(r.kind==='postcall')
-    return (r.used||[]).some(function(u){ return !u.r; }) || (r.meds||[]).length>0;
+    return (r.used||[]).some(function(u){ return !u.r; }) || (r.meds||[]).length>0 ||
+           !!r.note || r.restocked==='No';
   return (r.missing||[]).length>0 || r.missingCount>0 || (r.expired||[]).length>0 ||
          (r.soon||[]).length>0 || !!r.note;
 }
@@ -12055,7 +12107,7 @@ function kitBaseRows(){
   });
 }
 function kitSearchText(r){
-  var t=[r.who, r.bag, r.call, r.note, kitUnitName(r.unit)];
+  var t=[r.who, r.bag, r.call, r.note, r.review, r.radio, kitUnitName(r.unit)];
   (r.missing||[]).concat(r.expired||[], r.soon||[], r.meds||[]).forEach(function(x){ t.push(x); });
   (r.used||[]).forEach(function(u){ t.push(u.n, u.fn); });
   return t.join(' ').toLowerCase();
@@ -12064,6 +12116,7 @@ function kitSearchText(r){
 function kitFeedHtml(){
   var rows=kitBaseRows();
   if(kitView.kind==='found') rows=rows.filter(kitFound);
+  else if(kitView.kind==='review') rows=rows.filter(kitToReview);
   else if(kitView.kind) rows=rows.filter(function(r){ return r.kind===kitView.kind; });
   var q=kitView.q.trim().toLowerCase();
   if(q) rows=rows.filter(function(r){ return kitSearchText(r).indexOf(q)>=0; });
@@ -12096,18 +12149,22 @@ function kitFormHtml(r){
   var bag;
   if(r.kind==='postcall'){
     var seen={}, names=[];
+    if(r.bag){ names.push(r.bag); if(r.unit) seen[r.unit]=1; }
     (r.used||[]).forEach(function(u){
-      if(u.f && !seen[u.f]){ seen[u.f]=1; names.push(u.fn||kitUnitName(u.f)); }
+      if(u.f && !seen[u.f] && (u.fn||kitUnitName(u.f))!==r.bag){ seen[u.f]=1; names.push(u.fn||kitUnitName(u.f)); }
     });
     bag=names.join(', ')||'Nothing used';
   }else bag=r.bag||kitUnitName(r.unit);
   var calls=r.kind==='postcall'?(Number(r.calls)||0):0;
   var meta=kitTime(r.time)+(r.who?' · '+r.who:'')+
     (calls?' · '+calls+' call'+(calls===1?'':'s'):'')+(r.kind==='postcall'&&r.call?' · IN '+r.call:'');
-  return '<li class="tl-row '+(found?'found':'clean')+'"><span class="tl-dot" aria-hidden="true"></span><div>'+
+  var open=r.sid?' tl-open" tabindex="0" role="button" aria-label="'+esc('Open '+kind+' form: '+bag+', '+meta)+'" '+
+    'onclick="kitOpen(\''+jsq(r.sid)+'\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();kitOpen(\''+jsq(r.sid)+'\')}':'';
+  return '<li class="tl-row '+(found?'found':'clean')+open+'"><span class="tl-dot" aria-hidden="true"></span><div>'+
     '<div class="tl-top"><span class="tl-kind k-'+esc(r.kind)+'">'+kind+'</span><b>'+esc(bag)+'</b>'+
     '<span class="tl-meta">'+esc(meta)+'</span></div>'+
-    (found?'<ul class="tl-items">'+kitFormItems(r)+'</ul>':'')+'</div></li>';
+    (found?'<ul class="tl-items">'+kitFormItems(r)+'</ul>':'')+
+    (r.review?'<div class="tl-review"><span class="tl-rv">Your note</span>'+esc(r.review)+'</div>':'')+'</div></li>';
 }
 
 /* Whether each thing a form named is still owed. A checklist line is owed
@@ -12150,6 +12207,11 @@ function kitFormItems(r){
     });
     if((r.meds||[]).length)
       h+='<li><span class="tl-w">Meds given</span>'+esc(r.meds.join(', '))+'</li>';
+    if(r.restocked==='No')
+      h+='<li><span class="tl-w">Restocked</span><span class="tag warn">Not restocked</span></li>';
+    if(r.note)
+      h+='<li><span class="tl-w">Issue</span>“'+esc(r.note)+'”'+
+         kitStatus(kitConcernOpen(r.note,r.bag||kitUnitName(r.unit)),true)+'</li>';
     return h;
   }
   var where=r.bag||kitUnitName(r.unit);
@@ -12226,6 +12288,205 @@ function kitEditLine(what,where,id){
     fileBagLine(u, kind==='missing'?t+' missing':kind==='expired'?t+' is expired':t, kind==='expired'?'Blocking':'Soon');
   });
 }
+/* ---- one form, in full, with the Equipment Manager's note ----------------
+   Every row in the feed opens. The top is what the feed already knows; the
+   rest is the row exactly as the spreadsheet holds it, fetched on open, plus
+   every checklist line. The note box writes to that row's Reviewer Notes —
+   the same cell she can type in on the sheet. */
+var KIT_REVIEW_DAYS=14;
+// Sheet headings that read oddly out of the sheet, as the form asks them.
+var KIT_FIELD_NAMES={'Damaged':'Any issue with the bag','Incident Numbers':'Incident numbers',
+  'Restocked And Returned':'Restocked and returned','Any Issue With The Bag':'Any issue with the bag',
+  'Other Answers':'Also answered'};
+var KIT_NOTE_CHIPS=['Looks good','Noted','Late','Resolved','Followed up'];
+function kitToReview(r){
+  if(!r || r.review || !r.sid) return false;
+  var d=kitParseDay(r.date); if(!d) return false;
+  return (Date.now()-d.getTime()) < KIT_REVIEW_DAYS*86400000;
+}
+function kitRowBySid(sid){
+  for(var i=0;i<kitForms.length;i++) if(kitForms[i] && kitForms[i].sid===sid) return kitForms[i];
+  return null;
+}
+function kitUsedListHtml(r){
+  var by={}, order=[];
+  (r.used||[]).forEach(function(u){
+    var k=u.f||''; if(!by[k]){ by[k]=[]; order.push(k); } by[k].push(u);
+  });
+  if(!order.length) return '';
+  return '<div class="ent-sec"><h4>What was used</h4>'+order.map(function(f){
+    return '<div class="ent-used"><div class="ent-ub">'+esc(by[f][0].fn||kitUnitName(f)||'Unknown bag')+'</div><ul>'+
+      by[f].map(function(u){
+        return '<li><b class="ent-q">'+u.q+'</b><span>'+esc(u.n)+'</span>'+
+          (u.r?'<span class="tag ok">Put back</span>':'<span class="tag warn">To replace</span>')+'</li>';
+      }).join('')+'</ul></div>';
+  }).join('')+'</div>';
+}
+function kitEntryBody(r,full){
+  var kind={checkout:'Before duty', postcall:'After duty', bagcheck:'Equipment check'}[r.kind]||'Form';
+  var h='<div class="ent-top"><span class="tl-kind k-'+esc(r.kind)+'">'+kind+'</span>'+
+        '<span>'+esc(kitDayLong(r.date)+' · '+kitTime(r.time)+(r.who?' · '+r.who:''))+'</span></div>';
+  // The answers. Fields the feed already shows above are left out of the list.
+  var skip={Date:1,Time:1,Name:1,'What Was Used':1,'Replaced By Member':1,Bag:1};
+  if(full===null) h+='<div class="ent-sec">'+skelHtml(3)+'</div>';
+  else if(full && full.error) h+='<p class="hint">The full entry could not be read ('+esc(full.error)+').</p>';
+  else if(full){
+    var f=(full.fields||[]).filter(function(x){ return !skip[x.k] && x.k!=='Reviewer Notes'; });
+    if(f.length) h+='<dl class="ent-dl">'+f.map(function(x){
+      return '<dt>'+esc(KIT_FIELD_NAMES[x.k]||x.k)+'</dt><dd>'+esc(x.v).replace(/\n/g,'<br>')+'</dd>'; }).join('')+'</dl>';
+    var miss=(full.items||[]).filter(function(i){ return !i.ok; }), got=(full.items||[]).filter(function(i){ return i.ok; });
+    if(miss.length||got.length){
+      h+='<div class="ent-sec"><h4>Checklist</h4>'+
+        (miss.length?'<ul class="ent-ck">'+miss.map(function(i){ return '<li class="no">'+esc(i.n)+'</li>'; }).join('')+'</ul>':'')+
+        (got.length?'<details class="ent-more"><summary>'+got.length+' ticked'+(miss.length?'':' — everything')+'</summary><ul class="ent-ck">'+
+          got.map(function(i){ return '<li>'+esc(i.n)+'</li>'; }).join('')+'</ul></details>':'')+'</div>';
+    }
+  }
+  if(r.kind==='postcall') h+=kitUsedListHtml(r);
+  // The note.
+  var mine=can('equipment');
+  h+='<div class="ent-sec ent-note"><h4>Reviewer notes</h4>'+
+    (mine
+      ? '<textarea id="entNote" rows="3" placeholder="Your note on this form">'+esc(r.review||'')+'</textarea>'+
+        '<div class="ent-chips">'+KIT_NOTE_CHIPS.map(function(c){
+          return '<button type="button" class="btn xs ghost" onclick="kitChip(\''+jsq(c)+'\')">'+esc(c)+'</button>'; }).join('')+'</div>'
+      : (r.review?'<div class="kc-quote">'+esc(r.review)+'</div>':'<p class="hint" style="margin:0">No note yet.</p>'))+
+    '</div>';
+  return h;
+}
+function kitChip(c){
+  var t=document.getElementById('entNote'); if(!t) return;
+  var v=t.value.trim();
+  t.value = v ? (v.indexOf(c)>=0 ? v : v+' · '+c) : c;
+  t.focus();
+}
+function kitOpen(sid){
+  var r=kitRowBySid(sid); if(!r) return;
+  var url=(DB.api&&DB.api.url)||'';
+  var mine=can('equipment');
+  openModal({title:(r.kind==='postcall'?(r.bag||'After duty'):(r.bag||kitUnitName(r.unit)||'Form')),
+    body:'<div id="entHost">'+kitEntryBody(r, url?null:{error:'no spreadsheet is connected'})+'</div>',
+    okText:mine?'Save note':'Close', cancelText:mine?'Close':'',
+    onOk:function(w){
+      if(!mine) return true;
+      var t=w.querySelector('#entNote');
+      return {note:t?t.value.trim():''};
+    }
+  }).then(function(v){
+    if(!v || !mine) return;
+    if(v.note===(r.review||'')) return;
+    kitSaveReview(r, v.note);
+  });
+  if(!url) return;
+  var q=url+(url.indexOf('?')<0?'?':'&')+'formentry='+encodeURIComponent(sid)+'&kind='+encodeURIComponent(r.kind);
+  fetchJSONTries(q,2,15000).then(function(j){
+    var host=document.getElementById('entHost'); if(!host) return;
+    var keep=document.getElementById('entNote'), typed=keep?keep.value:null;
+    host.innerHTML=kitEntryBody(r, j&&j.ok ? j : {error: j&&j.error ? j.error : 'the spreadsheet needs the current script'});
+    var t=document.getElementById('entNote'); if(t && typed!==null) t.value=typed;
+  }).catch(function(){
+    var host=document.getElementById('entHost');
+    if(host){
+      var keep=document.getElementById('entNote'), typed=keep?keep.value:null;
+      host.innerHTML=kitEntryBody(r,{error:'could not reach the spreadsheet'});
+      var t=document.getElementById('entNote'); if(t && typed!==null) t.value=typed;
+    }
+  });
+}
+/* Shown at once, sent, then confirmed by reading the feed back. */
+function kitSaveReview(r, note){
+  var url=(DB.api&&DB.api.url)||''; if(!url) return;
+  if(!requireAuth('your note')) return;
+  var before=r.review||'';
+  r.review=note; renderKits();
+  try{
+    fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({form:'__review', site:'ops', idToken:googleIdToken, key:(DB.api&&DB.api.key)||'',
+                           kind:r.kind, sid:r.sid, note:note})});
+  }catch(e){}
+  (function again(tries){
+    setTimeout(function(){
+      fetchBagForms(false).then(function(){
+        var now=kitRowBySid(r.sid);
+        if(now && (now.review||'')===note){ toast('Note saved.'); renderKits(); return; }
+        if(tries<2){ again(tries+1); return; }
+        if(now) now.review=before;
+        toast('That note did not save — sign in again, or the spreadsheet needs the current script.', true);
+        renderKits();
+      });
+    }, tries?3000:1800);
+  })(0);
+}
+
+/* ---- what was used, organised -------------------------------------------
+   Every After Duty form that has loaded, added up: one line per item, how many
+   in all, which bags, how many are still to replace. By item for ordering, by
+   bag for restocking a particular kit. */
+var kitUse={days:30, by:'item'};
+try{ var _ku=JSON.parse(localStorage.getItem('emsops_kituse_v1')||'null');
+     if(_ku && (_ku.by==='item'||_ku.by==='bag') && [7,30,0].indexOf(_ku.days)>=0) kitUse=_ku; }catch(e){}
+function kitUseSet(k,v){
+  kitUse[k]=v;
+  try{ localStorage.setItem('emsops_kituse_v1',JSON.stringify(kitUse)); }catch(e){}
+  var host=document.getElementById('kitUseHost'); if(host) host.innerHTML=kitUseHtml();
+}
+function kitUseRows(){
+  var cut=kitUse.days ? Date.now()-kitUse.days*86400000 : 0;
+  var rows=kitForms.filter(function(r){
+    if(!r || r.kind!=='postcall') return false;
+    var d=kitParseDay(r.date); return d && d.getTime()>=cut-86400000;
+  });
+  var acc={}, order=[];
+  rows.forEach(function(r){
+    (r.used||[]).forEach(function(u){
+      if(kitUnit && u.f!==kitUnit) return;
+      var bag=u.fn||kitUnitName(u.f)||'Unknown bag';
+      var key = kitUse.by==='bag' ? bag : u.n;
+      if(!acc[key]){ acc[key]={k:key, q:0, out:0, sub:{}, last:''}; order.push(key); }
+      var a=acc[key]; a.q+=u.q; if(!u.r) a.out+=u.q;
+      var sk = kitUse.by==='bag' ? u.n : bag;
+      a.sub[sk]=(a.sub[sk]||0)+u.q;
+      if(r.date>a.last) a.last=r.date;
+    });
+  });
+  return {forms:rows.length, list:order.map(function(k){ return acc[k]; })
+    .sort(function(a,b){ return b.q-a.q || a.k.localeCompare(b.k); })};
+}
+function kitUseHtml(){
+  var u=kitUseRows();
+  var seg=function(k,opts){
+    return '<div class="seg" role="group">'+opts.map(function(o){
+      return '<button type="button" class="'+(kitUse[k]===o[0]?'on':'')+'" aria-pressed="'+(kitUse[k]===o[0])+'" '+
+             'onclick="kitUseSet(\''+k+'\','+(typeof o[0]==='number'?o[0]:'\''+o[0]+'\'')+')">'+o[1]+'</button>';
+    }).join('')+'</div>';
+  };
+  var h='<div class="toolbar">'+seg('days',[[7,'7 days'],[30,'30 days'],[0,'Everything loaded']])+
+        seg('by',[['item','By item'],['bag','By bag']])+
+        (u.list.length?'<button type="button" class="btn sm" onclick="kitUseCopy()">Copy list</button>':'')+'</div>';
+  if(!u.list.length)
+    return h+'<div class="panel"><p class="hint" style="margin:0">'+
+      (kitState.at?'Nothing was logged as used'+(kitUse.days?' in the last '+kitUse.days+' days':'')+'.':'Reading the forms…')+'</p></div>';
+  h+='<div class="panel use-panel"><table class="use-t"><thead><tr><th>'+(kitUse.by==='bag'?'Bag':'Item')+'</th>'+
+     '<th class="n">Used</th><th class="n">To replace</th><th>'+(kitUse.by==='bag'?'Items':'From')+'</th><th>Last</th></tr></thead><tbody>'+
+     u.list.map(function(a){
+       var sub=Object.keys(a.sub).sort(function(x,y){ return a.sub[y]-a.sub[x]; });
+       return '<tr><td><b>'+esc(a.k)+'</b></td><td class="n">'+a.q+'</td>'+
+         '<td class="n">'+(a.out?'<span class="tag warn">'+a.out+'</span>':'<span class="dim">0</span>')+'</td>'+
+         '<td class="use-sub">'+sub.map(function(s){ return esc(s)+(a.sub[s]>1||kitUse.by==='bag'?' <b>×'+a.sub[s]+'</b>':''); }).join(' · ')+'</td>'+
+         '<td class="dim">'+esc(kitDay(a.last))+'</td></tr>';
+     }).join('')+'</tbody></table></div>';
+  return h;
+}
+function kitUseCopy(){
+  var u=kitUseRows();
+  var txt=u.list.map(function(a){
+    return a.q+' × '+a.k+' ('+Object.keys(a.sub).map(function(s){ return s+' '+a.sub[s]; }).join(', ')+')';
+  }).join('\n');
+  var done=function(){ toast('Copied.'); };
+  if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done,function(){ uiPrompt('Copy this:',txt,'What was used',{rows:10}); });
+  else uiPrompt('Copy this:',txt,'What was used',{rows:10});
+}
+
 function kitShow(id,scrollTo){
   kitUnit=id||'';
   kitForms=[]; kitState.total=0; kitState.more=false; kitState.at=0;

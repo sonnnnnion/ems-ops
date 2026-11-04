@@ -21,3 +21,6 @@ CLAUDE.md
 ._*
 .vscode/
 *.swp
+
+# Imported member data for one-time pastes into Apps Script. Names; never commit.
+private/

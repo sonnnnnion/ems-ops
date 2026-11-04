@@ -80,9 +80,12 @@ var SHEETS = {
        between here and there — an older deployment, a wording change — lost a
        report a member had filed correctly. Room Checks has always had this
        column; the two forms members use most did not. */
-    keys:    ['date','time','name','andrew','radio','subject','result','missingCount','expired','expiringSoon','detail','sid','unitId','missing'],
-    headers: ['Date','Time','Name','Andrew ID','Radio','Bag','Result','Missing','Expired','Expiring Soon','Damaged','Submission ID','Bag ID','What Was Missing'],
-    widths:  [95, 70, 150, 100, 90, 160, 150, 80, 220, 220, 260, 120, 110, 340]
+    /* `Reviewer Notes` is the Equipment Manager's own column: she types in it
+       here or from the site, and no form ever writes to it. `Other Answers`
+       holds what an imported Google Form row said that this form does not ask. */
+    keys:    ['date','time','name','andrew','radio','subject','result','missingCount','expired','expiringSoon','detail','sid','unitId','missing','review','extra'],
+    headers: ['Date','Time','Name','Andrew ID','Radio','Bag','Result','Missing','Expired','Expiring Soon','Damaged','Submission ID','Bag ID','What Was Missing','Reviewer Notes','Other Answers'],
+    widths:  [95, 70, 150, 100, 90, 160, 150, 80, 220, 220, 260, 120, 110, 340, 300, 320]
   },
   'Bag Checks': {
     name: 'Equipment Checks', was: ['Bag Checks'], freeze: 3,
@@ -92,13 +95,13 @@ var SHEETS = {
        pull Submission ID one place left and every row already filed would show
        its seal value under that heading. It just stops filling. */
     // Same gap as Checkouts, same fix, appended in the same place.
-    keys:    ['date','time','name','andrew','subject','result','missingCount','expired','expiringSoon','seal','sid','bagId','missing'],
-    headers: ['Date','Time','Name','Andrew ID','Bag','Result','Missing','Expired','Expiring Soon','Seal (no longer used)','Submission ID','Bag ID','What Was Missing'],
-    widths:  [95, 70, 150, 100, 150, 150, 80, 220, 220, 100, 120, 110, 340]
+    keys:    ['date','time','name','andrew','subject','result','missingCount','expired','expiringSoon','seal','sid','bagId','missing','review'],
+    headers: ['Date','Time','Name','Andrew ID','Bag','Result','Missing','Expired','Expiring Soon','Seal (no longer used)','Submission ID','Bag ID','What Was Missing','Reviewer Notes'],
+    widths:  [95, 70, 150, 100, 150, 150, 80, 220, 220, 100, 120, 110, 340, 300]
   },
   'Post-Call': {
     name: 'After Duty', was: ['Post-Call'], freeze: 3,
-    hide: ['Units Used', 'Could Not Replace (no longer used)', 'Used (data)', 'Submission ID'],
+    hide: ['Units Used', 'Could Not Replace (no longer used)', 'Used (data)', 'Submission ID', 'Bag ID'],
     wrap: ['What Was Used', 'Replaced By Member', 'Medications Given'],
     // `replaced` reverses the old `short` ("Could Not Replace"). Members do not
     // restock, so the old column asked everybody to account for something that
@@ -118,9 +121,12 @@ var SHEETS = {
        says how many calls the jumpkit went on, and Incident Number now holds
        one IN per call, comma-separated, any of them optional. */
     // `Equipment Cleaned` appended last: whether what was used got wiped down.
-    keys:    ['date','time','name','callnum','result','usageCount','usageText','short','usageJson','sid','replaced','meds','calls','cleaned'],
-    headers: ['Date','Time','Name','Incident Numbers','Result','Units Used','What Was Used','Could Not Replace (no longer used)','Used (data)','Submission ID','Replaced By Member','Medications Given','Calls','Equipment Cleaned'],
-    widths:  [95, 70, 150, 150, 150, 90, 380, 200, 200, 120, 260, 260, 70, 130]
+    /* The Equipment Manager's own After Duty questions, appended: which bag
+       came back, whether it came back restocked, the bedding and the radio, and
+       anything wrong with it. Then her `Reviewer Notes`, which no form writes. */
+    keys:    ['date','time','name','callnum','result','usageCount','usageText','short','usageJson','sid','replaced','meds','calls','cleaned','subject','unitId','restocked','bedding','radioBack','issue','review','extra'],
+    headers: ['Date','Time','Name','Incident Numbers','Result','Units Used','What Was Used','Could Not Replace (no longer used)','Used (data)','Submission ID','Replaced By Member','Medications Given','Calls','Equipment Cleaned','Bag','Bag ID','Restocked And Returned','Bedding Returned','Radio Returned','Any Issue With The Bag','Reviewer Notes','Other Answers'],
+    widths:  [95, 70, 150, 150, 150, 90, 380, 200, 200, 120, 260, 260, 70, 130, 150, 90, 120, 120, 120, 300, 300, 320]
   },
   'Reports': {
     name: 'Reports', freeze: 3,
@@ -546,7 +552,7 @@ function noteConcerns(p) {
     });
 
   // Free text is always a real report — somebody chose to type it.
-  ['restock', 'maint', 'detail'].forEach(function (k) {
+  ['restock', 'maint', 'detail', 'issue'].forEach(function (k) {
     if (p[k]) items.push({ what: String(p[k]), where: subj, area: area,
                            urgency: 'Soon', unit: unit });
   });
@@ -1037,6 +1043,7 @@ function doPost(e) {
     if (p.form === '__bagdone') return setBagDone(p);
     if (p.form === '__chore') return setChore(p);
     if (p.form === '__cleanjob') return setCleanJob(p);
+    if (p.form === '__review') return setReview(p);
     if (p.form === '__dpremove') return removeFromDP(p);
     if (p.form === '__bagstatus') return setBagStatus(p);
     if (p.form === '__tracker') return setTracker(p);
@@ -1073,7 +1080,8 @@ function doPost(e) {
     var missingCount = Number(p.missingCount) || 0;
     if (!p.result) {
       if (p.expired) p.result = 'Expired stock';
-      else if (conf.name === 'Post-Call') p.result = p.short ? 'Could not replace' : 'Complete';
+      else if (conf === SHEETS['Post-Call'])
+        p.result = p.issue ? 'Issue reported' : p.restocked === 'No' ? 'Not restocked' : 'Complete';
       else p.result = missingCount > 0 ? (missingCount + ' missing') : 'Complete';
     }
 
@@ -1085,7 +1093,8 @@ function doPost(e) {
     var row = sh.getLastRow();
     var bad = missingCount > 0 || p.condition === 'Broken' || p.urgency === 'Blocking' ||
               !!p.short;
-    var soon = !bad && (p.condition === 'Missing' || !!p.maint || !!p.restock);
+    var soon = !bad && (p.condition === 'Missing' || !!p.maint || !!p.restock ||
+                        !!p.issue || p.restocked === 'No');
     styleRow(sh, row, conf, bad, soon);
 
     writeItems(p);
@@ -2960,7 +2969,8 @@ function bagFormRows(unit, type, offset, limit) {
       bag: bag, result: String(x.get('result') || ''),
       missing: list(x.get('missing')), missingCount: Number(x.get('missingCount')) || 0,
       expired: list(x.get('expired')), soon: list(x.get('expiringSoon')),
-      note: String(x.get('detail') || '').trim(), n: x.n, t: 0 });
+      note: String(x.get('detail') || '').trim(), radio: String(x.get('radio') || '').trim(),
+      review: String(x.get('review') || '').trim(), n: x.n, t: 0 });
   });
   read(SHEETS['Bag Checks']).forEach(function (x) {
     var date = asDate(x.get('date')); if (!date) return;
@@ -2970,7 +2980,7 @@ function bagFormRows(unit, type, offset, limit) {
       result: String(x.get('result') || ''),
       missing: list(x.get('missing')), missingCount: Number(x.get('missingCount')) || 0,
       expired: list(x.get('expired')), soon: list(x.get('expiringSoon')),
-      note: '', n: x.n, t: 1 });
+      note: '', review: String(x.get('review') || '').trim(), n: x.n, t: 1 });
   });
   read(SHEETS['Post-Call']).forEach(function (x) {
     var date = asDate(x.get('date')); if (!date) return;
@@ -2988,7 +2998,11 @@ function bagFormRows(unit, type, offset, limit) {
     out.push({ kind: 'postcall', date: date, time: asTime(x.get('time')),
       who: String(x.get('name') || '').trim(), sid: String(x.get('sid') || ''),
       call: String(x.get('callnum') || '').trim(), calls: cn.n, result: String(x.get('result') || ''),
-      used: used, meds: list(x.get('meds')), n: x.n, t: 2 });
+      used: used, meds: list(x.get('meds')),
+      bag: String(x.get('subject') || '').trim(),
+      unit: String(x.get('unitId') || '').trim() || idByName[String(x.get('subject') || '').trim().toLowerCase()] || '',
+      restocked: String(x.get('restocked') || '').trim(), note: String(x.get('issue') || '').trim(),
+      review: String(x.get('review') || '').trim(), n: x.n, t: 2 });
   });
 
   /* Whether a form found anything — decided HERE, once, and sent on the row.
@@ -2996,7 +3010,8 @@ function bagFormRows(unit, type, offset, limit) {
      the rule are two answers the day one of them is changed. */
   out.forEach(function (r) {
     r.found = r.kind === 'postcall'
-      ? r.used.some(function (u) { return !u.r; }) || r.meds.length > 0
+      ? r.used.some(function (u) { return !u.r; }) || r.meds.length > 0 || !!r.note ||
+        r.restocked === 'No'
       : r.missing.length > 0 || r.missingCount > 0 || r.expired.length > 0 ||
         r.soon.length > 0 || !!r.note;
   });
@@ -3018,7 +3033,7 @@ function bagFormRows(unit, type, offset, limit) {
     if (!unit) return true;
     if (r.kind === 'checkout') return r.unit === unit;
     if (r.kind === 'bagcheck') return !!type && r.type === type;
-    return r.used.some(function (u) { return u.f === unit; });
+    return r.unit === unit || r.used.some(function (u) { return u.f === unit; });
   });
   var take = Math.min(Math.max(Number(limit) || 40, 1), 200);
   reply.rows = rows.slice(start, start + take).map(function (r) {
@@ -3026,6 +3041,82 @@ function bagFormRows(unit, type, offset, limit) {
   });
   reply.total = rows.length; reply.offset = start; reply.more = start + take < rows.length;
   return reply;
+}
+
+/* ============================================================================
+   REVIEWER NOTES and THE WHOLE ENTRY
+   ============================================================================
+   The Equipment Manager reads every duty form and writes a line against it —
+   "late (4min)", "noted", "BP cuff fixed". That line lives in the form's own row,
+   in `Reviewer Notes`, so it reads the same in the spreadsheet and on the site,
+   and she can type it in either place. */
+var REVIEW_TABS = { checkout: 'Checkouts', postcall: 'Post-Call', bagcheck: 'Bag Checks' };
+
+function rowBySid(conf, sid) {
+  var sh = sheetOf(conf);
+  if (!sh || sh.getLastRow() < 2 || !sid) return null;
+  var head = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  var c = head.indexOf('Submission ID');
+  if (c < 0) return null;
+  var ids = sh.getRange(2, c + 1, sh.getLastRow() - 1, 1).getValues();
+  for (var i = ids.length - 1; i >= 0; i--)
+    if (String(ids[i][0]).trim() === sid) return { sh: sh, row: i + 2, head: head };
+  return null;
+}
+
+function setReview(p) {
+  var c = writerCheck(p);
+  if (!c.name) {
+    logError('Reviewer note REFUSED: ' + c.why, String(p.sid || ''));
+    return json({ ok: false, error: 'not allowed: ' + c.why });
+  }
+  var conf = SHEETS[REVIEW_TABS[String(p.kind || '')] || ''];
+  var sid = String(p.sid || '').trim();
+  if (!conf || !sid) return json({ ok: false, error: 'bad request' });
+  ensureSheet(conf);
+  var hit = rowBySid(conf, sid);
+  if (!hit) return json({ ok: false, error: 'that form is not on the sheet' });
+  var col = hit.head.indexOf('Reviewer Notes');
+  if (col < 0) return json({ ok: false, error: 'no Reviewer Notes column' });
+  var note = String(p.note || '').slice(0, 2000);
+  hit.sh.getRange(hit.row, col + 1).setValue(note);
+  logAction('ops', c.name, 'Reviewer note', note, conf.name, sid);
+  return json({ ok: true });
+}
+
+/* Everything one form said, as the spreadsheet holds it, plus every checklist
+   line from Items. Columns that are machinery are left out; empty ones too. */
+function formEntry(sid, kind) {
+  var conf = SHEETS[REVIEW_TABS[kind] || ''];
+  if (!conf || !sid) return { ok: false, error: 'bad request' };
+  var hit = rowBySid(conf, sid);
+  if (!hit) return { ok: false, error: 'not found' };
+  var tz = sheetTZ();
+  var vals = hit.sh.getRange(hit.row, 1, 1, hit.head.length).getValues()[0];
+  var skip = { 'Submission ID': 1, 'Andrew ID': 1, 'Bag ID': 1, 'Used (data)': 1, 'Units Used': 1,
+               'Missing': 1, 'Seal (no longer used)': 1, 'Could Not Replace (no longer used)': 1 };
+  var fields = [];
+  hit.head.forEach(function (h, i) {
+    var v = vals[i];
+    if (!h || skip[h]) return;
+    if (v instanceof Date) v = Utilities.formatDate(v, tz, h === 'Time' ? 'HH:mm' : 'yyyy-MM-dd');
+    v = String(v === null || v === undefined ? '' : v).trim();
+    if (!v) return;
+    fields.push({ k: h, v: v });
+  });
+  var items = [];
+  var ish = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(ITEMS.name);
+  if (ish && ish.getLastRow() >= 2) {
+    var iv = ish.getRange(2, 1, ish.getLastRow() - 1, ITEMS.headers.length).getValues();
+    var cI = ITEMS.headers.indexOf('Item'), cP = ITEMS.headers.indexOf('Present'),
+        cS = ITEMS.headers.indexOf('Submission ID');
+    for (var r = iv.length - 1; r >= 0; r--) {
+      if (String(iv[r][cS]).trim() !== sid) continue;
+      var pr = iv[r][cP];
+      items.unshift({ n: String(iv[r][cI] || ''), ok: pr === true || String(pr).toUpperCase() === 'TRUE' });
+    }
+  }
+  return { ok: true, fields: fields, items: items };
 }
 
 /* What each bag has had taken out of it on calls since it was last restocked,
@@ -3253,6 +3344,9 @@ function doGet(e) {
   if (p.tracker) {
     var tr = trackerRows();
     return json({ ok: true, rows: tr.rows, fromContent: tr.fromContent, lists: TRACKER_LISTS, use: stockRates() });
+  }
+  if (p.formentry) {
+    return json(formEntry(String(p.formentry), String(p.kind || '')));
   }
   if (p.bagforms) {
     return json(bagFormRows(String(p.unit || ''), String(p.type || ''), p.offset, p.limit));
