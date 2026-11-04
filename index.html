@@ -2114,7 +2114,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20261030134951';
+var BUILD='20261103191357';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -6818,7 +6818,7 @@ function checkFiled(fid){
    is the half that matters here. Resolved means the request left the phone and
    the queue can let go of it; rejected means it never left, and it stays. The
    real confirmation is still the "On the spreadsheet" check, unchanged. */
-var LS_OUTBOX='emsops_outbox_v1', outboxBusy=false;
+var LS_OUTBOX='emsops_outbox_v1', outboxBusy=false, outboxInFlight='';
 
 function outboxRead(){
   try{ var v=JSON.parse(localStorage.getItem(LS_OUTBOX)||'[]'); return Array.isArray(v)?v:[]; }
@@ -6852,7 +6852,7 @@ function drainOutbox(){
   var step=function(){
     var q=outboxRead();
     if(!q.length) return Promise.resolve();
-    var item=q[0];
+    var item=q[0]; outboxInFlight=item.body;
     /* A bounded attempt, not an open-ended one.
 
        `fetch` waits as long as the network makes it, and campus wifi in a
@@ -6868,6 +6868,9 @@ function drainOutbox(){
     var bell = ctl ? setTimeout(function(){ try{ ctl.abort(); }catch(e){} }, 15000) : 0;
     return fetch(url,{method:'POST',mode:'no-cors',
         headers:{'Content-Type':'text/plain;charset=utf-8'}, body:item.body,
+        // keepalive: the send survives the tab closing or the phone locking
+        // straight after Submit. Browsers cap it near 64KB, so photos skip it.
+        keepalive: item.body.length<60000,
         signal: ctl?ctl.signal:undefined})
       .then(function(r){ if(bell) clearTimeout(bell); return r; },
             function(e){ if(bell) clearTimeout(bell); throw e; })
@@ -6884,7 +6887,7 @@ function drainOutbox(){
   };
   return step()
     .catch(function(){ /* still no signal; everything left stays queued */ })
-    .then(function(){ outboxBusy=false; paintOutbox(); return sentCount; });
+    .then(function(){ outboxBusy=false; outboxInFlight=''; paintOutbox(); return sentCount; });
 }
 
 /* Says what is waiting, wherever the banner is on the page. Deliberately silent
@@ -6918,6 +6921,21 @@ function startOutbox(){
   // asleep in a pocket may have reconnected without firing anything.
   document.addEventListener('visibilitychange', function(){
     if(!document.hidden) drainOutbox();
+    else beaconOutbox();
+  });
+  window.addEventListener('pagehide', beaconOutbox);
+}
+
+/* Leaving with something still queued: hand each item to the browser, which
+   sends it after the page is gone. Items stay queued; the sid makes the next
+   ordinary drain a harmless repeat. */
+function beaconOutbox(){
+  var url=(DB.api&&DB.api.url)||'';
+  if(!url || !navigator.sendBeacon) return;
+  outboxRead().forEach(function(it){
+    if(it.body.length<60000 && it.body!==outboxInFlight){
+      try{ navigator.sendBeacon(url, new Blob([it.body],{type:'text/plain;charset=utf-8'})); }catch(e){}
+    }
   });
 }
 
