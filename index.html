@@ -816,7 +816,12 @@
   .uqty{position:relative;display:flex;align-items:center;gap:6px}
   .uqty input{text-align:center;font-family:var(--font-mono);padding-left:8px;padding-right:8px}
   .uunit{font-size:11px;color:var(--ink-faint);white-space:nowrap}
-  .urow .btn{padding:6px 9px;justify-self:end}
+  .urow .btn{padding:6px 9px;justify-self:end;align-self:end;margin-bottom:3px}
+  /* Column headings sit inside each cell, so they line up on desktop and on the
+     two-line phone layout alike. Only the first row shows them. */
+  .ufld{display:flex;flex-direction:column;gap:5px;min-width:0}
+  .ulab{font-size:11.5px;font-weight:600;color:var(--ink-mute);white-space:nowrap}
+  .urow:not(:first-child) .ulab{display:none}
   /* On a phone the four columns become two rows: item on its own line, then
      quantity, source and the remove button. Four columns at 375px made every
      select too narrow to read the item name, which is the one thing that has to
@@ -827,10 +832,11 @@
        truncated "Crew Ch…" is the thing that makes someone pick the wrong bag. */
     .urow{grid-template-columns:88px 1fr 36px;grid-template-areas:'item item item' 'qty from x';
       gap:8px;padding:12px 0}
-    .urow>select:first-child{grid-area:item}
-    .urow .uqty{grid-area:qty;min-width:0}
+    .urow .uf-item{grid-area:item}
+    .urow .uf-qty{grid-area:qty}
+    .urow .uqty{min-width:0}
     .urow .uqty input{min-width:0;flex:1}
-    .urow>select:nth-of-type(2){grid-area:from}
+    .urow .uf-from{grid-area:from}
     .urow .btn{grid-area:x}
   }
 
@@ -2146,7 +2152,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20261104170905';
+var BUILD='20261104192608';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -5623,15 +5629,17 @@ function renderUsage(fid){
     var unitName=(items.filter(function(c){return c.id===r.item;})[0]||{}).unit||'';
     var typed = r.item==='__other';
     return '<div class="urow'+(typed?' typed':'')+'">'+
-      '<select aria-label="Item" onchange="setUsage(\''+fid+'\','+i+',\'item\',this.value)">'+itemOpts+'</select>'+
+      '<div class="ufld uf-item"><span class="ulab">Item name</span>'+
+      '<select aria-label="Item" onchange="setUsage(\''+fid+'\','+i+',\'item\',this.value)">'+itemOpts+'</select></div>'+
       (typed?'<input type="text" class="uother" placeholder="What was it?" value="'+
         esc(r.other||'')+'" aria-label="Item name" '+
         'oninput="setUsage(\''+fid+'\','+i+',\'other\',this.value)">':'')+
-      '<div class="uqty"><input type="number" min="1" max="'+USAGE_MAX+'" step="1" '+
+      '<div class="ufld uf-qty"><span class="ulab">Quantity used</span><div class="uqty"><input type="number" min="1" max="'+USAGE_MAX+'" step="1" '+
         'inputmode="numeric" value="'+esc(String(r.qty||1))+'" '+
         'aria-label="How many" onchange="setUsage(\''+fid+'\','+i+',\'qty\',this.value)">'+
-        '<span class="uunit">'+esc(unitName)+'</span></div>'+
-      '<select aria-label="Where from" onchange="setUsage(\''+fid+'\','+i+',\'from\',this.value)">'+unitOpts+'</select>'+
+        '<span class="uunit">'+esc(unitName)+'</span></div></div>'+
+      '<div class="ufld uf-from"><span class="ulab">From where</span>'+
+      '<select aria-label="Where from" onchange="setUsage(\''+fid+'\','+i+',\'from\',this.value)">'+unitOpts+'</select></div>'+
       '<button class="btn xs" type="button" aria-label="Remove this row" '+
         'onclick="delUsageRow(\''+fid+'\','+i+')">✕</button>'+
       /* Per row, not one box for the whole form. "Did you replace anything?" as
