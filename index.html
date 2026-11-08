@@ -1928,7 +1928,7 @@
     <button type="button" class="sb-item" data-need="office" data-grp="office" data-view="restock"><span class="ic">▤</span>Office Restock List</button>
 
     <div class="sb-label" data-need="mgr">Oversight</div>
-    <button type="button" class="sb-item" data-need="mgr" data-view="activity"><span class="ic">≡</span>Activity</button>
+    <button type="button" class="sb-item" data-view="activity"><span class="ic">≡</span>Activity</button>
     <button type="button" class="sb-item" data-need="mgr" data-view="reports"><span class="ic">▤</span>Reports</button>
     <!-- No data-need: see MANAGER_VIEWS. A member who reports something can
          now see whether it was dealt with, which is the question they were
@@ -2152,7 +2152,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20261107193321';
+var BUILD='20261107200142';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -3739,7 +3739,7 @@ var MANAGER_VIEWS={
   restock:'office', rooms:'office', chores:'office', cleaning:'office',
   inventory:'equipment', 'bag-check':'equipment', toget:'equipment',
   expiring:'equipment', kits:'equipment',
-  reports:'mgr', activity:'mgr', roles:'mgr', qr:'mgr', settings:'mgr',
+  reports:'mgr', roles:'mgr', qr:'mgr', settings:'mgr',
   people:'ops'
 };
 
