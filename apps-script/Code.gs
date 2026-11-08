@@ -3014,6 +3014,50 @@ function bagFormRows(unit, type, offset, limit) {
       review: String(x.get('review') || '').trim(), n: x.n, t: 2 });
   });
 
+  /* The bike site's two checks, so taking the bike jumpkit out and bringing it
+     back on an After Duty read in the same feed. Read by position: these tabs
+     are laid out by writeBikeRow, not by `keys`. No Reviewer Notes column, so
+     they never count as waiting for a note. */
+  var today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+  var lines = function (v) {
+    return String(v || '').split('\n').map(function (x) { return x.trim(); })
+      .filter(function (x) { return x; });
+  };
+  var bikeRows = function (conf, jk) {
+    var sh = sheetOf(conf);
+    if (!sh || sh.getLastRow() < 2) return;
+    var w = Math.min(sh.getLastColumn(), conf.headers.length);
+    sh.getRange(2, 1, sh.getLastRow() - 1, w).getValues().forEach(function (r, n) {
+      var date = asDate(r[0]); if (!date) return;
+      var at = function (i) { return i < r.length ? r[i] : ''; };
+      var subj = String(at(4) || '').trim();
+      var o = 0;                       // the jumpkit tab has Radio at 5; the bike tab does not
+      if (jk) o = 1;
+      var row = { kind: jk ? 'bikekit' : 'bikesafety', date: date, time: asTime(at(1)),
+        who: String(at(2) || '').trim(), sid: String(at(jk ? 12 : 11) || '').trim(),
+        unit: jk ? BIKE_SOURCE_ID : '',
+        bag: jk ? (/bike/i.test(subj) ? subj : 'Bike Jumpkit' + (subj ? ' · ' + subj : ''))
+                : (/bike/i.test(subj) ? subj : 'Bike' + (subj ? ' ' + subj : '')),
+        result: String(at(4 + o + 1) || ''),
+        missing: lines(at(4 + o + 3)), missingCount: Number(at(4 + o + 2)) || 0,
+        expired: [], soon: [], cond: [],
+        note: String(at(jk ? 11 : 10) || '').trim(), review: '', n: n, t: jk ? 3 : 4 };
+      if (jk) {
+        row.radio = String(at(5) || '').trim();
+        lines(at(10)).forEach(function (x) {
+          var m = x.match(/^(.*):\s*(\d{4}-\d{2}-\d{2})$/);
+          if (m && m[2] <= today) row.expired.push(m[1].trim() + ' (' + m[2] + ')');
+        });
+      } else {
+        row.cond = lines(at(9));
+        if (String(at(8) || '').trim()) row.cond.unshift('Grounded for weather');
+      }
+      out.push(row);
+    });
+  };
+  bikeRows(BIKE_SHEETS.jumpkit, true);
+  bikeRows(BIKE_SHEETS.safety, false);
+
   /* Whether a form found anything — decided HERE, once, and sent on the row.
      The site filters on it and the chart below counts it, and two copies of
      the rule are two answers the day one of them is changed. */
@@ -3021,7 +3065,7 @@ function bagFormRows(unit, type, offset, limit) {
     r.found = r.kind === 'postcall'
       ? r.used.some(function (u) { return !u.r; }) || r.meds.length > 0 || !!r.note ||
         r.restocked === 'No'
-      : r.missing.length > 0 || r.missingCount > 0 || r.expired.length > 0 ||
+      : r.missing.length > 0 || (r.cond || []).length > 0 || r.missingCount > 0 || r.expired.length > 0 ||
         r.soon.length > 0 || !!r.note;
   });
 
@@ -3042,6 +3086,7 @@ function bagFormRows(unit, type, offset, limit) {
     if (!unit) return true;
     if (r.kind === 'checkout') return r.unit === unit;
     if (r.kind === 'bagcheck') return !!type && r.type === type;
+    if (r.kind === 'bikesafety') return false;
     return r.unit === unit || r.used.some(function (u) { return u.f === unit; });
   });
   var take = Math.min(Math.max(Number(limit) || 40, 1), 200);
@@ -3096,7 +3141,9 @@ function setReview(p) {
 /* Everything one form said, as the spreadsheet holds it, plus every checklist
    line from Items. Columns that are machinery are left out; empty ones too. */
 function formEntry(sid, kind) {
-  var conf = SHEETS[REVIEW_TABS[kind] || ''];
+  var conf = kind === 'bikekit' ? BIKE_SHEETS.jumpkit
+           : kind === 'bikesafety' ? BIKE_SHEETS.safety
+           : SHEETS[REVIEW_TABS[kind] || ''];
   if (!conf || !sid) return { ok: false, error: 'bad request' };
   var hit = rowBySid(conf, sid);
   if (!hit) return { ok: false, error: 'not found' };

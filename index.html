@@ -1680,6 +1680,7 @@
   .tl-kind{font-size:12px;font-weight:700;border-radius:6px;padding:1px 7px;background:var(--bg-2);color:var(--ink-soft)}
   .tl-kind.k-postcall{background:var(--brand-wash);color:var(--brand)}
   .tl-kind.k-bagcheck{background:var(--gold-wash);color:#6f561a}
+  .tl-kind.k-bikekit,.tl-kind.k-bikesafety{background:var(--surface-2,#eef0f3);color:var(--ink-soft,#3b4350)}
   .tl-meta{font-size:12.5px;color:var(--ink-mute);margin-left:auto;white-space:nowrap}
   .tl-row.clean .tl-top b{font-weight:600;color:var(--ink-soft)}
   .tl-items{list-style:none;margin:8px 0 2px;padding:0;display:flex;flex-direction:column;gap:6px}
@@ -2152,7 +2153,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20261107200142';
+var BUILD='202611080129';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -12006,13 +12007,13 @@ function renderKits(){
   // ---- every form
   var base=kitBaseRows();
   var nFound=base.filter(kitFound).length;
-  var cnt=function(k){ return base.filter(function(r){ return r.kind===k; }).length; };
+  var cnt=function(k){ return base.filter(function(r){ return kitKindIs(r,k); }).length; };
   h+='<div class="sec" id="kitFeedTop"><h3>'+(kitUnit?esc(kitUnitName(kitUnit)):'Every form')+'</h3>'+
      '<span class="sec-n">'+kitState.total+'</span></div>';
   h+='<div class="toolbar"><div class="seg" role="group" aria-label="Which forms">'+
      [['','All',base.length],['review','To review',base.filter(kitToReview).length],
       ['found','Found something',nFound],['checkout','Before duty',cnt('checkout')],
-      ['postcall','After duty',cnt('postcall')],['bagcheck','Equipment checks',cnt('bagcheck')]]
+      ['postcall','After duty',cnt('postcall')],['bagcheck','Equipment checks',cnt('bagcheck')],['bike','Bike checks',cnt('bike')]]
        .filter(function(o){ return !o[0] || o[0]==='found' || o[2] || kitView.kind===o[0]; })
        .filter(function(o){ return o[0]!=='review' || can('equipment') || kitView.kind==='review'; })
        .map(function(o){
@@ -12097,13 +12098,18 @@ function kitCardHtml(n){
 }
 
 /* ---- the forms ---- */
+var KIT_KINDS={checkout:'Before duty', postcall:'After duty', bagcheck:'Equipment check',
+  bikekit:'Bike jumpkit check', bikesafety:'Bike safety check'};
+// The bike site's two checks share one switch.
+function kitKindIs(r,k){ return k==='bike' ? (r.kind==='bikekit'||r.kind==='bikesafety') : r.kind===k; }
+function kitIsBike(r){ return kitKindIs(r,'bike'); }
 function kitFormFound(r){
   if(!r) return false;
   if(r.kind==='postcall')
     return (r.used||[]).some(function(u){ return !u.r; }) || (r.meds||[]).length>0 ||
            !!r.note || r.restocked==='No';
   return (r.missing||[]).length>0 || r.missingCount>0 || (r.expired||[]).length>0 ||
-         (r.soon||[]).length>0 || !!r.note;
+         (r.soon||[]).length>0 || (r.cond||[]).length>0 || !!r.note;
 }
 // The sheet decides and says so on the row; the local rule is only for a row
 // from before it did.
@@ -12127,7 +12133,7 @@ function kitFeedHtml(){
   var rows=kitBaseRows();
   if(kitView.kind==='found') rows=rows.filter(kitFound);
   else if(kitView.kind==='review') rows=rows.filter(kitToReview);
-  else if(kitView.kind) rows=rows.filter(function(r){ return r.kind===kitView.kind; });
+  else if(kitView.kind) rows=rows.filter(function(r){ return kitKindIs(r,kitView.kind); });
   var q=kitView.q.trim().toLowerCase();
   if(q) rows=rows.filter(function(r){ return kitSearchText(r).indexOf(q)>=0; });
   var h='';
@@ -12155,7 +12161,7 @@ function kitFeedHtml(){
 
 function kitFormHtml(r){
   var found=kitFound(r);
-  var kind={checkout:'Before duty', postcall:'After duty', bagcheck:'Equipment check'}[r.kind]||'Form';
+  var kind=KIT_KINDS[r.kind]||'Form';
   var bag;
   if(r.kind==='postcall'){
     var seen={}, names=[];
@@ -12242,6 +12248,9 @@ function kitFormItems(r){
   (r.soon||[]).forEach(function(m){
     h+='<li><span class="tl-w">Expiring</span>'+esc(m)+'</li>';
   });
+  (r.cond||[]).forEach(function(m){
+    h+='<li><span class="tl-w">Flagged</span>'+esc(m)+'</li>';
+  });
   if(r.note)
     h+='<li><span class="tl-w">Note</span>“'+esc(r.note)+'”'+kitStatus(kitConcernOpen(r.note,where),true)+'</li>';
   return h;
@@ -12310,7 +12319,7 @@ var KIT_FIELD_NAMES={'Damaged':'Any issue with the bag','Incident Numbers':'Inci
   'Other Answers':'Also answered'};
 var KIT_NOTE_CHIPS=['Looks good','Noted','Late','Resolved','Followed up'];
 function kitToReview(r){
-  if(!r || r.review || !r.sid) return false;
+  if(!r || r.review || !r.sid || kitIsBike(r)) return false;
   var d=kitParseDay(r.date); if(!d) return false;
   return (Date.now()-d.getTime()) < KIT_REVIEW_DAYS*86400000;
 }
@@ -12333,7 +12342,7 @@ function kitUsedListHtml(r){
   }).join('')+'</div>';
 }
 function kitEntryBody(r,full){
-  var kind={checkout:'Before duty', postcall:'After duty', bagcheck:'Equipment check'}[r.kind]||'Form';
+  var kind=KIT_KINDS[r.kind]||'Form';
   var h='<div class="ent-top"><span class="tl-kind k-'+esc(r.kind)+'">'+kind+'</span>'+
         '<span>'+esc(kitDayLong(r.date)+' · '+kitTime(r.time)+(r.who?' · '+r.who:''))+'</span></div>';
   // The answers. Fields the feed already shows above are left out of the list.
@@ -12354,7 +12363,9 @@ function kitEntryBody(r,full){
   }
   if(r.kind==='postcall') h+=kitUsedListHtml(r);
   // The note.
-  var mine=can('equipment');
+  var mine=can('equipment') && !kitIsBike(r);
+  // The bike tabs have no Reviewer Notes column.
+  if(kitIsBike(r)) return h;
   h+='<div class="ent-sec ent-note"><h4>Reviewer notes</h4>'+
     (mine
       ? '<textarea id="entNote" rows="3" placeholder="Your note on this form">'+esc(r.review||'')+'</textarea>'+
@@ -12373,7 +12384,7 @@ function kitChip(c){
 function kitOpen(sid){
   var r=kitRowBySid(sid); if(!r) return;
   var url=(DB.api&&DB.api.url)||'';
-  var mine=can('equipment');
+  var mine=can('equipment') && !kitIsBike(r);
   openModal({title:(r.kind==='postcall'?(r.bag||'After duty'):(r.bag||kitUnitName(r.unit)||'Form')),
     body:'<div id="entHost">'+kitEntryBody(r, url?null:{error:'no spreadsheet is connected'})+'</div>',
     okText:mine?'Save note':'Close', cancelText:mine?'Close':'',
