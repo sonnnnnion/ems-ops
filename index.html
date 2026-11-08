@@ -2152,7 +2152,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='20261104192608';
+var BUILD='20261107193321';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -5231,7 +5231,7 @@ var FORMS={
     who:{callsign:true,name:true,andrew:false},
     // Which bag came back. The Equipment Manager reads After Duty by bag, and
     // a shift where nothing was used still has to say which kit it was.
-    pick:{key:'unit', label:'Which bag are you returning?', from:'units'},
+    pick:{key:'unit', label:'Which bag are you returning?', from:'units', bike:true},
     fixed:'postCall',
     // The structured bit. Item, how many, which unit it came out of — all
     // picked, none typed, so the buy-list can actually be summed.
@@ -5291,7 +5291,9 @@ var formDone={}, lastResult={};
 function fcfg(fid){ return FORMS[fid]; }
 
 /* ---- pick-list source: rooms and bags are both {id,name} lists ---- */
-function pickList(from){
+function pickList(from,opt){
+  if(from==='units' && opt && opt.bike) return pickList('units').concat([
+    {id:BIKE_SOURCE.id, name:BIKE_SOURCE.name, sub:'From the bike site'}]);
   if(from==='rooms') return DB.rooms.map(function(r){
     return {id:r.id,name:r.name,sub:r.slots+' slots'}; });
   // 'units' is the physical objects on the rack; 'bags' is the kit types and
@@ -5391,7 +5393,7 @@ function renderCheck(fid){
 
   /* --- picker --- */
   if(c.pick){
-    var list=pickList(c.pick.from);
+    var list=pickList(c.pick.from,c.pick);
     h+='<div class="card mt"><h3>'+esc(c.pick.label)+'</h3>';
     if(!list.length){
       h+='<p class="hint" style="margin-top:0">Nothing is in service to check right now.</p>';
@@ -5919,7 +5921,7 @@ function setPick(fid,id){
   if(er){ er.innerHTML=formEditRow(fid); applyGates(er); }
   paintJobsCard(fid);
   if(fcfg(fid).usage) renderUsage(fid);
-  var list=pickList(fcfg(fid).pick.from);
+  var list=pickList(fcfg(fid).pick.from,fcfg(fid).pick);
   for(var j=0;j<list.length;j++) if(list[j].id===id && picks[j]) picks[j].classList.add('on');
   saveDraft(fid); calcCheck(fid);
 }
@@ -5957,7 +5959,7 @@ function readCheck(fid){
     var e=document.getElementById(fid+'-x-'+x.id);
     out.extras[x.id]=e?e.value.trim():'';
   });
-  var picked=(c.pick?pickList(c.pick.from).filter(function(o){return o.id===out.pick;})[0]:null);
+  var picked=(c.pick?pickList(c.pick.from,c.pick).filter(function(o){return o.id===out.pick;})[0]:null);
   out.pickName=picked?picked.name:'';
   var exs=paintExpiry(fid); out.expired=(exs&&exs.expired)||[]; out.soon=(exs&&exs.soon)||[];
   if(c.meds) out.meds=medsComplete(fid);
@@ -6308,7 +6310,7 @@ function restoreDraft(fid){
   if(d.pick && !formPick[fid]){ formPick[fid]=d.pick;
     var body=document.getElementById(fid+'-body'); if(body) body.innerHTML=checkBody(fid);
     var host=document.getElementById(fcfg(fid).host);
-    var picks=host.querySelectorAll('.roompick'), list=pickList(fcfg(fid).pick.from);
+    var picks=host.querySelectorAll('.roompick'), list=pickList(fcfg(fid).pick.from,fcfg(fid).pick);
     for(var i=0;i<list.length;i++) if(list[i].id===d.pick && picks[i]) picks[i].classList.add('on');
   }
   (d.ticked||[]).forEach(function(id){

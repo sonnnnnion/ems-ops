@@ -2803,10 +2803,17 @@ function activitySpec(site) {
        "on a call" would have made the usage rows the one thing you could not
        filter by kit. */
     { form: 'After duty',  conf: SHEETS['Post-Call'],   kind: 'usage',
-      iDate:0, iTime:1, iWho:2, iAndrew:-1, iSubject:-1, iResult:4, iMissing:-1, iNotes:6,
+      iDate:0, iTime:1, iWho:2, iAndrew:-1, iSubject:14, iResult:4, iMissing:-1, iNotes:6,
       iUsage:8 },
     { form: 'Report',      conf: SHEETS['Reports'],     kind: 'report',
-      iDate:0, iTime:1, iWho:2, iAndrew:-1, iSubject:6, iResult:-1, iMissing:-1, iNotes:5 }
+      iDate:0, iTime:1, iWho:2, iAndrew:-1, iSubject:6, iResult:-1, iMissing:-1, iNotes:5 },
+    /* The bike site's checks are listed here too, so taking the bike jumpkit
+       out and bringing it back (After Duty, Bike Jumpkit) read on one timeline
+       for the Equipment Manager. */
+    { form: 'Bike jumpkit check', conf: BIKE_SHEETS.jumpkit, kind: 'check',
+      iDate:0, iTime:1, iWho:2, iAndrew:3, iSubject:4, iResult:6, iMissing:7, iNotes:11 },
+    { form: 'Bike safety check', conf: BIKE_SHEETS.safety, kind: 'check',
+      iDate:0, iTime:1, iWho:2, iAndrew:3, iSubject:4, iResult:5, iMissing:6, iNotes:10 }
   ];
 }
 
@@ -2882,6 +2889,8 @@ function activityRows(site, sinceDay, offset, limit) {
             if (!seenU[nm]) { seenU[nm] = 1; names.push(nm); }
           });
         }
+        // The bag being returned first, then any other bag something came out of.
+        if (subject && !seenU[subject]) names.unshift(subject);
         kits = names;
       }
 
