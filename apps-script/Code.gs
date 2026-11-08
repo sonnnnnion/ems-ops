@@ -181,8 +181,9 @@ var BIKE_SHEETS = {
     // renames rather than opening an empty tab beside the old one.
     was: ['Jumpkit Checks'],
     headers: ['Date','Time','Name','Andrew ID','Bag','Radio','Result','Missing',
-              'What Was Missing','Expiry Flag','Expiration Dates','Notes','Submission ID'],
-    widths:  [95, 70, 150, 100, 96, 90, 210, 74, 320, 190, 220, 260, 120]
+              'What Was Missing','Expiry Flag','Expiration Dates','Notes','Submission ID',
+              'Reviewer Notes'],
+    widths:  [95, 70, 150, 100, 96, 90, 210, 74, 320, 190, 220, 260, 120, 260]
   },
   safety: {
     name: 'Bike Safety Checks', freeze: 3,
@@ -194,8 +195,8 @@ var BIKE_SHEETS = {
        everybody's checks instead of the viewer's own. */
     headers: ['Date','Time','Name','Andrew ID','Bike','Result','Missing',
               'What Was Missing','Weather Grounded','Conditions Flagged','Notes','Submission ID',
-              'Bike ID','Status'],
-    widths:  [95, 70, 150, 100, 96, 210, 74, 320, 130, 240, 260, 120, 96, 80]
+              'Bike ID','Status','Reviewer Notes'],
+    widths:  [95, 70, 150, 100, 96, 210, 74, 320, 130, 240, 260, 120, 96, 80, 260]
   }
 };
 
@@ -938,6 +939,10 @@ function ensureSheet(conf) {
   }
   var have = sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), 1)).getValues()[0];
   if (have.join('|') !== conf.headers.join('|')) {
+    // A trimmed tab has no room for an appended heading, and the throw would
+    // cost the submission that got us here.
+    if (sh.getMaxColumns() < conf.headers.length)
+      sh.insertColumnsAfter(sh.getMaxColumns(), conf.headers.length - sh.getMaxColumns());
     sh.getRange(1, 1, 1, conf.headers.length).setValues([conf.headers]);
     formatSheet(sh, conf);
   }
@@ -1446,6 +1451,7 @@ function writeBikeRow(p) {
   ]);
   // Only the bike check carries these; the jumpkit tab has neither column.
   if (!isJk) row = row.concat([p.bikeId || '', p.statusClass || '']);
+  row.push('');                         // Reviewer Notes: no form writes it
 
   // The row and the header row are built in two different places, so they can
   // drift. When they do, every value lands one column off, which reads as a
@@ -3016,8 +3022,7 @@ function bagFormRows(unit, type, offset, limit) {
 
   /* The bike site's two checks, so taking the bike jumpkit out and bringing it
      back on an After Duty read in the same feed. Read by position: these tabs
-     are laid out by writeBikeRow, not by `keys`. No Reviewer Notes column, so
-     they never count as waiting for a note. */
+     are laid out by writeBikeRow, not by `keys`. */
   var today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
   var lines = function (v) {
     return String(v || '').split('\n').map(function (x) { return x.trim(); })
@@ -3041,7 +3046,8 @@ function bagFormRows(unit, type, offset, limit) {
         result: String(at(4 + o + 1) || ''),
         missing: lines(at(4 + o + 3)), missingCount: Number(at(4 + o + 2)) || 0,
         expired: [], soon: [], cond: [],
-        note: String(at(jk ? 11 : 10) || '').trim(), review: '', n: n, t: jk ? 3 : 4 };
+        note: String(at(jk ? 11 : 10) || '').trim(),
+        review: String(at(jk ? 13 : 14) || '').trim(), n: n, t: jk ? 3 : 4 };
       if (jk) {
         row.radio = String(at(5) || '').trim();
         lines(at(10)).forEach(function (x) {
@@ -3105,6 +3111,11 @@ function bagFormRows(unit, type, offset, limit) {
    in `Reviewer Notes`, so it reads the same in the spreadsheet and on the site,
    and she can type it in either place. */
 var REVIEW_TABS = { checkout: 'Checkouts', postcall: 'Post-Call', bagcheck: 'Bag Checks' };
+function reviewConf(kind) {
+  if (kind === 'bikekit') return BIKE_SHEETS.jumpkit;
+  if (kind === 'bikesafety') return BIKE_SHEETS.safety;
+  return SHEETS[REVIEW_TABS[kind] || ''];
+}
 
 function rowBySid(conf, sid) {
   var sh = sheetOf(conf);
@@ -3124,7 +3135,7 @@ function setReview(p) {
     logError('Reviewer note REFUSED: ' + c.why, String(p.sid || ''));
     return json({ ok: false, error: 'not allowed: ' + c.why });
   }
-  var conf = SHEETS[REVIEW_TABS[String(p.kind || '')] || ''];
+  var conf = reviewConf(String(p.kind || ''));
   var sid = String(p.sid || '').trim();
   if (!conf || !sid) return json({ ok: false, error: 'bad request' });
   ensureSheet(conf);
@@ -3141,9 +3152,7 @@ function setReview(p) {
 /* Everything one form said, as the spreadsheet holds it, plus every checklist
    line from Items. Columns that are machinery are left out; empty ones too. */
 function formEntry(sid, kind) {
-  var conf = kind === 'bikekit' ? BIKE_SHEETS.jumpkit
-           : kind === 'bikesafety' ? BIKE_SHEETS.safety
-           : SHEETS[REVIEW_TABS[kind] || ''];
+  var conf = reviewConf(kind);
   if (!conf || !sid) return { ok: false, error: 'bad request' };
   var hit = rowBySid(conf, sid);
   if (!hit) return { ok: false, error: 'not found' };

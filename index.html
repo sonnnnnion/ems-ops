@@ -2153,7 +2153,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='202611080129';
+var BUILD='202611081320';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -12102,7 +12102,6 @@ var KIT_KINDS={checkout:'Before duty', postcall:'After duty', bagcheck:'Equipmen
   bikekit:'Bike jumpkit check', bikesafety:'Bike safety check'};
 // The bike site's two checks share one switch.
 function kitKindIs(r,k){ return k==='bike' ? (r.kind==='bikekit'||r.kind==='bikesafety') : r.kind===k; }
-function kitIsBike(r){ return kitKindIs(r,'bike'); }
 function kitFormFound(r){
   if(!r) return false;
   if(r.kind==='postcall')
@@ -12319,7 +12318,7 @@ var KIT_FIELD_NAMES={'Damaged':'Any issue with the bag','Incident Numbers':'Inci
   'Other Answers':'Also answered'};
 var KIT_NOTE_CHIPS=['Looks good','Noted','Late','Resolved','Followed up'];
 function kitToReview(r){
-  if(!r || r.review || !r.sid || kitIsBike(r)) return false;
+  if(!r || r.review || !r.sid) return false;
   var d=kitParseDay(r.date); if(!d) return false;
   return (Date.now()-d.getTime()) < KIT_REVIEW_DAYS*86400000;
 }
@@ -12363,9 +12362,7 @@ function kitEntryBody(r,full){
   }
   if(r.kind==='postcall') h+=kitUsedListHtml(r);
   // The note.
-  var mine=can('equipment') && !kitIsBike(r);
-  // The bike tabs have no Reviewer Notes column.
-  if(kitIsBike(r)) return h;
+  var mine=can('equipment');
   h+='<div class="ent-sec ent-note"><h4>Reviewer notes</h4>'+
     (mine
       ? '<textarea id="entNote" rows="3" placeholder="Your note on this form">'+esc(r.review||'')+'</textarea>'+
@@ -12384,7 +12381,7 @@ function kitChip(c){
 function kitOpen(sid){
   var r=kitRowBySid(sid); if(!r) return;
   var url=(DB.api&&DB.api.url)||'';
-  var mine=can('equipment') && !kitIsBike(r);
+  var mine=can('equipment');
   openModal({title:(r.kind==='postcall'?(r.bag||'After duty'):(r.bag||kitUnitName(r.unit)||'Form')),
     body:'<div id="entHost">'+kitEntryBody(r, url?null:{error:'no spreadsheet is connected'})+'</div>',
     okText:mine?'Save note':'Close', cancelText:mine?'Close':'',
