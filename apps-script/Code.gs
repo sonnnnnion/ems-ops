@@ -2530,7 +2530,7 @@ var CHORES = {
   headers: ['Date','Time','Who','Call Sign','Did','Duty Period','Reason'],
   widths:  [95, 70, 180, 90, 110, 110, 200]
 };
-var CHORE_DID = { Removed: 1, Restored: 1, Excused: 1, Unexcused: 1 };
+var CHORE_DID = { Removed: 1, Restored: 1, Excused: 1, Unexcused: 1, Waived: 1, Unwaived: 1 };
 // Fixed reasons, not free text. This list is read back by an endpoint anybody
 // can call, and a box inviting somebody to write why a member left is a box
 // that will one day hold something that should not be public.
@@ -2584,7 +2584,9 @@ function setChore(p) {
     return json({ ok: false, error: 'not allowed: ' + c.why });
   }
   var did = CHORE_DID[String(p.did || '')] ? String(p.did) : '';
-  var cs = String(p.cs || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+  // Waived is the whole duty period: no chore requirement, for everybody.
+  var cs = (did === 'Waived' || did === 'Unwaived') ? '*'
+         : String(p.cs || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
   var dp = /^\d{4}:\d{1,3}$/.test(String(p.dp || '')) ? String(p.dp) : '';
   if (!did || !cs || !dp) return json({ ok: false, error: 'bad request' });
   var tz = sheetTZ(), now = new Date();

@@ -1680,7 +1680,7 @@
   .tl-kind{font-size:12px;font-weight:700;border-radius:6px;padding:1px 7px;background:var(--bg-2);color:var(--ink-soft)}
   .tl-kind.k-postcall{background:var(--brand-wash);color:var(--brand)}
   .tl-kind.k-bagcheck{background:var(--gold-wash);color:#6f561a}
-  .tl-kind.k-bikekit,.tl-kind.k-bikesafety{background:var(--surface-2,#eef0f3);color:var(--ink-soft,#3b4350)}
+  .tl-kind.k-bikekit,.tl-kind.k-bikesafety{background:var(--chip);color:var(--ink-soft)}
   .tl-meta{font-size:12.5px;color:var(--ink-mute);margin-left:auto;white-space:nowrap}
   .tl-row.clean .tl-top b{font-weight:600;color:var(--ink-soft)}
   .tl-items{list-style:none;margin:8px 0 2px;padding:0;display:flex;flex-direction:column;gap:6px}
@@ -1728,6 +1728,9 @@
   .person{display:inline-flex;align-items:baseline;gap:6px;background:var(--oos-wash);color:var(--ink);border-radius:8px;padding:4px 10px;font-size:13.5px}
   .person b{font-family:var(--font-mono);color:var(--oos);font-size:13px}
   .person.ok{background:var(--ok-wash)} .person.ok b{color:var(--ok)}
+  button.person{border:0;font:inherit;font-size:13.5px;cursor:pointer}
+  button.person:hover{filter:brightness(.96)}
+  .person.ex{background:var(--chip)} .person.ex b{color:var(--ink-mute)}
   .chorewrap{overflow-x:auto;border:1px solid var(--rule);border-radius:var(--r-md);background:var(--card);box-shadow:var(--shadow-sm)}
   .choretab{border-collapse:separate;border-spacing:0;width:100%}
   .choretab th,.choretab td{padding:8px 8px;border-bottom:1px solid var(--rule-soft);font-size:14px;text-align:center;
@@ -2153,7 +2156,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='202611081320';
+var BUILD='202611101808';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -10398,6 +10401,11 @@ function renderTracker(){
      (picked
        ? '<button class="btn xs" data-need="mgr" onclick="dpDelete(\''+jsq(picked)+'\')">Delete this duty period</button>'
        : '')+
+     (picked && Array.isArray(remoteChores)
+       ? (choreWaived(picked)
+           ? '<button class="btn xs" data-need="mgr" onclick="choreWaive(\''+jsq(picked)+'\',false)">Chores required again</button>'
+           : '<button class="btn xs" data-need="mgr" onclick="choreWaive(\''+jsq(picked)+'\',true)">No chore requirement this duty period</button>')
+       : '')+
      '</div>';
 
 
@@ -10411,7 +10419,8 @@ function renderTracker(){
      `dpEntries` is the merged read, and is what the card already uses. */
   var fill=!!(trackerDP && dpKeysKnown().indexOf(trackerDP)>=0);
   h+='<div class="trackhead"><div class="th-t">CMU EMS Room Check Tracker</div>'+
-     '<div class="th-dp">DP: <b>'+(fill?esc(String(dpParse(trackerDP).n)):'&nbsp;')+'</b></div></div>';
+     '<div class="th-dp">DP: <b>'+(fill?esc(String(dpParse(trackerDP).n)):'&nbsp;')+'</b></div></div>'+
+     (fill && choreWaived(trackerDP)?'<p class="noprint" style="margin:8px 0 0"><span class="tag mute">No chore requirement this duty period</span></p>':'');
 
   // The shaded rows carried the whole "these take three people" signal with
   // nothing saying so, and the count of how many call signs a duty period needs
@@ -10761,6 +10770,16 @@ function dpAllEntries(key){
 }
 
 function choreSame(a,b){ return a.cs===b.cs && a.did===b.did && a.dp===b.dp; }
+/* A duty period with no chore requirement: nobody owes a room check in it, so
+   nobody can miss one. Recorded in the Chore Log under call sign `*`. */
+function choreWaived(key){
+  var w=false;
+  choreLedger().forEach(function(d){
+    if(!d || d.cs!=='*' || d.dp!==key) return;
+    if(d.did==='Waived') w=true; else if(d.did==='Unwaived') w=false;
+  });
+  return w;
+}
 
 /* The sheet's decisions, then this device's newer ones on top. A local one is
    dropped once the sheet holds more rows like it than it did when the decision
@@ -10791,10 +10810,14 @@ function choreTable(){
       if(e.name) m.name=e.name;
     });
   });
-  var cut={}, cutBy={}, excused={};
+  var cut={}, cutBy={}, excused={}, waived={};
   choreLedger().forEach(function(d){
     if(!d||!d.cs) return;
     var p=dpParse(d.dp); if(p.year!==y) return;
+    if(d.cs==='*'){
+      if(d.did==='Waived') waived[p.n]=1; else if(d.did==='Unwaived') delete waived[p.n];
+      return;
+    }
     if(d.did==='Removed'){ cut[d.cs]=p.n; cutBy[d.cs]=d; }
     else if(d.did==='Restored'){ delete cut[d.cs]; delete cutBy[d.cs]; }
     else if(d.did==='Excused') excused[d.cs+'@'+p.n]=d;
@@ -10813,6 +10836,7 @@ function choreTable(){
     var cells=cols.map(function(n){
       if(n<from) return {n:n, st:'none'};
       if(m.dps[n]) return {n:n, st:'done'};
+      if(waived[n]) return {n:n, st:'waived'};
       if(n===curN) return {n:n, st:'pending'};
       if(excused[cs+'@'+n]) return {n:n, st:'excused'};
       return {n:n, st:'missed'};
@@ -10828,7 +10852,7 @@ function choreTable(){
   removed.sort(function(a,b){ return csSort(a.shown,b.shown); });
   var lastDone=cols.filter(function(n){ return n<curN; })[0]||0;
   return {year:y, cols:cols, curN:curN, lastDone:lastDone, rows:rows, removed:removed,
-          known:Object.keys(people).length};
+          known:Object.keys(people).length, waived:waived};
 }
 
 /* Who did it, as a role rather than an address. The sheet records the Google
@@ -10848,7 +10872,7 @@ function choreCounts(t,n){
   var c={n:n, done:0, excused:0, missed:0, todo:0, expected:0};
   t.rows.forEach(function(r){
     var cell=r.cells.filter(function(x){ return x.n===n; })[0];
-    if(!cell || cell.st==='none') return;
+    if(!cell || cell.st==='none' || cell.st==='waived') return;
     c.expected++;
     if(cell.st==='done') c.done++;
     else if(cell.st==='excused') c.excused++;
@@ -10891,7 +10915,8 @@ function renderChores(){
      '<div class="gl gl-hero">'+ringSVG([{v:hero.done,cls:'r-ok'},{v:hero.excused,cls:'r-mute'},
                                         {v:hero.missed,cls:'r-crit'},{v:hero.todo,cls:'r-mute'}], chorePct(hero)+'%')+
        '<div><div class="gl-n">'+hero.done+'<small>of '+hero.expected+'</small></div>'+
-       '<div class="gl-l">did it in DP '+hero.n+(last?'':' so far')+'</div>'+
+       '<div class="gl-l">'+(t.waived[hero.n]?'DP '+hero.n+' · no chore requirement'
+                                             :'did it in DP '+hero.n+(last?'':' so far'))+'</div>'+
        '<ul class="key"><li><i class="p-ok"></i>Did it</li><li><i class="p-crit"></i>Missed</li>'+
        '<li><i class="p-mute"></i>Excused</li></ul></div></div>'+
      (last?glTile(cur.done+' of '+cur.expected, 'DP '+t.curN+' so far', cur.todo+' still to go',''):'')+
@@ -10906,21 +10931,37 @@ function renderChores(){
             title:'DP '+n+': '+c.done+' of '+c.expected+' did it'+(c.missed?', '+c.missed+' missed':'')+
                   (c.todo?', '+c.todo+' still to go':''),
             parts:[{v:c.done,cls:'p-ok'},{v:c.excused,cls:'p-mute'},{v:c.missed,cls:'p-crit'},{v:c.todo,cls:'p-todo'}],
-            pct:chorePct(c)};
+            pct:chorePct(c), waived:!!t.waived[n]};
   });
   h+='<div class="sec"><h3>By duty period</h3></div><div class="panel">'+
      '<ul class="key" style="margin:0 0 4px"><li><i class="p-ok"></i>Did it</li><li><i class="p-crit"></i>Missed</li>'+
      '<li><i class="p-mute"></i>Excused</li><li><i class="p-todo"></i>Still to go</li></ul>'+
-     colChart(cols,{h:150,gap:10,bw:46,pick:'choreDpPick',valueText:function(c){ return c.pct+'%'; }});
+     colChart(cols,{h:150,gap:10,bw:46,pick:'choreDpPick',valueText:function(c){ return c.waived?'None':c.pct+'%'; }});
   var sc=choreCounts(t,sel);
   var who=t.rows.filter(function(r){
     return r.cells.some(function(c){ return c.n===sel && (c.st==='missed' || (sel===t.curN && c.st==='pending')); });
   });
+  var exc=t.rows.filter(function(r){
+    return r.cells.some(function(c){ return c.n===sel && c.st==='excused'; });
+  });
   h+='<div class="missrow"><span class="lbl">'+(sel===t.curN?'Still to go in DP '+sel+':':'Missed DP '+sel+':')+'</span>'+
-     (who.length ? who.map(function(r){
-        return '<span class="person'+(sel===t.curN?' ok':'')+'"><b>'+esc(r.shown)+'</b>'+(r.name?esc(r.name):'')+'</span>';
+     (t.waived[sel] ? '<span class="tag mute">No chore requirement</span>'
+     : who.length ? who.map(function(r){
+        var inner='<b>'+esc(r.shown)+'</b>'+(r.name?esc(r.name):'');
+        // A missed one is tappable for whoever decides: excuse it from here.
+        return (decide && sel!==t.curN)
+          ? '<button type="button" class="person" title="Excuse for DP '+sel+'" aria-label="'+esc(r.shown)+' missed DP '+sel+'. Excuse it" '+
+            'onclick="choreExcuse(\''+jsq(r.cs)+'\','+sel+')">'+inner+'</button>'
+          : '<span class="person'+(sel===t.curN?' ok':'')+'">'+inner+'</span>';
       }).join('')
       : '<span class="tag ok">'+(sel===t.curN?'Everybody has done theirs':'Nobody')+'</span>')+
+     (!t.waived[sel] && exc.length ? '<span class="lbl" style="margin-left:8px">Excused:</span>'+exc.map(function(r){
+        var inner='<b>'+esc(r.shown)+'</b>'+(r.name?esc(r.name):'');
+        return decide
+          ? '<button type="button" class="person ex" title="Count DP '+sel+' as missed again" aria-label="'+esc(r.shown)+' excused for DP '+sel+'. Count it again" '+
+            'onclick="choreUnexcuse(\''+jsq(r.cs)+'\','+sel+')">'+inner+'</button>'
+          : '<span class="person ex">'+inner+'</span>';
+      }).join('') : '')+
      '</div></div>';
 
   // ---- everybody
@@ -10963,6 +11004,7 @@ function choreGridHtml(t,sel,decide){
       var lab=esc(r.shown)+', DP '+c.n, sc=(c.n===sel?' class="sel"':'');
       if(c.st==='none') h+='<td'+sc+'><span class="cc none"></span></td>';
       else if(c.st==='done') h+='<td'+sc+'><span class="cc done" title="'+lab+': did it" aria-label="'+lab+': did it">✓</span></td>';
+      else if(c.st==='waived') h+='<td'+sc+'><span class="cc none" title="'+lab+': no chore requirement" aria-label="'+lab+': no chore requirement">–</span></td>';
       else if(c.st==='pending') h+='<td'+sc+'><span class="cc pending" title="'+lab+': not yet" aria-label="'+lab+': not yet">·</span></td>';
       else if(c.st==='missed') h+='<td'+sc+'>'+(decide
           ? '<button type="button" class="cc missed" title="Missed — tap to excuse" aria-label="'+lab+': missed. Excuse it" '+
@@ -11037,6 +11079,17 @@ function choreUnexcuse(cs,n){
    honest confirmation is reading the Chore Log back and finding the row — and a
    change that is not there after three reads did not happen, and says so
    rather than sitting on screen as though it had. */
+function choreWaive(key,on){
+  var n=dpParse(key).n;
+  uiConfirm('', on ? 'No chore requirement for DP '+n+'? Nobody will be counted as missing it.'
+                   : 'Require chores in DP '+n+' again?',
+            {okText:on?'No requirement':'Require chores',cancelText:'Cancel'})
+    .then(function(ok){ if(ok) choreSend('*', on?'Waived':'Unwaived', key, ''); });
+}
+function choreRepaint(){
+  renderChores();
+  if(typeof renderTracker==='function') renderTracker();
+}
 function choreSend(cs,did,dp,why){
   dataChanged();
   var url=(DB.api&&DB.api.url)||'';
@@ -11047,7 +11100,7 @@ function choreSend(cs,did,dp,why){
   var why2=(CHORE_WHY_OPTS.filter(function(o){ return o.v===why; })[0]||{}).t||'';
   choreLocal.push({cs:cs, did:did, dp:dp, why:why2, who:'', date:todayISO(), base:base});
   choreMsg='';
-  renderChores();
+  choreRepaint();
   try{
     fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},
       body:JSON.stringify({form:'__chore', cs:cs, did:did, dp:dp, why:why||'',
@@ -11059,12 +11112,12 @@ function choreVerify(d,base,tries){
   setTimeout(function(){
     fetchDutyPeriods().then(function(){
       var n=(Array.isArray(remoteChores)?remoteChores:[]).filter(function(r){ return choreSame(r,d); }).length;
-      if(n>base){ renderChores(); return; }
+      if(n>base){ choreRepaint(); return; }
       if(tries<2){ choreVerify(d,base,tries+1); return; }
       choreLocal=choreLocal.filter(function(l){ return !(choreSame(l,d) && l.base===base); });
       choreMsg='<b>That did not save.</b> Sign in again and retry — or the spreadsheet '+
                'is running an older copy of the script.';
-      renderChores();
+      choreRepaint();
     });
   }, tries?3000:2000);
 }
