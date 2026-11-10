@@ -436,6 +436,46 @@ function putExpiry(list, site, who) {
   if (fresh.length) sh.getRange(sh.getLastRow() + 1, 1, fresh.length, n).setValues(fresh);
 }
 
+/* Dates for bag items, named the way the card names them. `k` is the Expiry
+   key, `<unit>|<item>`. */
+function putBagDates(list, who) {
+  var map = nameMap(), units = map.units || {}, items = map.items || {};
+  putExpiry(list.map(function (e) {
+    var cut = String(e.k).indexOf('|');
+    var u = String(e.k).slice(0, cut), it = String(e.k).slice(cut + 1);
+    return { k: e.k, bag: units[u] || u, item: items[it] || e.item || it, date: e.date };
+  }), 'ops', who);
+}
+
+/* The Equipment Manager correcting a date from the bag's card. Written to the
+   Expiry tab, and to any tracker row tied to that bag item, so the two can
+   never disagree about it. */
+function setBagDate(p) {
+  var c = writerCheck(p);
+  if (!c.name) {
+    logError('Expiry date REFUSED: ' + c.why, String(p.k || ''));
+    return json({ ok: false, error: 'not allowed: ' + c.why });
+  }
+  var k = String(p.k || '').trim(), date = String(p.date || '').trim();
+  if (!/^[^|]+\|.+$/.test(k) || !/^\d{4}-\d{2}-\d{2}$/.test(date))
+    return json({ ok: false, error: 'bad request' });
+  putBagDates([{ k: k, item: String(p.item || ''), date: date }], c.name);
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(TRACKER.name);
+  var cb = tcol('bag');
+  if (sh && sh.getLastRow() >= 2 && cb && sh.getLastColumn() >= cb) {
+    var tz = sheetTZ(), at = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd HH:mm');
+    var p3 = date.split('-'), d = new Date(+p3[0], +p3[1] - 1, +p3[2]);
+    sh.getRange(2, cb, sh.getLastRow() - 1, 1).getValues().forEach(function (r, i) {
+      if (String(r[0] || '').trim() !== k) return;
+      sh.getRange(i + 2, tcol('exp')).setValue(d);
+      sh.getRange(i + 2, tcol('updated')).setValue(at);
+      sh.getRange(i + 2, tcol('by')).setValue(c.name);
+    });
+  }
+  logAction('ops', c.name, 'Expiry date', date, k, '');
+  return json({ ok: true });
+}
+
 function expiryRows(site) {
   site = site === 'bike' ? 'bike' : 'ops';
   var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(EXPIRY.name);
@@ -1052,6 +1092,7 @@ function doPost(e) {
     if (p.form === '__dpremove') return removeFromDP(p);
     if (p.form === '__bagstatus') return setBagStatus(p);
     if (p.form === '__tracker') return setTracker(p);
+    if (p.form === '__expiry') return setBagDate(p);
     if (p.form === '__restockedit') return editRestock(p);
 
     // The bike site's forms, which post a different payload shape.
@@ -2025,9 +2066,12 @@ var TRACKER = {
   // Her own tracker's columns, in her order, with her words — Target, Status —
   // and the site's reading of each row in Alert beside them.
   headers: ['List', 'Item', 'Location', 'Stock', 'Target', 'Expiration', 'Status', 'Alert', 'Order Notes',
-            'Notes', 'Brand', 'Counts Down With', 'Updated', 'Updated By', 'ID'],
-  widths: [200, 300, 140, 70, 70, 110, 120, 150, 240, 230, 120, 150, 130, 180, 90],
-  hide: ['Counts Down With', 'ID']
+            'Notes', 'Brand', 'Counts Down With', 'Updated', 'Updated By', 'ID', 'Bag Item'],
+  widths: [200, 300, 140, 70, 70, 110, 120, 150, 240, 230, 120, 150, 130, 180, 90, 160],
+  /* `Bag Item` ties a row to one item in one bag (`<unit>|<item>`, the Expiry
+     key), so a date typed here is the date that bag's card shows. Appended
+     last, so nothing already in the tab moves. */
+  hide: ['Counts Down With', 'ID', 'Bag Item']
 };
 // Her two sheets, by the names she gave them.
 var TRACKER_LISTS = ['Medication Tracker', 'General Equipment Inventory'];
@@ -2039,8 +2083,8 @@ var TRACKER_STATUS = ['Stocked', 'Purchase', 'More coming'];
 // in two places.
 var TF = { list: 'List', item: 'Item', loc: 'Location', stock: 'Stock', par: 'Target', exp: 'Expiration',
            status: 'Status', alert: 'Alert', order: 'Order Notes', notes: 'Notes', brand: 'Brand',
-           link: 'Counts Down With', updated: 'Updated', by: 'Updated By', id: 'ID' };
-var TRACKER_EDITABLE = ['list', 'item', 'loc', 'stock', 'par', 'exp', 'status', 'order', 'notes', 'brand', 'link'];
+           link: 'Counts Down With', updated: 'Updated', by: 'Updated By', id: 'ID', bag: 'Bag Item' };
+var TRACKER_EDITABLE = ['list', 'item', 'loc', 'stock', 'par', 'exp', 'status', 'order', 'notes', 'brand', 'link', 'bag'];
 function tcol(f) { return TRACKER.headers.indexOf(TF[f]) + 1; }
 function colLetter(n) { var s = ''; while (n > 0) { var m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = (n - m - 1) / 26; } return s; }
 
@@ -2075,7 +2119,7 @@ function trackerCells(o, who, at) {
   var num = function (v) { return (v === null || v === undefined || v === '' || isNaN(Number(v))) ? '' : Number(v); };
   var val = { list: o.list || TRACKER_LISTS[0], item: o.item || '', loc: o.loc || '', stock: num(o.stock), par: num(o.par),
               exp: d, status: normStatus(o.status), alert: '', order: o.order || '', notes: o.notes || '',
-              brand: o.brand || '', link: o.link || '', updated: at, by: who, id: o.id };
+              brand: o.brand || '', link: o.link || '', updated: at, by: who, id: o.id, bag: o.bag || '' };
   var fieldOf = {};
   Object.keys(TF).forEach(function (f) { fieldOf[TF[f]] = f; });
   return TRACKER.headers.map(function (h) { var f = fieldOf[h]; return val[f] === undefined ? '' : val[f]; });
@@ -2091,7 +2135,7 @@ function trackerObj(r, i, tzz) {
            item: String(g('item') || '').trim(), loc: String(g('loc') || '').trim(), stock: num(g('stock')),
            par: num(g('par')), exp: /^\d{4}-\d{2}-\d{2}$/.test(exp) ? exp : '', status: normStatus(g('status')),
            order: String(g('order') || ''), notes: String(g('notes') || ''), brand: String(g('brand') || ''),
-           link: String(g('link') || ''),
+           link: String(g('link') || ''), bag: String(g('bag') || '').trim(),
            updated: up instanceof Date ? Utilities.formatDate(up, tzz, 'yyyy-MM-dd HH:mm') : String(up || ''),
            by: String(g('by') || '') };
 }
@@ -2109,8 +2153,12 @@ function ensureTracker() {
     paintTrackerStatus();
   }
   var have = sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), 1)).getValues()[0];
-  if (have.join('|') !== TRACKER.headers.join('|'))
+  if (have.join('|') !== TRACKER.headers.join('|')) {
+    if (sh.getMaxColumns() < TRACKER.headers.length)
+      sh.insertColumnsAfter(sh.getMaxColumns(), TRACKER.headers.length - sh.getMaxColumns());
     sh.getRange(1, 1, 1, TRACKER.headers.length).setValues([TRACKER.headers]);
+    try { sh.hideColumns(tcol('bag')); } catch (err) {}
+  }
   return sh;
 }
 
@@ -2149,7 +2197,9 @@ function trackerRows() {
   if (!sh) return { rows: trackerFromContent(), fromContent: true };
   if (sh.getLastRow() < 2) return { rows: [], fromContent: false };
   var tzz = sheetTZ();
-  var rows = sh.getRange(2, 1, sh.getLastRow() - 1, TRACKER.headers.length).getValues()
+  // Capped at the tab's width: `Bag Item` is appended, and a tab that has not
+  // been written to since may not have room for it yet.
+  var rows = sh.getRange(2, 1, sh.getLastRow() - 1, Math.min(TRACKER.headers.length, sh.getMaxColumns())).getValues()
     .map(function (r, i) { return trackerObj(r, i, tzz); })
     .filter(function (o) { return o.item; });
   return { rows: rows, fromContent: false };
@@ -2183,7 +2233,7 @@ function setTracker(p) {
     byId[o.id] = i;
     byKey[keyOf(o.list, o.item, o.loc)] = i;
   });
-  var fresh = [], dels = [], touched = {}, names = [], moves = [];
+  var fresh = [], dels = [], touched = {}, names = [], moves = [], dated = [];
   ops.forEach(function (op) {
     if (!op || typeof op !== 'object') return;
     if (op.op === 'del') {
@@ -2214,6 +2264,10 @@ function setTracker(p) {
       byId[base.id] = -1; byKey[keyOf(base.list, base.item, base.loc)] = -1;
     }
     names.push(base.item);
+    // A dated row tied to a bag item: that bag's card reads this date.
+    if (base.bag && base.exp && (Object.prototype.hasOwnProperty.call(row, 'exp') ||
+                                 Object.prototype.hasOwnProperty.call(row, 'bag')))
+      dated.push({ k: base.bag, item: base.item, date: base.exp });
   });
   Object.keys(touched).forEach(function (i) {
     if (dels.indexOf(Number(i)) < 0) sh.getRange(Number(i) + 2, 1, 1, n).setValues([vals[i]]);
@@ -2222,6 +2276,9 @@ function setTracker(p) {
   dels.sort(function (a, b) { return b - a; }).forEach(function (d) { sh.deleteRow(d + 2); });
   logStock(moves);
   paintTrackerStatus();
+  if (dated.length) {
+    try { putBagDates(dated, c.name); } catch (err) { logError('tracker dates: ' + err, ''); }
+  }
   logAction('ops', c.name, 'Updated the tracker',
             names.length > 4 ? names.length + ' changes' : names.join(', '), '', '');
   return json({ ok: true, changed: names.length });

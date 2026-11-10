@@ -2156,7 +2156,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='202611101808';
+var BUILD='202611101819';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -8638,21 +8638,23 @@ function expiryIndex(){
 
 function expiringRows(){
   var ix=expiryIndex(), rows=[];
-  /* Shared dates first, then this device's on top. A date typed here that has
-     not reached the sheet yet still shows; one that has is not shown twice. */
-  var merged={};
+  /* The sheet's dates, and this device's only where the sheet has none yet — a
+     date typed here that has not reached it. This device's copy used to win
+     outright, so a date corrected anywhere else never reached a phone that had
+     once typed the old one. */
+  var merged={}, when={};
   Object.keys(remoteExpiry||{}).forEach(function(k){
     var e=(remoteExpiry||{})[k];
-    if(e&&e.date) merged[k]=e.date;
+    if(e&&e.date){ merged[k]=e.date; when[k]=e.at||''; }
   });
-  Object.keys(DB.expiry||{}).forEach(function(k){ merged[k]=DB.expiry[k]; });
+  Object.keys(DB.expiry||{}).forEach(function(k){ if(!merged[k]) merged[k]=DB.expiry[k]; });
   Object.keys(merged).forEach(function(k){
     var cut=k.indexOf('|'); if(cut<0) return;
     var place=k.slice(0,cut), item=k.slice(cut+1);
     var iso=merged[k]; var n=daysUntil(iso);
     if(n===null) return;
     var label=ix.items[item]||item;
-    rows.push({key:k, iso:iso, days:n,
+    rows.push({key:k, iso:iso, days:n, at:when[k]||'',
       item:label, known:!!ix.items[item],
       place:ix.places[place]||place,
       // Same key wantItem() would mint, so the row can show what the list
@@ -8993,6 +8995,12 @@ function trackerSend(ops){
    where it stands — nothing else on the screen is redrawn under her hands. */
 function trackerSet(id, fields, isNew){
   if(!requireAuth('this change')) return false;
+  /* A dated row tied to a bag item moves that bag's date too — the script does
+     the same on the sheet — so the card is right before the sheet echoes it. */
+  if('exp' in fields || 'bag' in fields){
+    var cur=trkRow(id)||{}, bag=('bag' in fields)?fields.bag:cur.bag, ex=('exp' in fields)?fields.exp:cur.exp;
+    if(bag && ex){ remoteExpiry=remoteExpiry||{}; remoteExpiry[bag]={date:ex, by:'', at:todayISO()}; }
+  }
   var l=trackerLocal[id]||(trackerLocal[id]={f:{}, isNew:!!isNew});
   Object.keys(fields).forEach(function(k){ l.f[k]=fields[k]; });
   trackerQueue[id]=Object.assign(trackerQueue[id]||{id:id}, fields);
@@ -9040,15 +9048,35 @@ function trackerForm(r){
     {key:'order',label:'Order notes',type:'text',value:r?r.order:''},
     {key:'notes',label:'Notes',type:'text',value:r?r.notes:''},
     {key:'brand',label:'Brand or vendor',type:'text',value:r?r.brand:''},
-    {key:'link',label:'Counts down when the After Duty form says one was used',type:'select',value:r?r.link||'':'',options:cons}
+    {key:'link',label:'Counts down when the After Duty form says one was used',type:'select',value:r?r.link||'':'',options:cons},
+    {key:'bag',label:'Its date is the date for this bag item',type:'select',value:r?r.bag||'':'',options:trkBagItems(r)}
   ];
+}
+/* Every dated item in every bag, as `<unit>|<item>` — the key a bag's card
+   reads its dates by. A row tied to one sends its Expiration there. */
+function trkBagItems(r){
+  var out=[{v:'',t:'None'}], seen={};
+  (DB.bagUnits||[]).forEach(function(u){
+    if(!u || u.active===false) return;
+    var t=(DB.bags||[]).filter(function(b){ return b.id===u.type; })[0]; if(!t) return;
+    (t.sections||[]).forEach(function(sec){
+      (sec.items||[]).forEach(function(it){
+        if(!it.exp) return;
+        var k=u.id+'|'+it.id; seen[k]=1;
+        out.push({v:k, t:u.name+' — '+String(it.label||'').replace(/^\(\d+\)\s*/,'')});
+      });
+    });
+  });
+  // A link to an item that has since left its bag still shows, so it can be seen and cleared.
+  if(r && r.bag && !seen[r.bag]) out.push({v:r.bag, t:r.bag+' (no longer in a bag)'});
+  return out;
 }
 function trackerFields(v){
   var list = v.list==='__new' ? (v.newlist||'').trim() : v.list;
   var num=function(x){ return String(x).trim()==='' ? null : Math.max(0,Math.floor(Number(x)||0)); };
   return {item:v.item.trim(), list:list||TRACKER_LISTS[0], loc:(v.loc||'').trim(), stock:num(v.stock), par:num(v.par),
           exp:v.exp||'', status:v.status||'Stocked', order:(v.order||'').trim(), notes:(v.notes||'').trim(),
-          brand:(v.brand||'').trim(), link:v.link||''};
+          brand:(v.brand||'').trim(), link:v.link||'', bag:v.bag||''};
 }
 function trackerAdd(list){
   if(!requireAuth('this item being added')) return;
@@ -11937,9 +11965,21 @@ function kitNeeds(u,exp){
   // already said so, which is a line of its own above.
   var said={};
   lines.forEach(function(l){ if(l.k==='expired') said[l.label.toLowerCase()]=1; });
-  var dates=(exp||[]).filter(function(r){
-    return r.key.indexOf(u.id+'|')===0 && r.days<=60 && !said[String(r.item).toLowerCase()];
+  /* This bag's dates. An Equipment Check dates a bag TYPE, which is a different
+     scope from one kit on purpose — except where the type IS one kit (the CC
+     Pod), when it is the same thing said from the other form. One line per
+     item: whichever was recorded last. */
+  var solo=(DB.bagUnits||[]).filter(function(x){ return x && x.type===u.type && x.active!==false; }).length===1;
+  var best={};
+  (exp||[]).forEach(function(r){
+    var cut=r.key.indexOf('|'), pre=r.key.slice(0,cut), it=r.key.slice(cut+1);
+    if(pre!==u.id && !(solo && u.type && pre===u.type)) return;
+    var b=best[it];
+    if(!b || (r.at||'')>(b.at||'') || ((r.at||'')===(b.at||'') && pre===u.id)) best[it]=r;
   });
+  var dates=Object.keys(best).map(function(it){ return best[it]; }).filter(function(r){
+    return r.days<=60 && !said[String(r.item).toLowerCase()];
+  }).sort(function(a,b){ return a.days-b.days; });
   /* "Close to expiring" ticked on a Before Duty form: the member telling the
      Equipment Manager, which is exactly what she asked the form to do. It
      arrives as a line on the shared list; it is shown here, on the bag. */
@@ -12134,8 +12174,11 @@ function kitCardHtml(n){
     h+='<div class="kc-group"><div class="kc-gh"><span class="gi i-date">◷</span>Expiry dates</div><ul class="kc-list">'+
        n.dates.map(function(d){
          var w = d.days<0 ? 'expired '+(-d.days)+'d ago' : d.days===0 ? 'expires today' : d.days+' days left';
+         var k=u.id+'|'+d.key.slice(d.key.indexOf('|')+1);
          return '<li><div class="kc-item"><b>'+esc(d.item)+'</b></div>'+
-                '<span class="daysleft '+(d.days<0?'bad':'soon')+'">'+w+'</span></li>';
+                '<span class="daysleft '+(d.days<0?'bad':'soon')+'">'+w+'</span>'+
+                '<button type="button" class="rmbtn" data-need="equipment" '+
+                'onclick="kitExpUpdate(\''+jsq(k)+'\',\''+jsq(d.item)+'\',\''+jsq(d.iso)+'\')">Update</button></li>';
        }).join('')+'</ul></div>';
   if(kitNote[u.id]) h+='<p class="kc-msg">'+kitNote[u.id]+'</p>';
   if(!n.any && !n.oos.oos)
@@ -12424,6 +12467,40 @@ function kitEntryBody(r,full){
       : (r.review?'<div class="kc-quote">'+esc(r.review)+'</div>':'<p class="hint" style="margin:0">No note yet.</p>'))+
     '</div>';
   return h;
+}
+/* A date corrected from the bag's card. Shown at once, then read back: the
+   reply to a POST cannot be read, so the sheet holding it is the only proof. */
+function kitExpUpdate(k,label,cur){
+  var url=(DB.api&&DB.api.url)||'';
+  if(!url){ uiAlert('No spreadsheet is connected.','Not saved'); return; }
+  uiForm('Update the date', label, [{key:'date',label:'Expires',type:'date',required:true,value:cur||''}],
+         {okText:'Save'}).then(function(v){
+    if(!v || !v.date || v.date===cur) return;
+    if(!requireAuth('this date')) return;
+    var was=remoteExpiry?remoteExpiry[k]:undefined;
+    remoteExpiry=remoteExpiry||{};
+    remoteExpiry[k]={date:v.date, by:'', at:todayISO()};
+    DB.expiry=DB.expiry||{}; DB.expiry[k]=v.date; saveDBQuiet();
+    renderKits();
+    try{
+      fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body:JSON.stringify({form:'__expiry', site:'ops', k:k, item:label, date:v.date,
+                             idToken:googleIdToken, key:(DB.api&&DB.api.key)||''})});
+    }catch(e){}
+    (function again(tries){
+      setTimeout(function(){
+        fetchSharedState().then(function(){
+          var now=(remoteExpiry||{})[k];
+          if(now && now.date===v.date){ toast('Date saved.'); renderKits(); return; }
+          if(tries<2){ again(tries+1); return; }
+          remoteExpiry=remoteExpiry||{};
+          if(was) remoteExpiry[k]=was; else delete remoteExpiry[k];
+          toast('That date did not save — sign in again, or the spreadsheet needs the current script.', true);
+          renderKits();
+        });
+      }, tries?3000:2000);
+    })(0);
+  });
 }
 function kitChip(c){
   var t=document.getElementById('entNote'); if(!t) return;
