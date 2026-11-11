@@ -2163,7 +2163,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='202611102014';
+var BUILD='202611111734';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -3126,6 +3126,8 @@ var DEFAULTS={
     {id:'c-opa',       name:'OPA',                          unit:'each'},
     {id:'c-npa',       name:'NPA',                          unit:'each'},
     {id:'c-bvm',       name:'Bag-valve mask',               unit:'each'},
+    // `at:'aed'`: only from a bag that carries an AED — see aedUnits().
+    {id:'c-aedpads',   name:'AED pads',                     unit:'set', at:'aed'},
     {id:'c-suction',   name:'Suction catheter',             unit:'each'},
     {id:'c-gloves',    name:'Gloves',                       unit:'pair'},
     {id:'c-mask',      name:'Face mask',                    unit:'each'},
@@ -4600,9 +4602,13 @@ function rememberAdopted(map){
   try{ localStorage.setItem(LS_ADOPTED,JSON.stringify(map)); }catch(e){}
 }
 
-function adoptShippedAdditions(){
+/* `srv` is the server's copy, when this runs right after a pull. Only that can
+   say an addition is truly shared: the local baseline is patched below to
+   carry additions, so reading it here marked an item taken before the server
+   ever had it, and the next pull removed it for good. */
+function adoptShippedAdditions(srv){
   var done=adoptedIds(), n=0, touched=false;
-  [['bags','bag'],['bagUnits','unit']].forEach(function(pair){
+  [['bags','bag'],['bagUnits','unit'],['consumables','item']].forEach(function(pair){
     var key=pair[0], tag=pair[1];
     var shipped=DEFAULTS[key]||[];
     if(!Array.isArray(DB[key])) return;
@@ -4612,8 +4618,8 @@ function adoptShippedAdditions(){
        on the first load the seeded defaults still contain the kit, and a
        moment later the pull takes it away again. */
     var shared={};
-    if(contentBase && Array.isArray(contentBase[key]))
-      contentBase[key].forEach(function(x){ if(x&&x.id) shared[x.id]=1; });
+    if(srv && Array.isArray(srv[key]))
+      srv[key].forEach(function(x){ if(x&&x.id) shared[x.id]=1; });
     shipped.forEach(function(x){
       if(!x||!x.id) return;
       var mark=tag+':'+x.id;
@@ -4629,7 +4635,7 @@ function adoptShippedAdditions(){
          off. */
       if(have[x.id]) return;
       DB[key].push(JSON.parse(JSON.stringify(x)));
-      n++; done[mark]=1; touched=true;
+      n++;
     });
   });
   if(touched) rememberAdopted(done);
@@ -4640,7 +4646,7 @@ function adoptShippedAdditions(){
      starts REFUSING the server's bags to protect that phantom, so a manager's
      real checklist update would never reach anybody again. */
   if(n && contentBase){
-    ['bags','bagUnits'].forEach(function(key){
+    ['bags','bagUnits','consumables'].forEach(function(key){
       if(!Array.isArray(contentBase[key]) || !Array.isArray(DB[key])) return;
       var have={}; contentBase[key].forEach(function(x){ if(x&&x.id) have[x.id]=1; });
       DB[key].forEach(function(x){
@@ -4737,7 +4743,7 @@ function applyContentInner(obj){
      editor; until then it simply shows, which is the point. */
   if(adoptShippedPhotos()) n++;
   // Kits the published copy predates, same reasoning and the same one-time rule.
-  if(adoptShippedAdditions()) n++;
+  if(adoptShippedAdditions(obj)) n++;
   if(n) saveDB();
   return n>0;
 }
@@ -5622,16 +5628,39 @@ var BIKE_SOURCE={id:'bike-jumpkit', name:'Bike Jumpkit'};
 function usageSources(){
   return (DB.bagUnits||[]).filter(function(u){return u.active;}).concat([BIKE_SOURCE]);
 }
+/* Bags with an AED in them, read from their contents lists rather than named
+   here, so a bag that gains an AED offers its pads without another change.
+   A line naming only pads is pads, not an AED. */
+function aedUnits(){
+  var types={};
+  (DB.bags||[]).forEach(function(b){
+    (b.sections||[]).forEach(function(sec){
+      (sec.items||[]).forEach(function(it){
+        var l=String(it.label||'');
+        if(/\bAED\b/.test(l) && !/^\W*(\(\d+\)\s*)?(adult |child |pediatric )?pads\b/i.test(l)) types[b.id]=1;
+      });
+    });
+  });
+  return usageSources().filter(function(u){ return u.type && types[u.type]; });
+}
+// Where one usage item can have come from: everywhere, unless it says otherwise.
+function usageSourcesFor(itemId){
+  var c=(DB.consumables||[]).filter(function(x){ return x.id===itemId; })[0];
+  if(c && c.at==='aed'){ var a=aedUnits(); if(a.length) return a; }
+  return usageSources();
+}
 
 function renderUsage(fid){
   var host=document.getElementById(fid+'-usage'); if(!host) return;
   var rows=usageState(fid);
-  var items=DB.consumables||[], units=usageSources();
+  var items=DB.consumables||[];
   // A row nobody has pointed anywhere yet comes from the bag being returned.
   var dflt=formPick[fid]||'';
-  if(dflt && units.some(function(u){ return u.id===dflt; }))
-    rows.forEach(function(r){ if(!r.from) r.from=dflt; });
   host.innerHTML=rows.map(function(r,i){
+    var units=usageSourcesFor(r.item);
+    if(r.from && !units.some(function(u){ return u.id===r.from; })) r.from='';
+    if(!r.from && dflt && units.some(function(u){ return u.id===dflt; })) r.from=dflt;
+    if(!r.from && units.length===1) r.from=units[0].id;
     var itemOpts='<option value="">— pick an item —</option>'+items.map(function(c){
       return '<option value="'+esc(c.id)+'"'+(r.item===c.id?' selected':'')+'>'+esc(c.name)+'</option>';
     }).join('')+'<option value="__other"'+(r.item==='__other'?' selected':'')+
