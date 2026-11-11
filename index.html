@@ -2163,7 +2163,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='202611111734';
+var BUILD='202611111741';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -2889,6 +2889,7 @@ var DEFAULTS={
      sections:[
        {name:'Front', items:[
          {id:'bb-aed', label:'(1) AED', exp:true},
+         {id:'bb-aedpads', label:'Adult AED pads', exp:true},
          {id:'bb-childpads', label:'(1) child pads (behind AED)', exp:true}]},
        {name:'Main compartment', items:[
          {id:'bb-suction', label:'(1) suction unit — with one set of catheters and tubing inside'},
@@ -3438,6 +3439,11 @@ var LABEL_FIXES={
   'sp-petro':'(4) 5x9 petroleum gauze'
 };
 
+// New checklist lines for bags that already shipped. Same rule as the fixes above.
+var ITEM_ADDS=[
+  {after:'bb-aed', item:{id:'bb-aedpads', label:'Adult AED pads', exp:true}}
+];
+
 /* One checklist line become several, by the old line's id. The Equipment
    Manager asked for the stethoscope, BP cuff and pulse ox to be checked one at a
    time: "all three tested and working" can only be ticked or not, and a single
@@ -3463,6 +3469,14 @@ function applyLabelFixes(){
         } else out.push(it);
       });
       if(hit){ sec.items=out; n++; }
+      // Lines added to a bag after it shipped, placed after the line they follow.
+      ITEM_ADDS.forEach(function(a){
+        if(!Array.isArray(sec.items)) return;
+        var at=-1;
+        sec.items.forEach(function(y,i){ if(y && y.id===a.after) at=i; });
+        if(at<0 || sec.items.some(function(y){ return y && y.id===a.item.id; })) return;
+        sec.items.splice(at+1,0,JSON.parse(JSON.stringify(a.item))); n++;
+      });
     });
   });
   (DB.bags||[]).forEach(function(b){
@@ -5630,14 +5644,14 @@ function usageSources(){
 }
 /* Bags with an AED in them, read from their contents lists rather than named
    here, so a bag that gains an AED offers its pads without another change.
-   A line naming only pads is pads, not an AED. */
+   A line about pads is pads, not an AED. */
 function aedUnits(){
   var types={};
   (DB.bags||[]).forEach(function(b){
     (b.sections||[]).forEach(function(sec){
       (sec.items||[]).forEach(function(it){
         var l=String(it.label||'');
-        if(/\bAED\b/.test(l) && !/^\W*(\(\d+\)\s*)?(adult |child |pediatric )?pads\b/i.test(l)) types[b.id]=1;
+        if(/\bAED\b/.test(l) && !/\bpads?\b/i.test(l)) types[b.id]=1;
       });
     });
   });
