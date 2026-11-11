@@ -355,9 +355,11 @@ function actionRows(site, sinceDay) {
 
 var EXPIRY = {
   name: 'Expiry',
-  headers: ['Key','Bag','Item','Expires','Last Reported By','Updated','Site'],
+  // Ignored: a date the Equipment Manager set aside (a different product went
+  // in, say), kept here with why. It only counts while the date is unchanged.
+  headers: ['Key','Bag','Item','Expires','Last Reported By','Updated','Site','Ignored'],
   hide: ['Key','Site'],
-  widths:  [220, 150, 320, 100, 150, 120, 70]
+  widths:  [220, 150, 320, 100, 150, 120, 70, 320]
 };
 
 var CONCERNS = {
@@ -378,8 +380,11 @@ function ensureExpiry() {
   var sh = ss.getSheetByName(EXPIRY.name);
   if (!sh) { sh = ss.insertSheet(EXPIRY.name); sh.appendRow(EXPIRY.headers); }
   var have = sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), 1)).getValues()[0];
-  if (have.join('|') !== EXPIRY.headers.join('|'))
+  if (have.join('|') !== EXPIRY.headers.join('|')) {
+    if (sh.getMaxColumns() < EXPIRY.headers.length)
+      sh.insertColumnsAfter(sh.getMaxColumns(), EXPIRY.headers.length - sh.getMaxColumns());
     sh.getRange(1, 1, 1, EXPIRY.headers.length).setValues([EXPIRY.headers]);
+  }
   return sh;
 }
 
@@ -426,10 +431,11 @@ function putExpiry(list, site, who) {
   // payload would read the -1 sentinel back as a row number.
   rows = dedupeBy(rows, function (e) { return String(e.k); });
   rows.forEach(function (e) {
-    var row = [String(e.k), String(e.bag || ''), String(e.item || ''),
-               String(e.date), who || '', when, site];
     var ix = site + '\u0001' + String(e.k);
     var r = at[ix];
+    // The Ignored note stays; it lapses by itself once the date changes.
+    var row = [String(e.k), String(e.bag || ''), String(e.item || ''),
+               String(e.date), who || '', when, site, r > 0 ? have[r - 2][7] || '' : ''];
     if (r > 0) sh.getRange(r, 1, 1, n).setValues([row]);
     else { fresh.push(row); at[ix] = -1; }
   });
@@ -476,6 +482,43 @@ function setBagDate(p) {
   return json({ ok: true });
 }
 
+/* "For 2026-08-31 — different aspirin (Name, 2026-11-10)": readable in the
+   sheet, and still parseable. */
+function parseIgnored(v) {
+  var m = String(v || '').match(/^For (\d{4}-\d{2}-\d{2})(?: \u2014 ([\s\S]*?))? \((.*), (\d{4}-\d{2}-\d{2})\)$/);
+  return m ? { date: m[1], why: m[2] || '', by: m[3], at: m[4] } : null;
+}
+
+/* Setting a date aside, or taking it back. Only the ops site's rows. */
+function setExpiryIgnore(p) {
+  var c = writerCheck(p);
+  if (!c.name) {
+    logError('Expiry ignore REFUSED: ' + c.why, String(p.k || ''));
+    return json({ ok: false, error: 'not allowed: ' + c.why });
+  }
+  var k = String(p.k || '').trim(), date = String(p.date || '').trim();
+  var on = p.on === true || p.on === 'true';
+  var why = String(p.why || '').replace(/[\r\n]+/g, ' ').replace(/[()]/g, '').trim().slice(0, 200);
+  if (!/^[^|]+\|.+$/.test(k) || !/^\d{4}-\d{2}-\d{2}$/.test(date))
+    return json({ ok: false, error: 'bad request' });
+  var sh = ensureExpiry();
+  var find = function () {
+    var last = sh.getLastRow();
+    if (last < 2) return 0;
+    var v = sh.getRange(2, 1, last - 1, 7).getValues();
+    for (var i = 0; i < v.length; i++)
+      if (String(v[i][0]).trim() === k && rowSite(v[i][6]) === 'ops') return i + 2;
+    return 0;
+  };
+  var r = find();
+  if (!r && on) { putBagDates([{ k: k, item: String(p.item || ''), date: date }], c.name); r = find(); }
+  if (!r) return json({ ok: true });
+  var today = Utilities.formatDate(new Date(), sheetTZ(), 'yyyy-MM-dd');
+  sh.getRange(r, 8).setValue(on ? 'For ' + date + (why ? ' \u2014 ' + why : '') + ' (' + c.name + ', ' + today + ')' : '');
+  logAction('ops', c.name, on ? 'Expiry ignored' : 'Expiry un-ignored', date + (why ? ' · ' + why : ''), k, '');
+  return json({ ok: true });
+}
+
 function expiryRows(site) {
   site = site === 'bike' ? 'bike' : 'ops';
   var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(EXPIRY.name);
@@ -486,11 +529,13 @@ function expiryRows(site) {
     return (v instanceof Date) ? Utilities.formatDate(v, tz, 'yyyy-MM-dd') : String(v);
   };
   var out = {};
-  sh.getRange(2, 1, sh.getLastRow() - 1, EXPIRY.headers.length).getValues()
+  sh.getRange(2, 1, sh.getLastRow() - 1, Math.min(EXPIRY.headers.length, sh.getMaxColumns())).getValues()
     .forEach(function (r) {
       var k = String(r[0] || '').trim();
       if (!k || rowSite(r[6]) !== site) return;
       out[k] = { date: asDate(r[3]), by: String(r[4] || ''), at: asDate(r[5]) };
+      var ig = parseIgnored(r[7]);
+      if (ig && ig.date === out[k].date) out[k].ign = ig;
     });
   return out;
 }
@@ -1093,6 +1138,7 @@ function doPost(e) {
     if (p.form === '__bagstatus') return setBagStatus(p);
     if (p.form === '__tracker') return setTracker(p);
     if (p.form === '__expiry') return setBagDate(p);
+    if (p.form === '__expignore') return setExpiryIgnore(p);
     if (p.form === '__restockedit') return editRestock(p);
 
     // The bike site's forms, which post a different payload shape.

@@ -1647,6 +1647,10 @@
   .kc-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
   .kc-list li{display:flex;align-items:center;gap:10px}
   .kc-item{flex:1;min-width:0}
+  .kc-list li.kc-dt{flex-wrap:wrap;row-gap:2px}
+  .kc-dt .kc-item{min-width:8em}
+  .kc-dt .kc-item b{overflow-wrap:normal}
+  .kc-dta{display:flex;gap:4px;margin-left:auto}
   .kc-item b{display:block;font-weight:600;font-size:14.5px;line-height:1.35;overflow-wrap:anywhere}
   .kc-item span{display:block;font-size:12.5px;color:var(--ink-mute);margin-top:1px}
   .kc-quote{font-size:14px;line-height:1.45;color:var(--ink-soft);border-left:3px solid var(--rule-strong);
@@ -1677,6 +1681,8 @@
   .tl-row.found{background:linear-gradient(90deg,rgba(166,75,8,.035),transparent 40%)}
   .tl-top{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px}
   .tl-top b{font-size:14.5px}
+  .kc-ign{margin-top:6px;font-size:13px;color:var(--ink-mute)}
+  .kc-ign summary{cursor:pointer;padding:4px 0}
   .tl-radio{font-size:12px;font-weight:500;padding:1px 8px;border-radius:999px;background:var(--chip);color:var(--ink-mute);white-space:nowrap}
   .tl-kind{font-size:12px;font-weight:700;border-radius:6px;padding:1px 7px;background:var(--bg-2);color:var(--ink-soft)}
   .tl-kind.k-postcall{background:var(--brand-wash);color:var(--brand)}
@@ -2157,7 +2163,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='202611102009';
+var BUILD='202611102014';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -8637,16 +8643,18 @@ function expiryIndex(){
   return {items:items, places:places};
 }
 
-function expiringRows(){
+/* `all` keeps dates the Equipment Manager set aside (Ignore on the bag card);
+   every list of things due leaves them out. */
+function expiringRows(all){
   var ix=expiryIndex(), rows=[];
   /* The sheet's dates, and this device's only where the sheet has none yet — a
      date typed here that has not reached it. This device's copy used to win
      outright, so a date corrected anywhere else never reached a phone that had
      once typed the old one. */
-  var merged={}, when={};
+  var merged={}, when={}, ign={};
   Object.keys(remoteExpiry||{}).forEach(function(k){
     var e=(remoteExpiry||{})[k];
-    if(e&&e.date){ merged[k]=e.date; when[k]=e.at||''; }
+    if(e&&e.date){ merged[k]=e.date; when[k]=e.at||''; if(e.ign && e.ign.date===e.date) ign[k]=e.ign; }
   });
   Object.keys(DB.expiry||{}).forEach(function(k){ if(!merged[k]) merged[k]=DB.expiry[k]; });
   Object.keys(merged).forEach(function(k){
@@ -8654,8 +8662,9 @@ function expiringRows(){
     var place=k.slice(0,cut), item=k.slice(cut+1);
     var iso=merged[k]; var n=daysUntil(iso);
     if(n===null) return;
+    if(ign[k] && !all) return;
     var label=ix.items[item]||item;
-    rows.push({key:k, iso:iso, days:n, at:when[k]||'',
+    rows.push({key:k, iso:iso, days:n, at:when[k]||'', ign:ign[k]||null,
       item:label, known:!!ix.items[item],
       place:ix.places[place]||place,
       // Same key wantItem() would mint, so the row can show what the list
@@ -11981,6 +11990,8 @@ function kitNeeds(u,exp){
   var dates=Object.keys(best).map(function(it){ return best[it]; }).filter(function(r){
     return r.days<=60 && !said[String(r.item).toLowerCase()];
   }).sort(function(a,b){ return a.days-b.days; });
+  var ignored=dates.filter(function(r){ return r.ign; });
+  dates=dates.filter(function(r){ return !r.ign; });
   /* "Close to expiring" ticked on a Before Duty form: the member telling the
      Equipment Manager, which is exactly what she asked the form to do. It
      arrives as a line on the shared list; it is shown here, on the bag. */
@@ -12001,7 +12012,7 @@ function kitNeeds(u,exp){
           : flag ? 'Check it over'
           : dates.length ? 'Dates due'
           : 'Complete';
-  return {u:u, lines:lines, used:used, calls:calls, flag:flag, dates:dates, blocking:blocking,
+  return {u:u, lines:lines, used:used, calls:calls, flag:flag, dates:dates, ignored:ignored, blocking:blocking,
           last:owed&&owed.last, things:things, notes:notes, state:state, say:say, any:any, oos:oo,
           restock:!!(used.length||flag||lines.some(function(l){ return l.k==='missing'||l.k==='expired'; }))};
 }
@@ -12019,7 +12030,7 @@ function kitGroups(needs){
 
 function renderKits(){
   var host=document.getElementById('kitsHost'); if(!host) return;
-  var exp=expiringRows();
+  var exp=expiringRows(true);
   var needs=kitUnitsAll().map(function(u){ return kitNeeds(u,exp); });
   var busy=needs.filter(function(n){ return n.any || n.oos.oos; });
   var crit=needs.filter(function(n){ return n.state==='crit'; }).length;
@@ -12176,11 +12187,21 @@ function kitCardHtml(n){
        n.dates.map(function(d){
          var w = d.days<0 ? 'expired '+(-d.days)+'d ago' : d.days===0 ? 'expires today' : d.days+' days left';
          var k=u.id+'|'+d.key.slice(d.key.indexOf('|')+1);
-         return '<li><div class="kc-item"><b>'+esc(d.item)+'</b></div>'+
+         return '<li class="kc-dt"><div class="kc-item"><b>'+esc(d.item)+'</b></div>'+
                 '<span class="daysleft '+(d.days<0?'bad':'soon')+'">'+w+'</span>'+
+                '<span class="kc-dta"><button type="button" class="rmbtn" data-need="equipment" '+
+                'onclick="kitExpUpdate(\''+jsq(k)+'\',\''+jsq(d.item)+'\',\''+jsq(d.iso)+'\')">Update</button>'+
                 '<button type="button" class="rmbtn" data-need="equipment" '+
-                'onclick="kitExpUpdate(\''+jsq(k)+'\',\''+jsq(d.item)+'\',\''+jsq(d.iso)+'\')">Update</button></li>';
+                'onclick="kitExpIgnore(\''+jsq(d.key)+'\',\''+jsq(d.item)+'\',\''+jsq(d.iso)+'\',true)">Ignore</button></span></li>';
        }).join('')+'</ul></div>';
+  if(n.ignored && n.ignored.length)
+    h+='<details class="kc-ign"><summary>'+n.ignored.length+' date'+(n.ignored.length===1?'':'s')+' ignored</summary><ul class="kc-list">'+
+       n.ignored.map(function(d){
+         return '<li><div class="kc-item"><b>'+esc(d.item)+'</b><span>'+esc(kitDayLong(d.iso))+
+                (d.ign.why?' · '+esc(d.ign.why):'')+(d.ign.by?' · '+esc(d.ign.by):'')+'</span></div>'+
+                '<button type="button" class="rmbtn" data-need="equipment" '+
+                'onclick="kitExpIgnore(\''+jsq(d.key)+'\',\''+jsq(d.item)+'\',\''+jsq(d.iso)+'\',false)">Undo</button></li>';
+       }).join('')+'</ul></details>';
   if(kitNote[u.id]) h+='<p class="kc-msg">'+kitNote[u.id]+'</p>';
   if(!n.any && !n.oos.oos)
     h+='<div class="kc-group"><p class="hint" style="margin:0">Nothing to replace.</p></div>';
@@ -12504,6 +12525,44 @@ function kitExpUpdate(k,label,cur){
     })(0);
   });
 }
+/* Setting a date aside without changing it: a different product went in, so
+   the old date is no longer the bag's. Kept in the Expiry tab with why; it
+   lapses on its own once that item gets a new date. */
+function kitExpIgnore(k,label,iso,on){
+  var url=(DB.api&&DB.api.url)||'';
+  if(!url){ uiAlert('No spreadsheet is connected.','Not saved'); return; }
+  var ask = on
+    ? uiForm('Ignore this date', label+' · '+kitDayLong(iso),
+        [{key:'why',label:'Why',type:'text',value:''}], {okText:'Ignore'})
+    : Promise.resolve({why:''});
+  ask.then(function(v){
+    if(!v) return;
+    if(!requireAuth('this date')) return;
+    remoteExpiry=remoteExpiry||{};
+    var cur=remoteExpiry[k], was=cur?cur.ign:undefined;
+    if(!cur){ cur=remoteExpiry[k]={date:iso, by:'', at:todayISO()}; }
+    if(on) cur.ign={date:iso, why:String(v.why||'').trim(), by:'', at:todayISO()}; else delete cur.ign;
+    renderKits();
+    try{
+      fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body:JSON.stringify({form:'__expignore', site:'ops', k:k, item:label, date:iso, on:on, why:v.why||'',
+                             idToken:googleIdToken, key:(DB.api&&DB.api.key)||''})});
+    }catch(e){}
+    (function again(tries){
+      setTimeout(function(){
+        fetchSharedState().then(function(){
+          var now=(remoteExpiry||{})[k], has=!!(now && now.ign && now.ign.date===iso);
+          if(has===on){ toast(on?'Ignored.':'Back on the list.'); renderKits(); return; }
+          if(tries<2){ again(tries+1); return; }
+          var e=(remoteExpiry||{})[k];
+          if(e){ if(was) e.ign=was; else delete e.ign; }
+          toast('That did not save — sign in again, or the spreadsheet needs the current script.', true);
+          renderKits();
+        });
+      }, tries?3000:2000);
+    })(0);
+  });
+}
 function kitChip(c){
   var t=document.getElementById('entNote'); if(!t) return;
   var v=t.value.trim();
@@ -12684,7 +12743,7 @@ function kitRestocked(id){
   if(!can('equipment')) return;
   var u=kitUnitById(id); if(!u) return;
   if(!requireAuth('this bag being marked restocked')) return;
-  var n=kitNeeds(u,expiringRows());
+  var n=kitNeeds(u,expiringRows(true));
   // Only lines that are open problems; "close to expiring" notes are lines on
   // the shared list and have their own tick.
   var closing=n.lines.filter(function(l){ return l.k==='missing'||l.k==='expired'; });
