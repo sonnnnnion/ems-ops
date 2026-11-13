@@ -2163,7 +2163,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='202611111741';
+var BUILD='202611121930';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -6857,7 +6857,7 @@ function doSubmit(fid,s){
        its "Replaced By Member" column. */
   }
 
-  lastResult[fid]={sent:sent, url:!!url, s:s, tab:c.tab, sid:payload.sid, filed:null};
+  lastResult[fid]={sent:sent, url:!!url, s:s, tab:c.tab, sid:payload.sid, filed:sent?'sent':null, payload:payload};
   formDone[fid]=true;
   // Remember who filed it. Here, and not on every keystroke, because by this
   // point the name and Andrew ID have passed validation — storing a half-typed
@@ -6870,34 +6870,64 @@ function doSubmit(fid,s){
   renderCheck(fid);
   // The submission is in the air by now and the panel is on screen. Go and ask
   // the spreadsheet whether it arrived.
-  if(sent) checkFiled(fid);
+  if(sent) confirmFiled(fid);
 }
 
-/* Did it actually land?
+/* The member sees "Submitted" at once and nothing else, because that is true
+   the moment Submit is pressed: the payload is on the phone and the send has
+   started. The spreadsheet takes about three seconds to answer ANY request, so
+   everything after that happens here without asking anything of the person:
 
-   A submission is posted no-cors, which means the browser is forbidden from
-   reading the reply — so "sent" has never been the same claim as "saved", and
-   the completion panel used to say so by telling the member to ask a manager to
-   go and look in the spreadsheet. That is the single commonest reason anybody
-   opens that file, and it asks the person with the least access to do the
-   checking.
+     1. wait for the send to leave the phone;
+     2. ask the spreadsheet for the row, a few times, a few seconds apart;
+     3. if it never shows, send it once more (the sid makes a repeat harmless)
+        and ask again.
 
-   A plain GET is readable, so the site can just ask. Three tries, backing off:
-   the row is written before the script answers, but a cold container can take a
-   few seconds to get there and a phone on campus wifi can drop the first one. */
-function checkFiled(fid){
-  var r=lastResult[fid]; if(!r||!r.sid) return;
-  var url=(DB.api&&DB.api.url)||''; if(!url) return;
-  var paint=function(state){
-    if(!lastResult[fid]||lastResult[fid].sid!==r.sid) return;   // a newer filing owns the panel
-    lastResult[fid].filed=state;
+   Only two things are ever said out loud: the phone could not send at all, or
+   the row could not be confirmed after all of the above. */
+function setFiled(fid,sid,state){
+  var r=lastResult[fid]; if(!r||r.sid!==sid) return false;   // a newer filing owns the panel
+  if(r.filed!==state){
+    r.filed=state;
     var el=document.getElementById(fid+'-filed');
     if(el) el.outerHTML=filedLine(fid);
+  }
+  return true;
+}
+function confirmFiled(fid, round){
+  var r=lastResult[fid]; if(!r||!r.sid) return;
+  var url=(DB.api&&DB.api.url)||''; if(!url) return;
+  var sid=r.sid, t0=Date.now();
+  round=round||0;
+  r.watch=(r.watch||0)+1; var me=r.watch;
+  var mine=function(){ var x=lastResult[fid]; return !!(x && x.sid===sid && x.watch===me); };
+  setFiled(fid,sid,'sent');
+  var verify=function(n){
+    if(!mine()) return;
+    fetchJSONTries(url+(url.indexOf('?')<0?'?':'&')+'filed='+encodeURIComponent(sid), 1, 9000)
+      .then(function(j){ return !!(j&&j.ok&&j.found); }, function(){ return false; })
+      .then(function(found){
+        if(!mine()) return;
+        if(found){ setFiled(fid,sid,'yes'); return; }
+        if(n<3){ setTimeout(function(){ verify(n+1); }, 2500); return; }
+        if(round<1){ outboxAdd(r.payload); drainOutbox(); confirmFiled(fid, round+1); return; }
+        setFiled(fid,sid,'fail');
+      });
   };
-  paint('checking');
-  fetchJSONTries(url+(url.indexOf('?')<0?'?':'&')+'filed='+encodeURIComponent(r.sid), 3, 9000)
-    .then(function(j){ paint(j&&j.ok&&j.found ? 'yes' : 'no'); })
-    .catch(function(){ paint('unreachable'); });
+  (function wait(){
+    if(!mine()) return;
+    if(!outboxRead().some(function(q){ return q.sid===sid; })){ setFiled(fid,sid,'sent'); verify(0); return; }
+    // Still on the phone. Said only once an attempt has really failed — a send
+    // that is simply in flight is not a problem and must not look like one.
+    if(!outboxBusy && outboxFailedAt>=t0) setFiled(fid,sid,'stuck');
+    else if(outboxBusy) setFiled(fid,sid,'sent');
+    setTimeout(wait, 500);
+  })();
+}
+function resendFiled(fid){
+  var r=lastResult[fid]; if(!r||!r.payload) return;
+  if(!outboxRead().some(function(q){ return q.sid===r.sid; })) outboxAdd(r.payload);
+  drainOutbox(); confirmFiled(fid, 1);
 }
 
 /* ============================================================================
@@ -6928,7 +6958,7 @@ function checkFiled(fid){
    is the half that matters here. Resolved means the request left the phone and
    the queue can let go of it; rejected means it never left, and it stays. The
    real confirmation is still the "On the spreadsheet" check, unchanged. */
-var LS_OUTBOX='emsops_outbox_v1', outboxBusy=false, outboxInFlight='';
+var LS_OUTBOX='emsops_outbox_v1', outboxBusy=false, outboxInFlight='', outboxFailedAt=0, outboxStuck=false;
 
 function outboxRead(){
   try{ var v=JSON.parse(localStorage.getItem(LS_OUTBOX)||'[]'); return Array.isArray(v)?v:[]; }
@@ -6991,12 +7021,12 @@ function drainOutbox(){
         for(var i=0;i<cur.length;i++){
           if(cur[i].at===item.at && cur[i].body===item.body){ cur.splice(i,1); break; }
         }
-        outboxWrite(cur); sentCount++;
+        outboxWrite(cur); sentCount++; outboxStuck=false;
         return step();
       });
   };
   return step()
-    .catch(function(){ /* still no signal; everything left stays queued */ })
+    .catch(function(){ outboxFailedAt=Date.now(); outboxStuck=true; /* everything left stays queued */ })
     .then(function(){ outboxBusy=false; outboxInFlight=''; paintOutbox(); return sentCount; });
 }
 
@@ -7006,10 +7036,11 @@ function drainOutbox(){
 function paintOutbox(){
   var el=document.getElementById('outboxNote'); if(!el) return;
   var n=outboxCount();
-  if(!n){ el.hidden=true; el.innerHTML=''; return; }
+  // Only once a send has actually failed. One that is in flight is not waiting.
+  if(!n || outboxBusy || !outboxStuck){ el.hidden=true; el.innerHTML=''; return; }
   el.hidden=false;
-  el.innerHTML='<b>'+n+' '+(n===1?'submission is':'submissions are')+' waiting to send.</b> '+
-    'They are saved on this phone and will go out on their own once there is signal. '+
+  el.innerHTML='<b>'+n+' '+(n===1?'submission':'submissions')+' could not send.</b> '+
+    'Saved on this phone; '+(n===1?'it goes':'they go')+' out by '+(n===1?'itself':'themselves')+' when the connection is back. '+
     '<button type="button" class="btn xs" onclick="drainOutbox().then(paintOutbox)">Try now</button>';
 }
 
@@ -7055,23 +7086,15 @@ function filedLine(fid){
   if(!r.url) return '<div id="'+fid+'-filed" class="donefiled bad"><b>Not sent anywhere yet.</b> '+
     'No spreadsheet is connected, so this was recorded on this device only. '+
     'A manager needs to finish the setup in Site Settings.</div>';
-  /* Still on the phone. Checked before the spreadsheet answer, because when
-     there is no signal that answer is "could not be reached to confirm it" —
-     which reads like something went wrong, when in fact nothing has: the
-     submission is safe and will send itself. Those are different situations and
-     the person walking away from the bag deserves to know which one they are
-     in. */
-  if(r.sid && outboxRead().some(function(q){ return q.sid===r.sid; }))
-    return '<div id="'+fid+'-filed" class="donefiled warn"><b>Saved on this phone, waiting for signal.</b> '+
-      'It will send itself as soon as you have a connection \u2014 you can close this. '+
-      '<button type="button" class="btn xs" onclick="drainOutbox().then(function(){ checkFiled(\''+jsq(fid)+'\'); })">Try now</button></div>';
-  if(st==='yes'){ cls+=' good'; txt='\u2713 On the spreadsheet. Nothing else to do.'; }
-  else if(st==='no'){ cls+=' bad'; txt='Not on the spreadsheet yet. It may still be arriving \u2014 '+
-    '<button type="button" class="btn xs" onclick="checkFiled(\''+fid+'\')">check again</button>'; }
-  else if(st==='unreachable'){ cls+=' warn'; txt='Sent, but the spreadsheet could not be reached to '+
-    'confirm it. <button type="button" class="btn xs" onclick="checkFiled(\''+fid+'\')">check again</button>'; }
-  else txt='Checking the spreadsheet\u2026';
-  return '<div id="'+fid+'-filed" class="'+cls+'">'+txt+'</div>';
+  if(st==='stuck')
+    return '<div id="'+fid+'-filed" class="donefiled warn"><b>Could not send \u2014 no connection.</b> '+
+      'Saved on this phone; it sends itself when the connection is back. '+
+      '<button type="button" class="btn xs" onclick="drainOutbox()">Try now</button></div>';
+  if(st==='fail')
+    return '<div id="'+fid+'-filed" class="donefiled bad"><b>Could not confirm this reached the spreadsheet.</b> '+
+      '<button type="button" class="btn xs" onclick="resendFiled(\''+jsq(fid)+'\')">Send again</button></div>';
+  return '<div id="'+fid+'-filed" class="donefiled good">\u2713 Submitted'+
+    (st==='yes'?' \u2014 on the spreadsheet.':'.')+'</div>';
 }
 
 /* What this filing actually says, in the words of the form that was filed.
