@@ -59,9 +59,10 @@ var SHEETS = {
        a room is renamed, which is the failure this file has hit more than once.
     */
     // `Also Cleaned` appended last: cleaning jobs done on the same visit.
-    keys:    ['date','time','name','andrew','subject','result','missingCount','missing','restock','maint','sid','dp','callsign','roomId','dpKey','jobNames'],
-    headers: ['Date','Time','Name','Andrew ID','Room','Result','Missing','What Was Missing','Restock Needed','Maintenance','Submission ID','Duty Period','Call Sign','Room ID','DP Key','Also Cleaned'],
-    widths:  [95, 70, 150, 100, 150, 150, 80, 320, 260, 260, 120, 120, 90, 110, 90, 240]
+    // `Picked Anyway`: an ops login chose a room already done this duty period.
+    keys:    ['date','time','name','andrew','subject','result','missingCount','missing','restock','maint','sid','dp','callsign','roomId','dpKey','jobNames','override'],
+    headers: ['Date','Time','Name','Andrew ID','Room','Result','Missing','What Was Missing','Restock Needed','Maintenance','Submission ID','Duty Period','Call Sign','Room ID','DP Key','Also Cleaned','Picked Anyway'],
+    widths:  [95, 70, 150, 100, 150, 150, 80, 320, 260, 260, 120, 120, 90, 110, 90, 240, 280]
   },
   /* Keyed by the name the site sends, which never changes; `name` is what the
      tab is called, which now matches what the site calls the form. `was` is how
@@ -1191,6 +1192,8 @@ function doPost(e) {
 
     writeItems(p);
     addToRestock(p);
+    if (conf === SHEETS['Room Checks'] && p.override)
+      try { logAction('ops', p.name || p.callsign || '', 'Picked anyway', String(p.subject || ''), String(p.dp || ''), String(p.sid || '')); } catch (err) {}
     /* What a call took off the bike kit, onto the bike list. Named as coming
        from a call so whoever works that list can see it was used rather than
        found missing on a check — the two want different follow-ups. */

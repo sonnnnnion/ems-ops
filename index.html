@@ -2200,7 +2200,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='202611141819';
+var BUILD='202611141829';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -6685,6 +6685,14 @@ function doSubmit(fid,s){
   };
   Object.keys(s.radios).forEach(function(k){ payload[k]=s.radios[k]; });
   Object.keys(s.extras).forEach(function(k){ payload[k]=s.extras[k]; });
+  // Recorded, so ops overrides can be watched: who was signed in, and why the
+  // room was shut.
+  if(c.pick && c.pick.from==='rooms' && s.pick && roomForced[fid]===s.pick){
+    var who=''; try{ who=normEmail(localStorage.getItem(LS_EMAIL)||''); }catch(e){} who=who||(ROLE_LABEL[ROLE]||ROLE);
+    var rr=(DB.rooms||[]).filter(function(x){ return x.id===s.pick; })[0];
+    var full=rr && s.dp && dpRoomDone(s.dp,s.pick)>=(rr.slots||1);
+    payload.override='Yes — '+(full?'slots were full':'already done this round')+' · '+who;
+  }
   if(s.jobs && s.jobs.length){
     payload.jobIds=s.jobs.map(function(j){ return j.id; }).join(',');
     payload.jobNames=s.jobs.map(function(j){ return j.name; }).join(' | ');
