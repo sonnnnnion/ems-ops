@@ -1317,6 +1317,12 @@
   .rp-st.s-warn{color:var(--warn)} .rp-st.s-oos{color:var(--oos)} .rp-st.s-off{color:var(--ink-mute)}
   .roompick.on .rp-st{color:#fff}
   .roompick .rp-st + .rp-sub{text-transform:none;letter-spacing:0;font-size:12px}
+  .choretag{margin:-6px 0 12px;font-size:12.5px;font-style:italic;color:var(--ink-mute);display:flex;gap:8px;align-items:baseline}
+  .choretag.empty span{display:none}
+  .roompick .rp-done{display:none;font-size:12px;font-weight:600;color:var(--ink-mute);margin-top:4px}
+  .roompick.done{opacity:.6;background:repeating-linear-gradient(135deg,#F3EFE9 0 8px,#ECE6DD 8px 16px);cursor:not-allowed}
+  .roompick.done .rp-sub{display:none}
+  .roompick.done .rp-done{display:block}
   .roompick.off{opacity:.75;background:repeating-linear-gradient(135deg,#F3EFE9 0 8px,#ECE6DD 8px 16px);cursor:not-allowed}
 
   /* Summary tiles that are buttons, with a picture of what they count. */
@@ -1426,6 +1432,8 @@
   .stk-tick{width:58px;height:58px;border-radius:999px;background:var(--ok);color:#fff;display:grid;place-items:center;font-size:30px;margin:0 auto 10px}
   .stk-done h2{font-family:var(--font-display);font-size:24px;margin:0}
   .stk-done p{color:var(--ink-mute);margin:4px 0 0}
+  .stk-q{font-size:20px;margin:4px 0 12px;line-height:1.3}
+  .stk-list small{font-weight:500;color:var(--ink-mute)}
   .stk-list{list-style:none;margin:16px 0 0;padding:0;border-top:1px solid var(--rule-soft)}
   .stk-list li{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--rule-soft);font-size:14px}
   .stk-list span{font-family:var(--font-mono);font-size:13px;color:var(--ink-soft);white-space:nowrap}
@@ -1507,6 +1515,34 @@
   .ord-f{display:flex;gap:8px;justify-content:flex-end;margin-top:12px;padding-top:10px;border-top:1px solid var(--rule-soft)}
   .ord-empty{margin-bottom:18px}
   /* The year ahead: a month per column, scrolled sideways. */
+  .expcal{padding:14px}
+  .ec-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+  .ec-head b{font-size:15px;min-width:9.5em;text-align:center}
+  .ec-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+  .ec-dow{font-size:11px;font-weight:600;color:var(--ink-mute);text-align:center;padding:2px 0}
+  .ec-cell{min-height:64px;border:1px solid var(--rule-soft);border-radius:8px;background:var(--card);padding:4px 5px;
+    font:inherit;text-align:left;display:flex;flex-direction:column;gap:2px;color:var(--ink-soft);min-width:0}
+  .ec-cell:disabled{cursor:default}
+  .ec-pad{border:0;background:transparent}
+  .ec-cell .ec-d{font-size:12px;font-weight:600}
+  .ec-cell.today{border-color:var(--brand)}
+  .ec-cell.today .ec-d{color:var(--brand)}
+  .ec-cell.has{background:var(--warn-wash);border-color:color-mix(in srgb,var(--warn) 40%,var(--rule));cursor:pointer}
+  .ec-cell.past{background:var(--oos-wash);border-color:color-mix(in srgb,var(--oos) 35%,var(--rule));cursor:pointer}
+  .ec-cell.sel{outline:2px solid var(--brand);outline-offset:1px}
+  .ec-n{display:none;font-size:11px;font-weight:700;color:var(--warn)}
+  .ec-cell.past .ec-n{color:var(--oos)}
+  .ec-names i{display:block;font-style:normal;font-size:11px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ec-names i.more{color:var(--ink-mute)}
+  .ec-day{margin-top:12px;font-size:13.5px}
+  .ec-day ul{margin:6px 0 0;padding-left:18px}
+  .ec-day span{color:var(--ink-mute)}
+  .linkish{border:0;background:none;padding:0;font:inherit;color:var(--ink);text-decoration:underline;cursor:pointer}
+  @media(max-width:600px){
+    .ec-cell{min-height:44px}
+    .ec-names{display:none}
+    .ec-n{display:block}
+  }
   .cal-strip{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(178px,1fr);gap:10px;overflow-x:auto;
     padding:2px 2px 12px;margin-bottom:18px;scroll-snap-type:x proximity;overscroll-behavior-x:contain;align-items:start}
   .cal-col{background:var(--card);border:1px solid var(--rule);border-radius:var(--r-md);padding:12px;scroll-snap-align:start;min-height:120px}
@@ -1928,7 +1964,7 @@
          view, so go() has always allowed it; the nav gate meant the only way in
          was to scan a QR sticker. Somebody opening the site to do their rooms
          could not find the form. -->
-    <button type="button" class="sb-item" data-grp="office" data-view="room-check"><span class="ic">✔</span>Room Check</button>
+    <button type="button" class="sb-item" data-grp="office" data-view="room-check"><span class="ic">✔</span>Chore Form</button>
     <!-- Ungated, and kept beside Room Check so the two items anybody can reach
          stay together: whoever files a check is exactly who wants to know what
          is left in the duty period. -->
@@ -1981,7 +2017,8 @@
 
     <!-- ===== ROOM CHECK ====================================================== -->
     <section class="view" data-view="room-check">
-      <h2 class="view-title">Room <em>check</em></h2>
+      <h2 class="view-title">Chore <em>form</em></h2>
+      <p class="choretag"><span id="choreTag"></span><button type="button" class="rmbtn" data-need="office" onclick="editChoreTag()">Edit</button></p>
       <!-- A reminder, not a gate, and deliberately so. Room checks are filed by
            ordinary members and the call sign is typed by hand, so anything
            enforced here would only be enforceable against people who chose to
@@ -2163,7 +2200,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='202611121930';
+var BUILD='202611141735';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -2638,6 +2675,9 @@ var DEFAULTS={
      sitting behind whatever they cached weeks ago. Their own data — submissions,
      the To Get list, the spreadsheet link, who has access — is never touched. */
   seed:13,
+
+  // The small line under the Chore Form's title. The Office Manager edits it.
+  choreTagline:'or P21 will hunt you down',
 
   // ONE Apps Script Web App in front of ONE spreadsheet. Every form writes to
   // its own tab in that file, so Equipment and Office data sit side by side and
@@ -5194,7 +5234,7 @@ function go(v,fromHash){
      jumps. Without this the tracker shows only what this device filed, which is
      the whole bug: publishing needs a manager token and filing does not. */
   if(v==='tracker'){ renderTracker(); fetchDutyPeriods().then(function(){ renderTracker(); }); }
-  if(v==='room-check'){ fetchDutyPeriods().then(function(){ renderDpState('room-check'); }); }
+  if(v==='room-check'){ fetchDutyPeriods().then(function(){ renderDpState('room-check'); paintRoomBlocks('room-check'); }); }
   if(v==='chores'){ renderChores(); fetchDutyPeriods().then(function(){ renderChores(); }); }
   if(v==='cleaning'){ renderCleaning(); fetchCleaning().then(function(){ renderCleaning(); }); }
   if(v==='room-check'){ fetchCleaning().then(function(){ paintJobsCard('room-check'); }); }
@@ -5366,6 +5406,7 @@ var formPick={};   // fid -> selected room/bag id
 
 function renderCheck(fid){
   var c=fcfg(fid); var host=document.getElementById(c.host); if(!host) return;
+  if(fid==='room-check') paintChoreTag();
   if(formDone[fid]){ host.innerHTML=donePanel(fid); applyGates(host); return; }
   var h='';
 
@@ -5446,9 +5487,9 @@ function renderCheck(fid){
              (why?'<span class="rp-sub">'+esc(why)+'</span>':'')+'</button>';
           return;
         }
-        h+='<button type="button" class="roompick'+(formPick[fid]===o.id?' on':'')+'" '+
+        h+='<button type="button" class="roompick'+(formPick[fid]===o.id?' on':'')+'" data-pid="'+esc(o.id)+'" '+
            'onclick="setPick(\''+fid+'\',\''+esc(o.id)+'\')">'+esc(o.name)+
-           '<span class="rp-sub">'+esc(o.sub||'')+'</span></button>';
+           '<span class="rp-sub">'+esc(o.sub||'')+'</span><span class="rp-done">Done this duty period</span></button>';
       });
       h+='</div>';
     }
@@ -5545,6 +5586,7 @@ function renderCheck(fid){
   if(c.usage) renderUsage(fid);
   if(c.meds) renderMeds(fid);
   restoreDraft(fid);
+  paintRoomBlocks(fid);
   // After the draft, never over it: a half-finished form is what this person
   // was actually doing, and the remembered name is only a starting point.
   fillMe(fid);
@@ -5933,6 +5975,67 @@ function checkBody(fid){
   return h;
 }
 
+/* ONE ROOM AT A TIME, ROUND BY ROUND.
+   Once a room has been done in a duty period it is blocked until every other
+   room has been done as many times, so the whole building gets cleaned before
+   any one room gets a second go. When the last room catches up they all open
+   again. A room that has used all its slots stays shut for the period. */
+function roomBlocks(fid){
+  var c=fcfg(fid); if(!c || !c.pick || c.pick.from!=='rooms') return null;
+  var el=document.getElementById(fid+'-dp'); if(!el) return null;
+  var n=dpNumber(el.value.trim()); if(!n) return null;
+  var key=dpKey(n); if(!dpExists(key)) return null;
+  var rooms=DB.rooms||[], done={}, open=[];
+  rooms.forEach(function(r){ done[r.id]=dpRoomDone(key,r.id); if(done[r.id]<(r.slots||1)) open.push(r); });
+  if(!open.length) return null;
+  var m=Math.min.apply(null,open.map(function(r){ return done[r.id]; }));
+  var out={key:key, blocked:{}, waiting:[]};
+  rooms.forEach(function(r){
+    if(done[r.id]>m || done[r.id]>=(r.slots||1)) out.blocked[r.id]=1;
+    else out.waiting.push(r.name);
+  });
+  return out;
+}
+function paintChoreTag(){
+  var el=document.getElementById('choreTag'); if(!el) return;
+  var t=String(DB.choreTagline==null?DEFAULTS.choreTagline:DB.choreTagline).trim();
+  el.textContent=t;
+  el.parentNode.classList.toggle('empty',!t);
+}
+function editChoreTag(){
+  if(!can('office')) return;
+  uiPrompt('The small line under "Chore form". Leave it blank to hide it.',
+           String(DB.choreTagline==null?'':DB.choreTagline),'Subtitle',{okText:'Save',allowEmpty:true}).then(function(v){
+    if(v===null || v===undefined) return;
+    DB.choreTagline=String(v).trim().slice(0,120);
+    saveDB(); paintChoreTag();
+  });
+}
+function roomBlockedSay(bl,id){
+  var r=(DB.rooms||[]).filter(function(x){ return x.id===id; })[0];
+  uiAlert((r?r.name:'That room')+' has already been done in '+dpLabel(bl.key)+'. '+
+    'Every room gets done before any room is done again. Still waiting: '+bl.waiting.join(', ')+'.','Pick another room');
+}
+function paintRoomBlocks(fid){
+  var c=fcfg(fid); if(!c || !c.pick || c.pick.from!=='rooms') return;
+  var host=document.getElementById(c.host); if(!host) return;
+  var bl=roomBlocks(fid);
+  host.querySelectorAll('.roompick[data-pid]').forEach(function(b){
+    var off=!!(bl && bl.blocked[b.getAttribute('data-pid')]);
+    b.classList.toggle('done',off);
+    if(off) b.setAttribute('aria-disabled','true'); else b.removeAttribute('aria-disabled');
+  });
+  // A room picked before the duty period was typed can turn out to be done.
+  if(bl && formPick[fid] && bl.blocked[formPick[fid]]){
+    var was=formPick[fid];
+    formPick[fid]=null;
+    host.querySelectorAll('.roompick.on').forEach(function(b){ b.classList.remove('on'); });
+    var body=document.getElementById(fid+'-body'); if(body) body.innerHTML=checkBody(fid);
+    var er=document.getElementById(fid+'-editrow'); if(er){ er.innerHTML=formEditRow(fid); applyGates(er); }
+    paintJobsCard(fid); calcCheck(fid);
+    roomBlockedSay(bl,was);
+  }
+}
 function pickOff(id){
   var u=(DB.bagUnits||[]).filter(function(x){return x.id===id;})[0]; if(!u) return;
   var o=bagOOS(u);
@@ -5963,6 +6066,8 @@ function renderCallIns(fid,vals){
   host.innerHTML=h;
 }
 function setPick(fid,id){
+  var bl=roomBlocks(fid);
+  if(bl && bl.blocked[id]){ roomBlockedSay(bl,id); return; }
   formPick[fid]=id;
   var host=document.getElementById(fcfg(fid).host);
   // Re-render only the two parts that depend on the pick, so the identity
@@ -6162,7 +6267,7 @@ function paintExpiry(fid){
   return out;
 }
 
-function onFormInput(fid){ renderAndrewMsg(fid); renderDpState(fid); paintExpiry(fid); calcCheck(fid); saveDraft(fid); }
+function onFormInput(fid){ renderAndrewMsg(fid); renderDpState(fid); paintRoomBlocks(fid); paintExpiry(fid); calcCheck(fid); saveDraft(fid); }
 
 /* What typing a duty period number tells you, before you commit to it.
 
@@ -6436,6 +6541,9 @@ function submitCheck(fid){
     if(c.choices[k].required && !s.radios[k]) missing.push(c.choices[k].label.replace(/\?$/,'').toLowerCase()); });
   if(c.freeform) Object.keys(c.freeform).forEach(function(k){
     if(!s.radios[k]) missing.push(c.freeform[k].label.toLowerCase()); });
+
+  var bl=roomBlocks(fid);
+  if(bl && s.pick && bl.blocked[s.pick]){ roomBlockedSay(bl,s.pick); return; }
 
   if(missing.length){
     uiAlert('Still needed: '+missing.join(', ')+'.','Not quite done');
@@ -7720,7 +7828,7 @@ var LIVE={
   chores:     {get:fetchDutyPeriods,  st:function(){return dpState;},      draw:function(){ renderChores(); }},
   cleaning:   {get:fetchCleaning,     st:function(){return cleanState;},   draw:function(){ renderCleaning(); }},
   kits:       {get:function(){ return kitsFetch(); }, st:kitsLiveState,    draw:function(){ renderKits(); }},
-  'room-check':{get:fetchDutyPeriods, st:function(){return dpState;},      draw:function(){ renderDpState('room-check'); }}
+  'room-check':{get:fetchDutyPeriods, st:function(){return dpState;},      draw:function(){ renderDpState('room-check'); paintRoomBlocks('room-check'); }}
 };
 
 function liveStop(){
@@ -9415,13 +9523,42 @@ var stk=null;
 function stkOpen(){
   if(!requireAuth('a stock count')) return;
   if(!remoteTracker){ toast('The tracker has not loaded yet.', true); return; }
-  stk={step:'pick', list:'', loc:'', ids:[], i:0, was:{}};
+  stk={step:'pick', list:'', loc:'', ids:[], i:0, was:{}, draft:{}};
   var el=document.getElementById('stk');
   if(!el){ el=document.createElement('div'); el.id='stk'; el.className='stk'; el.setAttribute('role','dialog');
     el.setAttribute('aria-modal','true'); el.setAttribute('aria-label','Count stock'); document.body.appendChild(el); }
   el.hidden=false; document.body.classList.add('stk-on');
   document.addEventListener('keydown',stkKey,true);
   stkDraw();
+}
+/* Counts are held here until the end, then shown as a list to confirm: a
+   number typed against the wrong shelf is caught before it reaches the sheet. */
+function stkVal(r,k){ var d=stk&&stk.draft[r.id]; return (d && Object.prototype.hasOwnProperty.call(d,k)) ? d[k] : r[k]; }
+function stkSetDraft(r,k,v){ var d=stk.draft[r.id]=stk.draft[r.id]||{}; if(trkSame(r[k],v)) delete d[k]; else d[k]=v; }
+function stkChanges(){
+  var out=[];
+  stk.ids.forEach(function(id){
+    var r=trkRow(id), d=stk.draft[id]; if(!r||!d) return;
+    if(Object.prototype.hasOwnProperty.call(d,'stock')) out.push({r:r, k:'stock', from:r.stock, to:d.stock});
+    if(Object.prototype.hasOwnProperty.call(d,'exp')) out.push({r:r, k:'exp', from:r.exp, to:d.exp});
+  });
+  return out;
+}
+function stkSave(){
+  var ch=stkChanges(), by={};
+  ch.forEach(function(c){ (by[c.r.id]=by[c.r.id]||{})[c.k]=c.k==='exp'?(c.to||''):c.to; });
+  Object.keys(by).forEach(function(id){ trackerSet(id,by[id]); });
+  stk.draft={}; stk.step='done'; stkDraw();
+  if(ch.length) toast(ch.length+' change'+(ch.length===1?'':'s')+' saved.');
+}
+// Asked inside the count sheet: a dialog would open underneath it.
+function stkDiscard(){
+  if(stk.sure){ stkClose(); return; }
+  stk.sure=true; stkDraw();
+}
+function stkTryClose(){
+  if(stk && stk.step!=='review' && stk.step!=='done' && stkChanges().length){ stk.back=stk.step; stk.step='review'; stkDraw(); return; }
+  stkClose();
 }
 function stkClose(){
   var el=document.getElementById('stk'); if(el){ el.hidden=true; el.innerHTML=''; }
@@ -9431,7 +9568,7 @@ function stkClose(){
 }
 function stkKey(e){
   if(!stk) return;
-  if(e.key==='Escape'){ e.preventDefault(); stkClose(); return; }
+  if(e.key==='Escape'){ e.preventDefault(); stkTryClose(); return; }
   if(stk.step==='count' && e.key==='Enter'){ e.preventDefault(); var i=document.getElementById('stkN'); if(i) stkNum(i.value); stkGo(1); }
 }
 function stkRows(){
@@ -9449,36 +9586,38 @@ function stkStart(){
 function stkGo(d){
   var i=stk.i+d;
   if(i<0) return;
-  if(i>=stk.ids.length){ stk.step='done'; stkDraw(); return; }
+  if(i>=stk.ids.length){ stk.back='count'; stk.step=stkChanges().length?'review':'done'; stkDraw(); return; }
   stk.i=i; stkDraw();
 }
 function stkStep(d){
   var r=trkRow(stk.ids[stk.i]); if(!r) return;
-  var n=Math.max(0,(r.stock==null?0:r.stock)+d);
-  trackerSet(r.id,{stock:n});
+  var cur=stkVal(r,'stock');
+  var n=Math.max(0,(cur==null?0:cur)+d);
+  stkSetDraft(r,'stock',n);
   var i=document.getElementById('stkN'); if(i) i.value=n;
   stkMark();
 }
 function stkNum(v){
   var r=trkRow(stk.ids[stk.i]); if(!r) return;
   var n=String(v).trim()===''?null:Math.max(0,Math.floor(Number(v)||0));
-  if(!trkSame(r.stock,n)) trackerSet(r.id,{stock:n});
+  stkSetDraft(r,'stock',n);
   stkMark();
 }
-function stkDate(v){ var r=trkRow(stk.ids[stk.i]); if(r && !trkSame(r.exp,v)) trackerSet(r.id,{exp:v||''}); }
+function stkDate(v){ var r=trkRow(stk.ids[stk.i]); if(r) stkSetDraft(r,'exp',v||''); }
 // The "was" line and the short warning follow the number as it changes.
 function stkMark(){
   var r=trkRow(stk.ids[stk.i]); if(!r) return;
   var was=stk.was[r.id], el=document.getElementById('stkWas');
-  if(el) el.innerHTML = trkSame(was,r.stock) ? '&nbsp;' : 'Was '+(was==null?'not counted':was);
+  var now=stkVal(r,'stock');
+  if(el) el.innerHTML = trkSame(was,now) ? '&nbsp;' : 'Was '+(was==null?'not counted':was);
   var sh=document.getElementById('stkShort');
-  if(sh) sh.hidden=!(r.par!=null && r.stock!=null && r.stock<r.par);
+  if(sh) sh.hidden=!(r.par!=null && now!=null && now<r.par);
 }
 function stkDraw(){
   var el=document.getElementById('stk'); if(!el||!stk) return;
   var h='<div class="stk-top"><b>Count stock</b>'+
     (stk.step==='count'?'<span class="stk-n">'+(stk.i+1)+' of '+stk.ids.length+'</span>':'')+
-    '<button type="button" class="stk-x" aria-label="Close" onclick="stkClose()">&times;</button></div>'+
+    '<button type="button" class="stk-x" aria-label="Close" onclick="stkTryClose()">&times;</button></div>'+
     (stk.step==='count'?'<div class="stk-bar"><i style="width:'+((stk.i+1)/stk.ids.length*100)+'%"></i></div>':'');
   if(stk.step==='pick'){
     var all=trackerAll(), lists=trackerLists(all).filter(function(l){ return all.some(function(r){ return (r.list||TRACKER_LISTS[0])===l; }); });
@@ -9492,19 +9631,32 @@ function stkDraw(){
   }else if(stk.step==='count'){
     var r=trkRow(stk.ids[stk.i]);
     if(!r){ stkGo(1); return; }
-    var usesExp = r.exp || (r.list||TRACKER_LISTS[0])===TRACKER_LISTS[0];
+    var curExp=stkVal(r,'exp'), curStock=stkVal(r,'stock');
+    var usesExp = curExp || r.exp || (r.list||TRACKER_LISTS[0])===TRACKER_LISTS[0];
     h+='<div class="stk-body stk-card">'+
       (r.loc?'<div class="stk-loc">'+esc(r.loc)+'</div>':'')+
       '<h2>'+esc(r.item)+'</h2>'+
       (r.par!=null?'<div class="stk-par">'+parWord(r.list)+' '+r.par+'</div>':'')+
       '<div class="stk-count"><button type="button" aria-label="One fewer" onclick="stkStep(-1)">−</button>'+
-        '<input id="stkN" type="number" min="0" inputmode="numeric" aria-label="How many" value="'+(r.stock==null?'':r.stock)+'" placeholder="—" onchange="stkNum(this.value)">'+
+        '<input id="stkN" type="number" min="0" inputmode="numeric" aria-label="How many" value="'+(curStock==null?'':curStock)+'" placeholder="—" onchange="stkNum(this.value)">'+
         '<button type="button" aria-label="One more" onclick="stkStep(1)">+</button></div>'+
       '<div class="stk-was" id="stkWas">&nbsp;</div>'+
       '<div class="stk-short" id="stkShort" hidden>Below the '+parWord(r.list).toLowerCase()+'</div>'+
-      (usesExp?'<label class="stk-exp">Expires<input type="date" value="'+esc(r.exp||'')+'" onchange="stkDate(this.value)"></label>':'')+
+      (usesExp?'<label class="stk-exp">Expires<input type="date" value="'+esc(curExp||'')+'" onchange="stkDate(this.value)"></label>':'')+
       '</div><div class="stk-foot"><button type="button" class="btn ghost" onclick="stkGo(-1)"'+(stk.i?'':' disabled')+'>Back</button>'+
       '<button type="button" class="btn solid stk-go" onclick="stkGo(1)">'+(stk.i===stk.ids.length-1?'Finish':'Next')+'</button></div>';
+  }else if(stk.step==='review'){
+    var ch=stkChanges();
+    var show=function(c){
+      if(c.k==='exp') return (c.from?kitDay(c.from):'no date')+' → '+(c.to?kitDay(c.to):'no date');
+      return (c.from==null?'—':c.from)+' → '+(c.to==null?'—':c.to);
+    };
+    h+='<div class="stk-body"><h2 class="stk-q">Are you sure you want to make '+(ch.length===1?'this change':'these '+ch.length+' changes')+'?</h2>'+
+      '<ul class="stk-list">'+ch.map(function(c){
+        return '<li><b>'+esc(c.r.item)+(c.k==='exp'?' <small>expires</small>':'')+'</b><span>'+esc(show(c))+'</span></li>'; }).join('')+'</ul></div>'+
+      '<div class="stk-foot"><button type="button" class="btn ghost" onclick="stk.sure=false;stk.step=stk.back||\'count\';stkDraw()">Go back</button>'+
+      '<button type="button" class="btn'+(stk.sure?' danger':'')+'" onclick="stkDiscard()">'+(stk.sure?'Tap again to discard':'Discard')+'</button>'+
+      '<button type="button" class="btn solid stk-go" onclick="stkSave()">Yes, save '+(ch.length===1?'it':'all '+ch.length)+'</button></div>';
   }else{
     var changed=stk.ids.map(trkRow).filter(function(r){ return r && !trkSame(stk.was[r.id],r.stock); });
     var short=stk.ids.map(trkRow).filter(function(r){ return r && r.par!=null && r.stock!=null && r.stock<r.par && trkStatus(r)==='Stocked'; });
@@ -9840,9 +9992,73 @@ function renderToGet(){
      '<button type="button" class="btn sm" data-need="equipment" onclick="trackerImport()">Paste in a tracker</button></div>';
   h+='<div class="trk-layout"><div id="trkListHost">'+trackerBody()+'</div>'+
      '<aside class="trk-aside" id="trkAside" aria-label="Needs attention">'+trackerAsideHtml(c)+'</aside></div>';
+  h+='<div id="trkCal">'+expCalHtml()+'</div>';
   host.innerHTML=h;
   applyGates(host);
 }
+
+/* THE EXPIRATION CALENDAR. A plain month, at the bottom of the tracker: every
+   dated thing on the day it expires, shelves and bags alike. Arrows move a
+   month; tapping a day lists what is on it. */
+var expCal={off:0, day:''};
+function expCalItems(){
+  var by={};
+  var put=function(iso,it){
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(String(iso||''))) return;
+    (by[iso]=by[iso]||[]).push(it);
+  };
+  trackerAll().forEach(function(r){ if(r.exp) put(r.exp,{item:r.item, where:r.loc||'', id:r.id}); });
+  expiringRows().forEach(function(r){ put(r.iso,{item:r.item, where:r.place}); });
+  return by;
+}
+function expCalHtml(){
+  if(!remoteTracker) return '';
+  var by=expCalItems(), now=new Date(), today=todayISO();
+  var first=new Date(now.getFullYear(), now.getMonth()+expCal.off, 1);
+  var y=first.getFullYear(), m=first.getMonth(), days=new Date(y,m+1,0).getDate();
+  var MON=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var pad=function(n){ return n<10?'0'+n:''+n; };
+  var inMonth=0;
+  var h='<div class="sec"><h3>Expiration calendar</h3></div><div class="panel expcal">'+
+    '<div class="ec-head"><button type="button" class="btn xs" aria-label="Previous month" onclick="expCalMove(-1)">‹</button>'+
+    '<b>'+MON[m]+' '+y+'</b>'+
+    '<button type="button" class="btn xs" aria-label="Next month" onclick="expCalMove(1)">›</button>'+
+    (expCal.off?'<button type="button" class="btn xs ghost" onclick="expCalMove(0)">Today</button>':'')+'</div>'+
+    '<div class="ec-grid" role="grid">'+['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(function(d){ return '<div class="ec-dow">'+d+'</div>'; }).join('');
+  for(var i=0;i<first.getDay();i++) h+='<div class="ec-cell ec-pad"></div>';
+  for(var d=1; d<=days; d++){
+    var iso=y+'-'+pad(m+1)+'-'+pad(d), its=by[iso]||[];
+    inMonth+=its.length;
+    var cls='ec-cell'+(iso===today?' today':'')+(its.length?(iso<today?' past':' has'):'')+(expCal.day===iso?' sel':'');
+    h+='<button type="button" class="'+cls+'"'+(its.length?' onclick="expCalPick(\''+iso+'\')"':' disabled')+
+       ' aria-label="'+esc(MON[m]+' '+d+(its.length?', '+its.length+' expiring':''))+'">'+
+       '<span class="ec-d">'+d+'</span>'+
+       (its.length?'<span class="ec-n">'+its.length+'</span><span class="ec-names">'+
+         its.slice(0,2).map(function(it){ return '<i>'+esc(it.item)+'</i>'; }).join('')+
+         (its.length>2?'<i class="more">+'+(its.length-2)+' more</i>':'')+'</span>':'')+'</button>';
+  }
+  h+='</div>';
+  var sel=expCal.day && by[expCal.day];
+  if(sel){
+    h+='<div class="ec-day"><b>'+esc(kitDayLong(expCal.day))+'</b><ul>'+sel.map(function(it){
+      return '<li>'+(it.id?'<button type="button" class="linkish" onclick="trkJump(\''+jsq(it.id)+'\')">'+esc(it.item)+'</button>':esc(it.item))+
+        (it.where?'<span> · '+esc(it.where)+'</span>':'')+'</li>'; }).join('')+'</ul></div>';
+  }else if(!inMonth){
+    var end=y+'-'+pad(m+1)+'-31', next=Object.keys(by).sort().filter(function(k){ return k>end; })[0];
+    h+='<p class="hint ec-next" style="margin:10px 0 0">Nothing expires this month.'+
+      (next?' Next: <b>'+esc(kitDayLong(next))+'</b> · '+esc(by[next].map(function(it){ return it.item; }).join(', '))+
+        ' <button type="button" class="btn xs" onclick="expCalTo(\''+next+'\')">Go</button>':'')+'</p>';
+  }
+  return h+'</div>';
+}
+function expCalTo(iso){
+  var p=iso.split('-'), now=new Date();
+  expCal.off=(Number(p[0])-now.getFullYear())*12+(Number(p[1])-1-now.getMonth());
+  expCal.day=iso;
+  var el=document.getElementById('trkCal'); if(el) el.innerHTML=expCalHtml();
+}
+function expCalMove(d){ expCal.off = d===0 ? 0 : expCal.off+d; expCal.day=''; var el=document.getElementById('trkCal'); if(el) el.innerHTML=expCalHtml(); }
+function expCalPick(iso){ expCal.day = expCal.day===iso ? '' : iso; var el=document.getElementById('trkCal'); if(el) el.innerHTML=expCalHtml(); }
 
 /* ---- the shopping list, read back from the sheet ----------------------------
    DB.toGet only ever held what THIS browser filed, because wantItem() runs on
@@ -10320,7 +10536,7 @@ function delPerson(i){
    address is competing with the two that are. */
 var QR_TARGETS=[
   {view:'checkout',   title:'Before Duty Form'},
-  {view:'room-check', title:'Room Check'},
+  {view:'room-check', title:'Chore Form'},
   {view:'post-call',  title:'After Duty Form'}
 ];
 
@@ -10522,7 +10738,7 @@ function renderTracker(){
 
      `dpEntries` is the merged read, and is what the card already uses. */
   var fill=!!(trackerDP && dpKeysKnown().indexOf(trackerDP)>=0);
-  h+='<div class="trackhead"><div class="th-t">CMU EMS Room Check Tracker</div>'+
+  h+='<div class="trackhead"><div class="th-t">CMU EMS Chore Tracker</div>'+
      '<div class="th-dp">DP: <b>'+(fill?esc(String(dpParse(trackerDP).n)):'&nbsp;')+'</b></div></div>'+
      (fill && choreWaived(trackerDP)?'<p class="noprint" style="margin:8px 0 0"><span class="tag mute">No chore requirement this duty period</span></p>':'');
 
@@ -10782,7 +10998,7 @@ function renderCleaning(){
 
   // Skipped room tasks
   h+='<div class="sec"><h3>Room tasks left undone most</h3></div>';
-  if(!sk.length) h+='<div class="panel"><p class="hint" style="margin:0">Nothing has been left undone on a room check this year.</p></div>';
+  if(!sk.length) h+='<div class="panel"><p class="hint" style="margin:0">Nothing has been left undone on a chore form this year.</p></div>';
   else h+='<div class="panel"><ul class="sk-list">'+sk.slice(0,8).map(function(x){
       var p=Math.round(x.skipped/x.of*100);
       return '<li><div class="sk-t"><b>'+esc(x.task)+'</b><span>'+esc(x.room)+'</span></div>'+
@@ -11154,7 +11370,7 @@ function choreRemove(cs){
   var r=t.rows.filter(function(x){ return x.cs===cs; })[0];
   var shown=r?r.shown:cs;
   uiForm('Take '+shown+' off the chore list?',
-         'If '+shown+' files a room check again, they come back.',
+         'If '+shown+' files a chore form again, they come back.',
          [{key:'why',label:'Why',type:'select',required:true,value:'left',options:CHORE_WHY_OPTS}],
          {okText:'Remove'})
     .then(function(v){ if(v) choreSend(cs,'Removed',dpKey(t.curN,t.year),v.why); });
@@ -13367,7 +13583,7 @@ function closeLightbox(){
    BOOT
    ========================================================================== */
 function renderAll(){
-  
+  paintChoreTag();
   renderRooms();
   renderBags();
   renderRoles();
