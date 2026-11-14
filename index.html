@@ -2200,7 +2200,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='202611141735';
+var BUILD='202611141819';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -5986,16 +5986,20 @@ function roomBlocks(fid){
   var n=dpNumber(el.value.trim()); if(!n) return null;
   var key=dpKey(n); if(!dpExists(key)) return null;
   var rooms=DB.rooms||[], done={}, open=[];
-  rooms.forEach(function(r){ done[r.id]=dpRoomDone(key,r.id); if(done[r.id]<(r.slots||1)) open.push(r); });
-  if(!open.length) return null;
-  var m=Math.min.apply(null,open.map(function(r){ return done[r.id]; }));
+  rooms.forEach(function(r){ done[r.id]=dpRoomDone(key,r.id); if(done[r.id]<(r.slots||1) && !roomOwnPace(r)) open.push(r); });
+  var m=open.length ? Math.min.apply(null,open.map(function(r){ return done[r.id]; })) : Infinity;
   var out={key:key, blocked:{}, waiting:[]};
   rooms.forEach(function(r){
-    if(done[r.id]>m || done[r.id]>=(r.slots||1)) out.blocked[r.id]=1;
-    else out.waiting.push(r.name);
+    var full=done[r.id]>=(r.slots||1);
+    if(full || (!roomOwnPace(r) && done[r.id]>m)) out.blocked[r.id]=1;
+    else if(!roomOwnPace(r)) out.waiting.push(r.name);
   });
   return out;
 }
+/* A room only some members may do (the Tech Room, R+) goes at its own pace:
+   it never holds the other rooms back, and is only shut once its slots are used. */
+function roomOwnPace(r){ return r.id==='tech' || /\(R\+\)/.test(String(r.name||'')); }
+var roomForced={};   // fid -> room an ops login chose to pick anyway
 function paintChoreTag(){
   var el=document.getElementById('choreTag'); if(!el) return;
   var t=String(DB.choreTagline==null?DEFAULTS.choreTagline:DB.choreTagline).trim();
@@ -6011,10 +6015,18 @@ function editChoreTag(){
     saveDB(); paintChoreTag();
   });
 }
-function roomBlockedSay(bl,id){
+function roomBlockedSay(bl,id,fid){
   var r=(DB.rooms||[]).filter(function(x){ return x.id===id; })[0];
-  uiAlert((r?r.name:'That room')+' has already been done in '+dpLabel(bl.key)+'. '+
-    'Every room gets done before any room is done again. Still waiting: '+bl.waiting.join(', ')+'.','Pick another room');
+  var full=r && dpRoomDone(bl.key,id)>=(r.slots||1);
+  var msg=(r?r.name:'That room')+(full?' has used all its slots in ':' has already been done in ')+dpLabel(bl.key)+'. '+
+    (full?'':'Every room gets done before any room is done again.')+
+    (bl.waiting.length?' Still waiting: '+bl.waiting.join(', ')+'.':'');
+  if(fid && can('ops'))
+    return uiConfirm(msg,'Pick another room',{okText:'Pick anyway',cancelText:'Pick another'}).then(function(ok){
+      if(!ok) return;
+      roomForced[fid]=id; setPick(fid,id);
+    });
+  uiAlert(msg,'Pick another room');
 }
 function paintRoomBlocks(fid){
   var c=fcfg(fid); if(!c || !c.pick || c.pick.from!=='rooms') return;
@@ -6026,14 +6038,14 @@ function paintRoomBlocks(fid){
     if(off) b.setAttribute('aria-disabled','true'); else b.removeAttribute('aria-disabled');
   });
   // A room picked before the duty period was typed can turn out to be done.
-  if(bl && formPick[fid] && bl.blocked[formPick[fid]]){
+  if(bl && formPick[fid] && bl.blocked[formPick[fid]] && roomForced[fid]!==formPick[fid]){
     var was=formPick[fid];
     formPick[fid]=null;
     host.querySelectorAll('.roompick.on').forEach(function(b){ b.classList.remove('on'); });
     var body=document.getElementById(fid+'-body'); if(body) body.innerHTML=checkBody(fid);
     var er=document.getElementById(fid+'-editrow'); if(er){ er.innerHTML=formEditRow(fid); applyGates(er); }
     paintJobsCard(fid); calcCheck(fid);
-    roomBlockedSay(bl,was);
+    roomBlockedSay(bl,was,fid);
   }
 }
 function pickOff(id){
@@ -6067,7 +6079,8 @@ function renderCallIns(fid,vals){
 }
 function setPick(fid,id){
   var bl=roomBlocks(fid);
-  if(bl && bl.blocked[id]){ roomBlockedSay(bl,id); return; }
+  if(bl && bl.blocked[id] && roomForced[fid]!==id){ roomBlockedSay(bl,id,fid); return; }
+  if(roomForced[fid]!==id) delete roomForced[fid];
   formPick[fid]=id;
   var host=document.getElementById(fcfg(fid).host);
   // Re-render only the two parts that depend on the pick, so the identity
@@ -6543,7 +6556,7 @@ function submitCheck(fid){
     if(!s.radios[k]) missing.push(c.freeform[k].label.toLowerCase()); });
 
   var bl=roomBlocks(fid);
-  if(bl && s.pick && bl.blocked[s.pick]){ roomBlockedSay(bl,s.pick); return; }
+  if(bl && s.pick && bl.blocked[s.pick] && roomForced[fid]!==s.pick){ roomBlockedSay(bl,s.pick,fid); return; }
 
   if(missing.length){
     uiAlert('Still needed: '+missing.join(', ')+'.','Not quite done');
@@ -6972,7 +6985,7 @@ function doSubmit(fid,s){
   // one would pre-fill the next form with a mistake.
   saveMe(s);
   clearDraft(fid);
-  formPick[fid]=null;
+  formPick[fid]=null; delete roomForced[fid];
   usageRows[fid]=null;
   medsGiven[fid]=null;
   renderCheck(fid);
