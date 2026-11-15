@@ -125,9 +125,10 @@ var SHEETS = {
     /* The Equipment Manager's own After Duty questions, appended: which bag
        came back, whether it came back restocked, the bedding and the radio, and
        anything wrong with it. Then her `Reviewer Notes`, which no form writes. */
-    keys:    ['date','time','name','callnum','result','usageCount','usageText','short','usageJson','sid','replaced','meds','calls','cleaned','subject','unitId','restocked','bedding','radioBack','issue','review','extra'],
-    headers: ['Date','Time','Name','Incident Numbers','Result','Units Used','What Was Used','Could Not Replace (no longer used)','Used (data)','Submission ID','Replaced By Member','Medications Given','Calls','Equipment Cleaned','Bag','Bag ID','Restocked And Returned','Bedding Returned','Radio Returned','Any Issue With The Bag','Reviewer Notes','Other Answers'],
-    widths:  [95, 70, 150, 150, 150, 90, 380, 200, 200, 120, 260, 260, 70, 130, 150, 90, 120, 120, 120, 300, 300, 320]
+    // `Bike Used` appended last: naming one puts that bike back in service.
+    keys:    ['date','time','name','callnum','result','usageCount','usageText','short','usageJson','sid','replaced','meds','calls','cleaned','subject','unitId','restocked','bedding','radioBack','issue','review','extra','bikeUsed'],
+    headers: ['Date','Time','Name','Incident Numbers','Result','Units Used','What Was Used','Could Not Replace (no longer used)','Used (data)','Submission ID','Replaced By Member','Medications Given','Calls','Equipment Cleaned','Bag','Bag ID','Restocked And Returned','Bedding Returned','Radio Returned','Any Issue With The Bag','Reviewer Notes','Other Answers','Bike Used'],
+    widths:  [95, 70, 150, 150, 150, 90, 380, 200, 200, 120, 260, 260, 70, 130, 150, 90, 120, 120, 120, 300, 300, 320, 120]
   },
   'Reports': {
     name: 'Reports', freeze: 3,
@@ -855,6 +856,80 @@ function saveBikeExpiry(p) {
    Weather-grounded checks are skipped. Grounding says the conditions are unsafe
    to ride in, not that the bike is — the site does not set a bike's status from
    one either. */
+/* WHO HAS WHICH BIKE. A pre-ride check that cleared the bike takes it out; a
+   row here puts it back. Rows come from the After Duty form naming the bike,
+   or a Bike Manager marking it returned on the bike site. */
+var BIKE_RETURNS = {
+  name: 'Bike Returns',
+  headers: ['Date','Time','Bike','Bike ID','Returned By','How','Submission ID'],
+  widths:  [95, 70, 120, 96, 160, 150, 140]
+};
+function ensureBikeReturns() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(BIKE_RETURNS.name);
+  if (sh) return sh;
+  sh = ss.insertSheet(BIKE_RETURNS.name);
+  sh.appendRow(BIKE_RETURNS.headers);
+  sh.getRange(1, 1, 1, BIKE_RETURNS.headers.length).setFontWeight('bold')
+    .setBackground(BRAND).setFontColor('#ffffff');
+  sh.setFrozenRows(1);
+  BIKE_RETURNS.widths.forEach(function (w, i) { sh.setColumnWidth(i + 1, w); });
+  return sh;
+}
+function bikeReturn(id, name, who, how, sid) {
+  if (!id) return;
+  var tz = sheetTZ(), now = new Date();
+  if (!name) bikeList().forEach(function (b) { if (b.id === id) name = b.name; });
+  ensureBikeReturns().appendRow([Utilities.formatDate(now, tz, 'yyyy-MM-dd'),
+    Utilities.formatDate(now, tz, 'HH:mm'), name || id, id, who || '', how || '', sid || '']);
+  logAction('bike', who || '', 'Bike returned', name || id, how || '', sid || '');
+}
+function setBikeReturned(p) {
+  var c = writerCheck(p);
+  if (!c.name) return json({ ok: false, error: 'not allowed: ' + c.why });
+  var id = String(p.bikeId || '').trim();
+  if (!id) return json({ ok: false, error: 'bad request' });
+  bikeReturn(id, '', c.name, 'Marked returned on Bike Ops', '');
+  return json({ ok: true });
+}
+function stamp(d, t, tz) {
+  var ds = (d instanceof Date) ? Utilities.formatDate(d, tz, 'yyyy-MM-dd') : String(d || '');
+  var ts = (t instanceof Date) ? Utilities.formatDate(t, tz, 'HH:mm') : String(t || '');
+  if (/^\d:/.test(ts)) ts = '0' + ts;
+  return ds + ' ' + ts;
+}
+function bikeList() {
+  var stored = readContent('bike');
+  var bikes = (stored && stored.content && stored.content.bikes) || [];
+  return bikes.filter(function (b) { return b && b.id; })
+    .map(function (b) { return { id: String(b.id), name: String(b.name || b.id) }; });
+}
+// {bikeId: {by, at}} for every bike out right now.
+function bikeUseRows() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet(), tz = sheetTZ();
+  var out = {}, back = {};
+  var rs = ss.getSheetByName(BIKE_RETURNS.name);
+  if (rs && rs.getLastRow() >= 2)
+    rs.getRange(2, 1, rs.getLastRow() - 1, 4).getValues().forEach(function (r) {
+      var id = String(r[3] || '').trim(), at = stamp(r[0], r[1], tz);
+      if (id && (!back[id] || at > back[id])) back[id] = at;
+    });
+  var sh = ss.getSheetByName(BIKE_SHEETS.safety.name);
+  if (!sh || sh.getLastRow() < 2) return out;
+  var last = {};
+  sh.getRange(2, 1, sh.getLastRow() - 1, Math.min(14, sh.getMaxColumns())).getValues().forEach(function (r) {
+    var id = String(r[12] || '').trim(); if (!id) return;
+    var at = stamp(r[0], r[1], tz);
+    if (!last[id] || at >= last[id].at) last[id] = { at: at, by: String(r[2] || '').trim(),
+      out: String(r[8] || '') !== 'YES' && String(r[13] || '').trim() !== 'oos' };
+  });
+  Object.keys(last).forEach(function (id) {
+    var c = last[id];
+    if (c.out && (!back[id] || c.at > back[id])) out[id] = { by: c.by, at: c.at };
+  });
+  return out;
+}
+
 function bikeCheckRows() {
   var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(BIKE_SHEETS.safety.name);
   if (!sh || sh.getLastRow() < 2) return {};
@@ -1140,6 +1215,7 @@ function doPost(e) {
     if (p.form === '__tracker') return setTracker(p);
     if (p.form === '__expiry') return setBagDate(p);
     if (p.form === '__expignore') return setExpiryIgnore(p);
+    if (p.form === '__bikereturn') return setBikeReturned(p);
     if (p.form === '__restockedit') return editRestock(p);
 
     // The bike site's forms, which post a different payload shape.
@@ -1192,6 +1268,9 @@ function doPost(e) {
 
     writeItems(p);
     addToRestock(p);
+    if (conf === SHEETS['Post-Call'] && p.bikeId)
+      try { bikeReturn(String(p.bikeId), String(p.bikeUsed || ''), String(p.name || ''), 'After Duty form', String(p.sid || '')); }
+      catch (err) { logError('bike return: ' + err, JSON.stringify(p)); }
     if (conf === SHEETS['Room Checks'] && p.override)
       try { logAction('ops', p.name || p.callsign || '', 'Picked anyway', String(p.subject || ''), String(p.dp || ''), String(p.sid || '')); } catch (err) {}
     /* What a call took off the bike kit, onto the bike list. Named as coming
@@ -3535,8 +3614,8 @@ function doGet(e) {
     var o = { ok: true, site: st, concerns: concernRows(st), expiry: expiryRows(st) };
     if (st === 'ops') o.bagStatus = bagStatusRows();
     // Only the bike site has a fleet whose status is derived from checks.
-    if (st === 'bike') o.checks = bikeCheckRows();
-    else o.lastChecked = lastCheckedRows();
+    if (st === 'bike') { o.checks = bikeCheckRows(); o.inUse = bikeUseRows(); }
+    else { o.lastChecked = lastCheckedRows(); o.bikes = bikeList(); o.inUse = bikeUseRows(); }
     return json(o);
   }
   if (p.names) {

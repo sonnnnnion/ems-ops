@@ -2200,7 +2200,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='202611141829';
+var BUILD='202611142312';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -5335,6 +5335,8 @@ var FORMS={
         {v:'Yes', t:'Yes'}, {v:'No', t:'No'}, {v:"Didn't use", t:"Didn't use any"}]},
       radioBack:{label:'Radio returned to the radio room?', required:true, options:[
         {v:'Yes', t:'Yes'}, {v:'No', t:'No'}]},
+      // Naming a bike puts it back in service on the bike site.
+      bikeUsed:{label:'Did you use a bike? If so, which one?', required:true, bikes:true},
       cleaned:{label:'Did you wipe down the equipment you used?', options:[
         {v:'Yes', t:'Yes'}, {v:'No', t:'No'}, {v:'Nothing used', t:'Nothing was used'}]}}
   },
@@ -5551,6 +5553,10 @@ function renderCheck(fid){
   if(c.choices){
     Object.keys(c.choices).forEach(function(k){
       var f=c.choices[k];
+      if(f.bikes){
+        h+='<div class="card mt"><h3>'+esc(f.label)+'</h3><div class="choicerow" id="'+fid+'-ch-'+k+'">'+bikeChoiceHtml(fid,k)+'</div></div>';
+        return;
+      }
       h+='<div class="card mt"><h3>'+esc(f.label)+(f.required?'':' <span class="opt">optional</span>')+'</h3><div class="choicerow">'+
         f.options.map(function(o){
           return '<label class="choice"><input type="radio" name="'+fid+'-'+k+'" data-radio="'+k+'" value="'+esc(o.v)+'" '+
@@ -6685,6 +6691,11 @@ function doSubmit(fid,s){
   };
   Object.keys(s.radios).forEach(function(k){ payload[k]=s.radios[k]; });
   Object.keys(s.extras).forEach(function(k){ payload[k]=s.extras[k]; });
+  if(s.radios.bikeUsed && s.radios.bikeUsed!=='No'){
+    var bk=(remoteBikes||[]).filter(function(b){ return b.id===s.radios.bikeUsed; })[0];
+    payload.bikeId=s.radios.bikeUsed; payload.bikeUsed=bk?bk.name:s.radios.bikeUsed;
+    if(remoteBikeUse) delete remoteBikeUse[s.radios.bikeUsed];
+  }
   // Recorded, so ops overrides can be watched: who was signed in, and why the
   // room was shut.
   if(c.pick && c.pick.from==='rooms' && s.pick && roomForced[fid]===s.pick){
@@ -7737,6 +7748,24 @@ var remoteBagStatus=null;    // {unitId:{oos,why,by,at}}
 var bagPending={};           // unitId -> {oos,why,at} changed here, awaiting the sheet
 var stateFetch={loading:false, error:'', at:0, sig:''};
 
+/* The bike fleet, from the bike site's published list, and which bikes are out
+   on a pre-ride check. Naming one on the After Duty form puts it back. */
+var remoteBikes=null, remoteBikeUse={};
+function bikeChoiceHtml(fid,k){
+  var cur=(document.querySelector('#'+fcfg(fid).host+' [data-radio="'+k+'"]:checked')||{}).value||'';
+  var opts=[{v:'No',t:'No bike'}].concat((remoteBikes||[]).map(function(b){
+    var u=remoteBikeUse[b.id];
+    return {v:b.id, t:b.name+(u?' · out with '+(u.by||'someone'):'')};
+  }));
+  return opts.map(function(o){
+    return '<label class="choice"><input type="radio" name="'+fid+'-'+k+'" data-radio="'+k+'" value="'+esc(o.v)+'"'+
+      (cur===o.v?' checked':'')+' onchange="onFormInput(\''+fid+'\')"><span>'+esc(o.t)+'</span></label>';
+  }).join('')+(remoteBikes?'':'<span class="hint" style="margin:0">Loading the bikes…</span>');
+}
+function paintBikeChoice(fid){
+  var el=document.getElementById(fid+'-ch-bikeUsed'); if(!el) return;
+  el.innerHTML=bikeChoiceHtml(fid,'bikeUsed');
+}
 function fetchSharedState(){
   var url=(DB.api&&DB.api.url)||'';
   if(!url) return Promise.resolve(false);
@@ -7761,6 +7790,7 @@ function fetchSharedState(){
       // deployment, which is why it is adopted only when it actually arrives —
       // an empty object would read as "nobody has checked anything".
       if(j.lastChecked && typeof j.lastChecked==='object') remoteChecked=j.lastChecked;
+      if(Array.isArray(j.bikes)){ remoteBikes=j.bikes; remoteBikeUse=(j.inUse&&typeof j.inUse==='object')?j.inUse:{}; paintBikeChoice('post-call'); }
       if(j.bagStatus && typeof j.bagStatus==='object'){ remoteBagStatus=j.bagStatus; settleBagPending(); }
       stateFetch.error=''; stateFetch.at=Date.now();
       stateFetch.sig=JSON.stringify([remoteConcerns,remoteExpiry,remoteBagStatus]);
