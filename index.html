@@ -2200,7 +2200,7 @@
 
    BUILD is rewritten on every release. Never edit it by hand.
    ========================================================================== */
-var BUILD='202611142312';
+var BUILD='202611151524';
 
 function checkForUpdate(){
   var url=location.pathname.replace(/[^/]*$/,'')+'index.html?cb='+Date.now();
@@ -5235,6 +5235,7 @@ function go(v,fromHash){
      the whole bug: publishing needs a manager token and filing does not. */
   if(v==='tracker'){ renderTracker(); fetchDutyPeriods().then(function(){ renderTracker(); }); }
   if(v==='room-check'){ fetchDutyPeriods().then(function(){ renderDpState('room-check'); paintRoomBlocks('room-check'); }); }
+  if(v==='post-call') loadBikes();
   if(v==='chores'){ renderChores(); fetchDutyPeriods().then(function(){ renderChores(); }); }
   if(v==='cleaning'){ renderCleaning(); fetchCleaning().then(function(){ renderCleaning(); }); }
   if(v==='room-check'){ fetchCleaning().then(function(){ paintJobsCard('room-check'); }); }
@@ -7760,7 +7761,20 @@ function bikeChoiceHtml(fid,k){
   return opts.map(function(o){
     return '<label class="choice"><input type="radio" name="'+fid+'-'+k+'" data-radio="'+k+'" value="'+esc(o.v)+'"'+
       (cur===o.v?' checked':'')+' onchange="onFormInput(\''+fid+'\')"><span>'+esc(o.t)+'</span></label>';
-  }).join('')+(remoteBikes?'':'<span class="hint" style="margin:0">Loading the bikes…</span>');
+  }).join('')+(remoteBikes?'':bikesFailed
+    ? '<span class="hint" style="margin:0">Could not load the bikes. <button type="button" class="btn xs" onclick="loadBikes()">Try again</button></span>'
+    : '<span class="hint" style="margin:0">Loading the bikes…</span>');
+}
+/* The After Duty form is the one page that needs the bikes, and nothing else on
+   it asks the spreadsheet for shared state — so it asks here, and says so if
+   the answer never comes. */
+var bikesFailed=false;
+function loadBikes(){
+  if(remoteBikes) return;
+  bikesFailed=false; paintBikeChoice('post-call');
+  fetchSharedState().then(function(ok){
+    if(!remoteBikes){ bikesFailed=true; paintBikeChoice('post-call'); }
+  });
 }
 function paintBikeChoice(fid){
   var el=document.getElementById(fid+'-ch-bikeUsed'); if(!el) return;
